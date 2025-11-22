@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { enrichWithImdb } from '../services/imdbApi';
 import { applyLocalOverrides, getNotes, getRatingOverrides, getSeenOverrides, setNote, setRating, setSeenOverride } from '../services/localStorage';
-import { fetchMovies } from '../services/googleSheets';
+import { FetchMoviesResult, SheetMeta, fetchMovies } from '../services/googleSheets';
 import { MovieRecord } from '../types/MovieRecord';
+
+type RefreshOptions = Parameters<typeof fetchMovies>[0];
 
 interface MovieContextValue {
   movies: MovieRecord[];
@@ -11,7 +13,8 @@ interface MovieContextValue {
   seenOverrides: Record<string, boolean>;
   ratings: Record<string, number>;
   notes: Record<string, string>;
-  refresh: () => Promise<void>;
+  sheetMeta: SheetMeta | null;
+  refresh: (options?: RefreshOptions) => Promise<void>;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
   updateNote: (id: string, text: string) => void;
@@ -26,13 +29,15 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [seenOverrides, setSeenOverridesState] = useState(getSeenOverrides());
   const [ratingOverrides, setRatings] = useState(getRatingOverrides());
   const [notes, setNotes] = useState(getNotes());
+  const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
 
-  const refresh = async () => {
+  const refresh = async (options?: RefreshOptions) => {
     setLoading(true);
     setError(null);
     try {
-      const base = await fetchMovies();
-      const withLocal = applyLocalOverrides(base);
+      const result: FetchMoviesResult = await fetchMovies(options);
+      setSheetMeta(result.meta);
+      const withLocal = applyLocalOverrides(result.movies);
       setMovies(withLocal);
       const enriched = await Promise.all(withLocal.map((movie) => enrichWithImdb(movie)));
       setMovies(enriched);
@@ -77,8 +82,8 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [movies, ratingOverrides]);
 
   const value = useMemo(
-    () => ({ movies, loading, error, refresh, updateSeen, updateRating, updateNote, seenOverrides, ratings: personalRatings, notes }),
-    [movies, loading, error, seenOverrides, personalRatings, notes]
+    () => ({ movies, loading, error, refresh, updateSeen, updateRating, updateNote, seenOverrides, ratings: personalRatings, notes, sheetMeta }),
+    [movies, loading, error, seenOverrides, personalRatings, notes, sheetMeta]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;

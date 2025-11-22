@@ -1,8 +1,36 @@
 import { MovieRecord } from '../types/MovieRecord';
+import embeddedSheetBackup from '../data/sheet-backup.csv?raw';
 
 const SHEET_ID = '1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI';
 const SHEET_CACHE_KEY = 'salvatierrez-sheet-cache-v1';
 const SHEET_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+
+type SheetCachePayload = {
+  fetchedAt: number;
+  text: string;
+  sourceUrl?: string;
+};
+
+export type SheetSource = 'network' | 'cache-fresh' | 'cache-stale' | 'embedded' | 'demo';
+
+export type SheetMeta = {
+  source: SheetSource;
+  fetchedAt?: number;
+  url?: string;
+};
+
+export type FetchMoviesResult = {
+  movies: MovieRecord[];
+  meta: SheetMeta;
+};
+
+type FetchOptions = {
+  /**
+   * Skip cache preference and try to hit the network immediately. Falls back to
+   * any cached/embedded copies if the network fails.
+   */
+  forceNetwork?: boolean;
+};
 
 const buildSheetUrls = (): string[] => {
   const envUrl = import.meta.env.VITE_SHEETS_CSV_URL?.trim();
@@ -104,35 +132,33 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
   };
 }
 
-function saveSheetCache(text: string) {
+function saveSheetCache(payload: SheetCachePayload) {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(
       SHEET_CACHE_KEY,
-      JSON.stringify({ fetchedAt: Date.now(), text })
+      JSON.stringify(payload)
     );
   } catch (error) {
     console.error('Failed to save sheet cache', error);
   }
 }
 
-function loadSheetCache(): string | null {
+function loadSheetCache(options?: { allowExpired?: boolean }): SheetCachePayload | null {
   if (typeof localStorage === 'undefined') return null;
   try {
     const raw = localStorage.getItem(SHEET_CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as { fetchedAt: number; text: string };
-    if (Date.now() - parsed.fetchedAt > SHEET_CACHE_TTL) return null;
-    return parsed.text;
+    const parsed = JSON.parse(raw) as SheetCachePayload;
+    if (!options?.allowExpired && Date.now() - parsed.fetchedAt > SHEET_CACHE_TTL) return null;
+    return parsed;
   } catch (error) {
     console.error('Failed to read sheet cache', error);
     return null;
   }
 }
 
-export async function fetchMovies(): Promise<MovieRecord[]> {
-  const urls = buildSheetUrls();
-
+async function tryNetwork(urls: string[]): Promise<SheetCachePayload | null> {
   for (const url of urls) {
     try {
       const response = await fetch(url, { mode: 'cors' });
@@ -141,27 +167,78 @@ export async function fetchMovies(): Promise<MovieRecord[]> {
         continue;
       }
       const text = await response.text();
-      saveSheetCache(text);
-      const parsed = parseCsv(text);
-      return parsed.map(mapToMovie);
+      const payload: SheetCachePayload = {
+        fetchedAt: Date.now(),
+        text,
+        sourceUrl: url
+      };
+      saveSheetCache(payload);
+      return payload;
     } catch (error) {
       console.warn('Sheet fetch threw, trying next URL', url, error);
       continue;
     }
   }
+  return null;
+}
 
-  const cached = loadSheetCache();
-  if (cached) {
+function useCache(options?: { allowExpired?: boolean }): SheetCachePayload | null {
+  const cached = loadSheetCache({ allowExpired: options?.allowExpired });
+  if (!cached) return null;
+  const age = Date.now() - cached.fetchedAt;
+  if (age > SHEET_CACHE_TTL && !options?.allowExpired) return null;
+  return cached;
+}
+
+function parsePayload(payload: SheetCachePayload): MovieRecord[] {
+  const parsed = parseCsv(payload.text);
+  return parsed.map(mapToMovie);
+}
+
+export async function fetchMovies(options?: FetchOptions): Promise<FetchMoviesResult> {
+  const urls = buildSheetUrls();
+
+  // Prefer fresh cache when not forcing a network pull.
+  if (!options?.forceNetwork) {
+    const freshCache = useCache();
+    if (freshCache) {
+      return {
+        movies: parsePayload(freshCache),
+        meta: { source: 'cache-fresh', fetchedAt: freshCache.fetchedAt, url: freshCache.sourceUrl }
+      };
+    }
+  }
+
+  const networkPayload = await tryNetwork(urls);
+  if (networkPayload) {
+    return {
+      movies: parsePayload(networkPayload),
+      meta: { source: 'network', fetchedAt: networkPayload.fetchedAt, url: networkPayload.sourceUrl }
+    };
+  }
+
+  const staleCache = useCache({ allowExpired: true });
+  if (staleCache) {
+    return {
+      movies: parsePayload(staleCache),
+      meta: { source: 'cache-stale', fetchedAt: staleCache.fetchedAt, url: staleCache.sourceUrl }
+    };
+  }
+
+  if (embeddedSheetBackup) {
     try {
-      const parsed = parseCsv(cached);
-      return parsed.map(mapToMovie);
+      const parsed = parseCsv(embeddedSheetBackup);
+      return {
+        movies: parsed.map(mapToMovie),
+        meta: { source: 'embedded' }
+      };
     } catch (error) {
-      console.error('Failed to parse cached sheet', error);
+      console.error('Failed to parse embedded sheet backup', error);
     }
   }
 
   console.error('Falling back to demo data after sheet failures');
-  return fallbackMovies;
+  return { movies: fallbackMovies, meta: { source: 'demo' } };
 }
 
 export function getSheetUrl(): string {

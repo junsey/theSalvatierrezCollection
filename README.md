@@ -23,7 +23,9 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 
 - **IMDb/OMDb**: La app llama a OMDb. Puedes poner `VITE_OMDB_API_KEY` para usar tu propia clave; incluye un fallback (fd2b1d69)
   para que las portadas/ratings carguen de inmediato.
-- **Google Sheets**: La app probará en orden `VITE_SHEETS_CSV_URL` (si existe), `gviz/tq?tqx=out:csv`, `export?format=csv&gid=0` y `pub?output=csv` sobre la hoja compartida para esquivar 404/403. Los resultados se guardan en `localStorage` 24h para evitar reintentos.
+- **Google Sheets**: La app probará en orden `VITE_SHEETS_CSV_URL` (si existe), `gviz/tq?tqx=out:csv`, `export?format=csv&gid=0` y `pub?output=csv` sobre la hoja compartida para esquivar 404/403. Los resultados se guardan en `localStorage` 24h para evitar reintentos y, si la red falla, se usa la copia guardada aunque esté expirada.
+  - Incluye una copia embebida en `src/data/sheet-backup.csv` para que nunca quede en blanco; puedes reemplazarla con un export de la hoja.
+  - En la sección **Configuración** hay un botón para regenerar manualmente el documento y forzar un fetch fresco.
  - **Cache de IMDb**: Las respuestas de OMDb se guardan en `localStorage` (clave `salvatierrez-imdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado.
 
 ## Features
@@ -34,6 +36,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 - Detailed modal with poster, plot, IMDb/local metadata, seen toggle, personal star rating (1–10), and notes (all persisted locally).
 - Genre and section hubs plus dedicated pages to browse movies within each category.
 - “Ritual of Random Cinema” surprise picker with section filter and “exclude seen” safeguard.
+- Settings page to ver la procedencia del documento, última sincronización, y regenerar manualmente el CSV.
 - Responsive dark fantasy theme with neon-cinema accents, subtle grain textures, and hover glows.
 
 ## Project structure

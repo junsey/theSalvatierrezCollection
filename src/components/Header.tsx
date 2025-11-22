@@ -6,7 +6,8 @@ const navItems = [
   { to: '/movies', label: 'All Movies' },
   { to: '/genres', label: 'Genres' },
   { to: '/sections', label: 'Sections' },
-  { to: '/surprise', label: 'Surprise Night' }
+  { to: '/surprise', label: 'Surprise Night' },
+  { to: '/settings', label: 'Configuración' }
 ];
 
 export const Header: React.FC = () => {

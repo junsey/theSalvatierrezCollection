@@ -9,6 +9,7 @@ import { SectionPage } from './pages/SectionPage';
 import { SurpriseMovieNightPage } from './pages/SurpriseMovieNightPage';
 import { GenresHub } from './pages/GenresHub';
 import { SectionsHub } from './pages/SectionsHub';
+import { SettingsPage } from './pages/SettingsPage';
 
 const App: React.FC = () => {
   return (
@@ -23,6 +24,7 @@ const App: React.FC = () => {
           <Route path="/sections" element={<SectionsHub />} />
           <Route path="/sections/:name" element={<SectionPage />} />
           <Route path="/surprise" element={<SurpriseMovieNightPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>
     </MovieProvider>
