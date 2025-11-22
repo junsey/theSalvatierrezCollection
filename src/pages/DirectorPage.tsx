@@ -83,10 +83,10 @@ export const DirectorPage: React.FC = () => {
             return (a.year ?? 0) - (b.year ?? 0);
           case 'year-desc':
             return (b.year ?? 0) - (a.year ?? 0);
-          case 'imdb-asc':
-            return (parseFloat(a.imdbRating ?? '0') || 0) - (parseFloat(b.imdbRating ?? '0') || 0);
-          case 'imdb-desc':
-            return (parseFloat(b.imdbRating ?? '0') || 0) - (parseFloat(a.imdbRating ?? '0') || 0);
+          case 'tmdb-asc':
+            return (a.tmdbRating ?? 0) - (b.tmdbRating ?? 0);
+          case 'tmdb-desc':
+            return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
           case 'rating-asc': {
             const ra = ratings[a.id] ?? null;
             const rb = ratings[b.id] ?? null;

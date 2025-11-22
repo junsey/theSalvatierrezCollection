@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FiltersBar } from '../components/FiltersBar';
 import { MovieCard } from '../components/MovieCard';
 import { MovieDetail } from '../components/MovieDetail';
@@ -20,6 +21,7 @@ export const AllMoviesPage: React.FC = () => {
   const { movies, loading, error, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
+  const location = useLocation();
 
   const handleChange = (patch: Partial<MovieFilters>) => {
     const next = { ...filters, ...patch };
@@ -31,7 +33,13 @@ export const AllMoviesPage: React.FC = () => {
     return movies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
-      .filter((m) => (filters.genre ? m.genreRaw.toLowerCase().includes(filters.genre.toLowerCase()) : true))
+      .filter((m) => {
+        if (!filters.genre) return true;
+        const genre = filters.genre.toLowerCase();
+        const rawMatch = m.genreRaw.toLowerCase().includes(genre);
+        const tmdbMatch = (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre);
+        return rawMatch || tmdbMatch;
+      })
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
@@ -45,10 +53,10 @@ export const AllMoviesPage: React.FC = () => {
             return (a.year ?? 0) - (b.year ?? 0);
           case 'year-desc':
             return (b.year ?? 0) - (a.year ?? 0);
-          case 'imdb-desc':
-            return Number(b.imdbRating ?? 0) - Number(a.imdbRating ?? 0);
-          case 'imdb-asc':
-            return Number(a.imdbRating ?? 0) - Number(b.imdbRating ?? 0);
+          case 'tmdb-desc':
+            return Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
+          case 'tmdb-asc':
+            return Number(a.tmdbRating ?? 0) - Number(b.tmdbRating ?? 0);
           case 'rating-desc':
             return Number(ratings[b.id] ?? 0) - Number(ratings[a.id] ?? 0);
           case 'rating-asc':
@@ -58,6 +66,18 @@ export const AllMoviesPage: React.FC = () => {
         }
       });
   }, [movies, filters, ratings]);
+
+  useEffect(() => {
+    if (!movies.length) return;
+    const params = new URLSearchParams(location.search);
+    const tmdbId = params.get('tmdbId');
+    if (tmdbId) {
+      const match = movies.find((m) => m.tmdbId === Number(tmdbId));
+      if (match) {
+        setActiveMovie(match);
+      }
+    }
+  }, [location.search, movies]);
 
   return (
     <section>

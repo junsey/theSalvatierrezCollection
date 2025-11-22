@@ -10,7 +10,7 @@ export const SurpriseMovieNightPage: React.FC = () => {
   return (
     <section>
       <h1>Surprise Movie Night</h1>
-      <p>Summon a random film with filters. Exclude seen movies to keep the ritual fresh.</p>
+      <p>Summon a random film with genre/section filtros. Exclude seen movies to keep the ritual fresh.</p>
       <SurpriseMovieNight movies={movies} onSelect={setActive} />
       {active && (
         <MovieDetail

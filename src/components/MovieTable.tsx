@@ -18,7 +18,7 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
           <th>Sección</th>
           <th>Género</th>
           <th>Vista</th>
-          <th>IMDb</th>
+          <th>TMDb</th>
           <th>Mi puntuación</th>
         </tr>
       </thead>
@@ -33,11 +33,11 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
               />
             </td>
             <td>{movie.title}</td>
-            <td>{movie.year ?? '—'}</td>
+            <td>{movie.tmdbYear ?? movie.year ?? '—'}</td>
             <td>{movie.seccion}</td>
             <td>{movie.genreRaw}</td>
             <td>{movie.seen ? 'Sí' : 'No'}</td>
-            <td>{movie.imdbRating ?? 'N/A'}</td>
+            <td>{movie.tmdbRating?.toFixed(1) ?? 'N/A'}</td>
             <td>{personalRatings[movie.id] ?? '—'}</td>
           </tr>
         ))}

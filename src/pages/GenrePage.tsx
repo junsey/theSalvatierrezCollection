@@ -16,30 +16,58 @@ const baseFilters: MovieFilters = {
   sort: 'title-asc'
 };
 
+const hasGenre = (movie: MovieRecord, genre: string) => {
+  const g = genre.toLowerCase();
+  return (
+    movie.genreRaw.toLowerCase().includes(g) ||
+    (movie.tmdbGenres ?? []).some((item) => item.toLowerCase() === g)
+  );
+};
+
 export const GenrePage: React.FC = () => {
   const { name } = useParams();
-  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const genreName = decodeURIComponent(name ?? '');
+  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, genre: genreName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
-  const genreMovies = useMemo(() => movies.filter((m) => m.genreRaw.toLowerCase().includes(genreName.toLowerCase())), [movies, genreName]);
+  const genreMovies = useMemo(() => movies.filter((m) => hasGenre(m, genreName)), [movies, genreName]);
 
   const filtered = useMemo(() => {
     return genreMovies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
+      .filter((m) => (filters.genre ? hasGenre(m, filters.genre) : true))
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
         return !m.seen;
       })
-      .sort((a, b) => (filters.sort === 'title-desc' ? b.title.localeCompare(a.title) : a.title.localeCompare(b.title)));
-  }, [genreMovies, filters]);
+      .sort((a, b) => {
+        switch (filters.sort) {
+          case 'title-desc':
+            return b.title.localeCompare(a.title);
+          case 'year-asc':
+            return (a.year ?? 0) - (b.year ?? 0);
+          case 'year-desc':
+            return (b.year ?? 0) - (a.year ?? 0);
+          case 'tmdb-desc':
+            return Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
+          case 'tmdb-asc':
+            return Number(a.tmdbRating ?? 0) - Number(b.tmdbRating ?? 0);
+          case 'rating-desc':
+            return Number(ratings[b.id] ?? 0) - Number(ratings[a.id] ?? 0);
+          case 'rating-asc':
+            return Number(ratings[a.id] ?? 0) - Number(ratings[b.id] ?? 0);
+          default:
+            return a.title.localeCompare(b.title);
+        }
+      });
+  }, [genreMovies, filters, ratings]);
 
   return (
     <section>
-      <h1>Genre: {genreName}</h1>
+      <h1>Género: {genreName}</h1>
       <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={genreMovies} />
       {filters.view === 'grid' ? (
         <div className="movie-grid">

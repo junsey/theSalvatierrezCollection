@@ -13,7 +13,10 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
   const secciones = uniqueValues(movies.map((m) => m.seccion));
   const genres = uniqueValues(
     movies
-      .flatMap((m) => m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()))
+      .flatMap((m) => [
+        ...m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()),
+        ...(m.tmdbGenres ?? [])
+      ])
       .filter(Boolean)
   );
 
@@ -50,8 +53,8 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         <option value="title-desc">Título Z-A</option>
         <option value="year-desc">Año ↓</option>
         <option value="year-asc">Año ↑</option>
-        <option value="imdb-desc">IMDb ↓</option>
-        <option value="imdb-asc">IMDb ↑</option>
+        <option value="tmdb-desc">TMDb ↓</option>
+        <option value="tmdb-asc">TMDb ↑</option>
         <option value="rating-desc">Mi puntuación ↓</option>
         <option value="rating-asc">Mi puntuación ↑</option>
       </select>

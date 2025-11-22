@@ -12,13 +12,27 @@ export type MovieRecord = {
   rating?: number | null;
   dubbing: string;
   format: string;
-  imdbId?: string;
-  imdbRating?: string;
-  imdbYear?: string;
-  imdbTitle?: string;
+  tmdbId?: number;
+  tmdbRating?: number | null;
+  tmdbYear?: number | null;
+  tmdbTitle?: string;
+  tmdbOriginalTitle?: string;
   posterUrl?: string;
   plot?: string;
-  imdbGenres?: string[];
+  tmdbGenres?: string[];
+  tmdbStatus?: TmdbStatus;
+};
+
+export type TmdbStatus = {
+  source: 'network' | 'cache' | 'stale-cache' | 'not-found' | 'error' | 'none';
+  requestedTitles: string[];
+  requestedYear?: number | null;
+  matchedId?: number;
+  matchedTitle?: string;
+  matchedOriginalTitle?: string;
+  fetchedAt?: number;
+  message?: string;
+  error?: string;
 };
 
 export type MovieFilters = {
@@ -27,5 +41,13 @@ export type MovieFilters = {
   genre: string | null;
   seen: 'all' | 'seen' | 'unseen';
   view: 'grid' | 'list';
-  sort: 'title-asc' | 'title-desc' | 'year-asc' | 'year-desc' | 'imdb-desc' | 'imdb-asc' | 'rating-desc' | 'rating-asc';
+  sort:
+    | 'title-asc'
+    | 'title-desc'
+    | 'year-asc'
+    | 'year-desc'
+    | 'tmdb-desc'
+    | 'tmdb-asc'
+    | 'rating-desc'
+    | 'rating-asc';
 };

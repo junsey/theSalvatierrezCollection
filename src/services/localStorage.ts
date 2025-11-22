@@ -1,4 +1,5 @@
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
+import { SheetMeta } from './googleSheets';
 
 type StoredState = {
   seen: Record<string, boolean>;
@@ -8,6 +9,14 @@ type StoredState = {
 };
 
 const STORAGE_KEY = 'salvatierrez-collection-state-v1';
+const MOVIE_CACHE_KEY = 'salvatierrez-movie-cache-v1';
+const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
+
+type CachedMoviesPayload = {
+  fetchedAt: number;
+  movies: MovieRecord[];
+  sheetMeta?: SheetMeta | null;
+};
 
 function loadState(): StoredState {
   if (typeof localStorage === 'undefined') return { seen: {}, ratings: {}, notes: {}, filters: {} };
@@ -70,4 +79,37 @@ export function applyLocalOverrides(movies: MovieRecord[]): MovieRecord[] {
     seen: state.seen[movie.id] ?? movie.seen,
     rating: state.ratings[movie.id] ?? movie.rating
   }));
+}
+
+export function saveMovieCache(movies: MovieRecord[], sheetMeta?: SheetMeta | null) {
+  if (typeof localStorage === 'undefined') return;
+  const payload: CachedMoviesPayload = {
+    fetchedAt: Date.now(),
+    movies,
+    sheetMeta
+  };
+  try {
+    localStorage.setItem(MOVIE_CACHE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.error('Failed to save movie cache', error);
+  }
+}
+
+export function loadMovieCache(options?: { allowExpired?: boolean }): CachedMoviesPayload | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(MOVIE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedMoviesPayload;
+    if (!options?.allowExpired && Date.now() - parsed.fetchedAt > SIX_MONTHS_MS) return null;
+    return parsed;
+  } catch (error) {
+    console.error('Failed to read movie cache', error);
+    return null;
+  }
+}
+
+export function clearMovieCache() {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(MOVIE_CACHE_KEY);
 }

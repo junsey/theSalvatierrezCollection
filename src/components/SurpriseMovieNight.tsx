@@ -34,30 +34,27 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     onSelect(random);
   };
 
-  const toggleValue = (list: string[], value: string, setter: (next: string[]) => void) => {
-    setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
-  };
-
   return (
     <div className="panel">
       <h2>Ritual of Random Cinema</h2>
       <div className="filters">
         <div>
           <small>Sections</small>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 500 }}>
+          <select
+            multiple
+            value={selectedSections}
+            onChange={(e) =>
+              setSelectedSections(Array.from(e.target.selectedOptions).map((opt) => opt.value))
+            }
+            style={{ minWidth: 240, minHeight: 120, background: 'var(--panel)', color: 'var(--text)' }}
+          >
             {sections.map((section) => (
-              <button
-                key={section}
-                onClick={() => toggleValue(selectedSections, section, setSelectedSections)}
-                style={{
-                  background: selectedSections.includes(section) ? 'rgba(126,166,217,0.25)' : undefined,
-                  borderColor: selectedSections.includes(section) ? 'rgba(126,166,217,0.5)' : undefined
-                }}
-              >
+              <option key={section} value={section}>
                 {section}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
+          <p style={{ fontSize: 12, opacity: 0.8 }}>Selecciona una o varias secciones (Ctrl/Cmd + click).</p>
         </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="checkbox" checked={excludeSeen} onChange={(e) => setExcludeSeen(e.target.checked)} /> Exclude seen
@@ -72,8 +69,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           <div style={{ marginTop: 16, animation: 'fadeIn 0.3s ease' }}>
             <strong>{chosen.title}</strong>
             <p>
-              {chosen.year ?? 'Year ?'} • {chosen.seccion}
-              <br /> IMDb: {chosen.imdbRating ?? 'N/A'}
+              {chosen.tmdbYear ?? chosen.year ?? 'Year ?'} • {chosen.seccion}
+              <br /> TMDb: {chosen.tmdbRating?.toFixed(1) ?? 'N/A'}
             </p>
             <img
               src={chosen.posterUrl ?? 'https://via.placeholder.com/200x300/0b0f17/ffffff?text=No+Poster'}

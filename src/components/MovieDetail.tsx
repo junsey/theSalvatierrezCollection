@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MovieRecord } from '../types/MovieRecord';
+import { DirectorCard } from './DirectorCard';
+import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 
 interface Props {
   movie: MovieRecord;
@@ -25,6 +27,28 @@ const StarRating: React.FC<{ value: number; onChange: (val: number) => void }> =
 };
 
 export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onRatingChange, onNoteChange, personalRating, personalNote }) => {
+  const [directors, setDirectors] = useState<{ id: number; name: string }[]>([]);
+  const [loadingDirectors, setLoadingDirectors] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchDirectors() {
+      if (!movie.tmdbId) {
+        setDirectors([]);
+        return;
+      }
+      setLoadingDirectors(true);
+      const found = await getDirectorFromMovie(movie.tmdbId);
+      if (!active) return;
+      setDirectors(found);
+      setLoadingDirectors(false);
+    }
+    fetchDirectors();
+    return () => {
+      active = false;
+    };
+  }, [movie.tmdbId]);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="panel modal" onClick={(e) => e.stopPropagation()}>
@@ -44,25 +68,41 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
                   Título original: {movie.originalTitle}
                 </span>
               )}
-              {movie.imdbTitle && <em style={{ color: 'var(--text-muted)' }}>IMDb: {movie.imdbTitle}</em>} <br />
-              <strong>{movie.year ?? 'Year ?'}</strong> • {movie.seccion}
+              {movie.tmdbOriginalTitle && movie.tmdbOriginalTitle !== movie.originalTitle && (
+                <em style={{ color: 'var(--text-muted)' }}>TMDb: {movie.tmdbOriginalTitle}</em>
+              )}{' '}
+              <br />
+              <strong>{movie.tmdbYear ?? movie.year ?? 'Year ?'}</strong> • {movie.seccion}
             </p>
             <p>
-              <strong>Genre:</strong> {movie.genreRaw}
-              {movie.imdbGenres && movie.imdbGenres.length > 0 && (
+              <strong>Género:</strong> {movie.genreRaw}
+              {movie.tmdbGenres && movie.tmdbGenres.length > 0 && (
                 <>
                   {' '}
-                  <small>(IMDb: {movie.imdbGenres.join(', ')})</small>
+                  <small>(TMDb: {movie.tmdbGenres.join(', ')})</small>
                 </>
               )}
             </p>
             {movie.saga && <p><strong>Saga:</strong> {movie.saga}</p>}
-            <p><strong>Director:</strong> {movie.director}</p>
+            <div className="director-section">
+              <div className="director-section__heading">
+                <strong>Director(es)</strong>
+                <small className="muted">Dato base: {movie.director || '—'}</small>
+              </div>
+              {!movie.tmdbId && <p className="muted">Sin TMDb ID para cruzar créditos.</p>}
+              {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
+              {movie.tmdbId && !loadingDirectors && directors.length === 0 && (
+                <p className="muted">TMDb no devolvió dirección para este título.</p>
+              )}
+              {directors.map((director) => (
+                <DirectorCard key={director.id} directorId={director.id} name={director.name} />
+              ))}
+            </div>
             {movie.group && <p><strong>Group:</strong> {movie.group}</p>}
             <p><strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}</p>
             <p><strong>Plot:</strong> {movie.plot ?? 'No plot available.'}</p>
             <p>
-              <strong>IMDb rating:</strong> {movie.imdbRating ?? 'N/A'}
+              <strong>TMDb rating:</strong> {movie.tmdbRating?.toFixed(1) ?? 'N/A'}
             </p>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -83,6 +123,62 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
                 onChange={(e) => onNoteChange(e.target.value)}
               />
             </div>
+            <details className="status-accordion">
+              <summary>Status</summary>
+              <div className="status-accordion__body">
+                {movie.tmdbStatus ? (
+                  <ul>
+                    <li>
+                      <strong>Estado:</strong>{' '}
+                      {(() => {
+                        const map: Record<string, string> = {
+                          network: 'Respuesta en línea',
+                          cache: 'Desde caché vigente',
+                          'stale-cache': 'Caché expirada',
+                          'not-found': 'Sin coincidencias',
+                          error: 'Error en TMDb',
+                          none: 'Sin consulta'
+                        };
+                        return map[movie.tmdbStatus?.source] ?? 'Desconocido';
+                      })()}{' '}
+                      {movie.tmdbStatus.message && <span>({movie.tmdbStatus.message})</span>}
+                    </li>
+                    <li>
+                      <strong>Títulos consultados:</strong> {movie.tmdbStatus.requestedTitles.join(' · ') || '—'}
+                    </li>
+                    <li>
+                      <strong>Año enviado:</strong> {movie.tmdbStatus.requestedYear ?? '—'}
+                    </li>
+                    <li>
+                      <strong>Coincidencia TMDb:</strong>{' '}
+                      {movie.tmdbStatus.matchedId ? (
+                        <>
+                          #{movie.tmdbStatus.matchedId} — {movie.tmdbStatus.matchedTitle}
+                          {movie.tmdbStatus.matchedOriginalTitle && (
+                            <span className="muted"> (Original: {movie.tmdbStatus.matchedOriginalTitle})</span>
+                          )}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </li>
+                    {movie.tmdbStatus.fetchedAt && (
+                      <li>
+                        <strong>Última consulta:</strong>{' '}
+                        {new Date(movie.tmdbStatus.fetchedAt).toLocaleString('es-ES')}
+                      </li>
+                    )}
+                    {movie.tmdbStatus.error && (
+                      <li className="status-accordion__error">
+                        <strong>Error:</strong> {movie.tmdbStatus.error}
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="muted">Sin estado TMDb registrado.</p>
+                )}
+              </div>
+            </details>
             <button style={{ marginTop: 12 }} onClick={onClose}>
               Close
             </button>

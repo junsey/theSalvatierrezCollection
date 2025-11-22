@@ -28,14 +28,40 @@ export const SectionPage: React.FC = () => {
   const filtered = useMemo(() => {
     return sectionMovies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
-      .filter((m) => (filters.genre ? m.genreRaw.toLowerCase().includes(filters.genre.toLowerCase()) : true))
+      .filter((m) => {
+        if (!filters.genre) return true;
+        const genre = filters.genre.toLowerCase();
+        return (
+          m.genreRaw.toLowerCase().includes(genre) ||
+          (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre)
+        );
+      })
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
         return !m.seen;
       })
-      .sort((a, b) => (filters.sort === 'title-desc' ? b.title.localeCompare(a.title) : a.title.localeCompare(b.title)));
-  }, [sectionMovies, filters]);
+      .sort((a, b) => {
+        switch (filters.sort) {
+          case 'title-desc':
+            return b.title.localeCompare(a.title);
+          case 'year-asc':
+            return (a.year ?? 0) - (b.year ?? 0);
+          case 'year-desc':
+            return (b.year ?? 0) - (a.year ?? 0);
+          case 'tmdb-desc':
+            return Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
+          case 'tmdb-asc':
+            return Number(a.tmdbRating ?? 0) - Number(b.tmdbRating ?? 0);
+          case 'rating-desc':
+            return Number(ratings[b.id] ?? 0) - Number(ratings[a.id] ?? 0);
+          case 'rating-asc':
+            return Number(ratings[a.id] ?? 0) - Number(ratings[b.id] ?? 0);
+          default:
+            return a.title.localeCompare(b.title);
+        }
+      });
+  }, [sectionMovies, filters, ratings]);
 
   return (
     <section>

@@ -7,10 +7,10 @@ export const SettingsPage: React.FC = () => {
   const [status, setStatus] = useState<string | null>(null);
 
   const handleRegenerate = async () => {
-    setStatus('Regenerando documento desde la hoja de cálculo…');
+    setStatus('Regenerando documento y caché TMDb…');
     try {
-      await refresh({ forceNetwork: true });
-      setStatus('Documento actualizado. Los datos locales se regeneraron.');
+      await refresh({ forceNetwork: true, invalidateMovieCache: true });
+      setStatus('Documento y datos enriquecidos actualizados.');
     } catch (err) {
       console.error(err);
       setStatus('No se pudo regenerar, usando la copia guardada.');
@@ -36,8 +36,9 @@ export const SettingsPage: React.FC = () => {
       <div className="panel" style={{ marginBottom: 16 }}>
         <h1>Configuración</h1>
         <p>
-          Guardamos una copia local del documento para que no se rompa si Google Sheets devuelve 404/403. Usa el botón para
-          regenerar manualmente y forzar una lectura nueva cada vez que quieras actualizar la colección.
+          Guardamos una copia local del documento para que no se rompa si Google Sheets devuelve 404/403 y cacheamos los datos
+          enriquecidos de TMDb por 6 meses. Usa el botón para regenerar manualmente y forzar una lectura nueva + refrescar la
+          caché de TMDb cuando quieras actualizar la colección.
         </p>
       </div>
       <div className="stat-grid" style={{ marginBottom: 16 }}>
