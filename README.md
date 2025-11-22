@@ -24,6 +24,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 - **IMDb/OMDb**: La app llama a OMDb. Puedes poner `VITE_OMDB_API_KEY` para usar tu propia clave; incluye un fallback (fd2b1d69)
   para que las portadas/ratings carguen de inmediato.
 - **Google Sheets**: La URL por defecto apunta a la hoja compartida. Cambia `VITE_SHEETS_CSV_URL` si quieres otra. Hay un pequeño fallback offline para demos.
+ - **Cache de IMDb**: Las respuestas de OMDb se guardan en `localStorage` (clave `salvatierrez-imdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado.
 
 ## Features
 
