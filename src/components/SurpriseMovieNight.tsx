@@ -11,35 +11,18 @@ const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
 
 export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeSeenDefault = true }) => {
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
-  const genres = useMemo(
-    () =>
-      unique(
-        movies.flatMap((m) => [
-          ...m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()),
-          ...(m.tmdbGenres ?? [])
-        ])
-      ),
-    [movies]
-  );
 
   const filtered = useMemo(() => {
     return movies.filter((m) => {
       const sectionMatch = selectedSections.length === 0 || selectedSections.includes(m.seccion);
-      const genreMatch =
-        selectedGenres.length === 0 ||
-        selectedGenres.some((genre) =>
-          m.genreRaw.toLowerCase().includes(genre.toLowerCase()) ||
-          (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre.toLowerCase())
-        );
       const seenMatch = excludeSeen ? !m.seen : true;
-      return sectionMatch && genreMatch && seenMatch;
+      return sectionMatch && seenMatch;
     });
-  }, [movies, selectedSections, selectedGenres, excludeSeen]);
+  }, [movies, selectedSections, excludeSeen]);
 
   const summon = () => {
     if (filtered.length === 0) {
@@ -51,47 +34,27 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     onSelect(random);
   };
 
-  const toggleValue = (list: string[], value: string, setter: (next: string[]) => void) => {
-    setter(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
-  };
-
   return (
     <div className="panel">
       <h2>Ritual of Random Cinema</h2>
       <div className="filters">
         <div>
           <small>Sections</small>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 500 }}>
+          <select
+            multiple
+            value={selectedSections}
+            onChange={(e) =>
+              setSelectedSections(Array.from(e.target.selectedOptions).map((opt) => opt.value))
+            }
+            style={{ minWidth: 240, minHeight: 120, background: 'var(--panel)', color: 'var(--text)' }}
+          >
             {sections.map((section) => (
-              <button
-                key={section}
-                onClick={() => toggleValue(selectedSections, section, setSelectedSections)}
-                style={{
-                  background: selectedSections.includes(section) ? 'rgba(126,166,217,0.25)' : undefined,
-                  borderColor: selectedSections.includes(section) ? 'rgba(126,166,217,0.5)' : undefined
-                }}
-              >
+              <option key={section} value={section}>
                 {section}
-              </button>
+              </option>
             ))}
-          </div>
-        </div>
-        <div>
-          <small>Géneros</small>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 500 }}>
-            {genres.map((genre) => (
-              <button
-                key={genre}
-                onClick={() => toggleValue(selectedGenres, genre, setSelectedGenres)}
-                style={{
-                  background: selectedGenres.includes(genre) ? 'rgba(126,166,217,0.25)' : undefined,
-                  borderColor: selectedGenres.includes(genre) ? 'rgba(126,166,217,0.5)' : undefined
-                }}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
+          </select>
+          <p style={{ fontSize: 12, opacity: 0.8 }}>Selecciona una o varias secciones (Ctrl/Cmd + click).</p>
         </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="checkbox" checked={excludeSeen} onChange={(e) => setExcludeSeen(e.target.checked)} /> Exclude seen

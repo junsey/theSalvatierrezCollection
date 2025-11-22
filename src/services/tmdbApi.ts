@@ -9,7 +9,10 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const IMG_FALLBACK_BASE = 'https://image.tmdb.org/t/p/';
 const CACHE_KEY = 'salvatierrez-tmdb-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-config-v1';
+const FAILED_CACHE_KEY = 'salvatierrez-tmdb-failed-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
+const DEFAULT_MAX_RPS = 40;
+const MIN_INTERVAL_MS = 1000 / DEFAULT_MAX_RPS;
 
 export type TmdbEnrichment = {
   tmdbId: number;
@@ -29,6 +32,8 @@ type CacheEntry = {
 
 type CacheMap = Record<string, CacheEntry>;
 
+type FailedCacheMap = Record<string, number>;
+
 type ConfigCache = {
   fetchedAt: number;
   secureBaseUrl: string;
@@ -36,6 +41,7 @@ type ConfigCache = {
 
 const normalizeTitle = (title: string) => title.trim().toLowerCase();
 const cache: CacheMap = loadCache();
+const failedCache: FailedCacheMap = loadFailedCache();
 
 function loadCache(): CacheMap {
   if (typeof localStorage === 'undefined') return {};
@@ -52,6 +58,23 @@ function loadCache(): CacheMap {
 function saveCache(map: CacheMap) {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(CACHE_KEY, JSON.stringify(map));
+}
+
+function loadFailedCache(): FailedCacheMap {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(FAILED_CACHE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as FailedCacheMap;
+  } catch (error) {
+    console.warn('Failed to read TMDb failed cache', error);
+    return {};
+  }
+}
+
+function saveFailedCache(map: FailedCacheMap) {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(FAILED_CACHE_KEY, JSON.stringify(map));
 }
 
 function loadConfigCache(): ConfigCache | null {
@@ -73,7 +96,20 @@ function saveConfigCache(payload: ConfigCache) {
   localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+let lastRequestAt = 0;
+
+async function rateLimit(maxRps: number = DEFAULT_MAX_RPS) {
+  const interval = Math.max(MIN_INTERVAL_MS, 1000 / maxRps);
+  const elapsed = Date.now() - lastRequestAt;
+  const wait = Math.max(0, interval - elapsed);
+  if (wait > 0) {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+  lastRequestAt = Date.now();
+}
+
+async function fetchJson<T>(url: string, maxRps?: number): Promise<T> {
+  await rateLimit(maxRps ?? DEFAULT_MAX_RPS);
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${TMDB_BEARER}`,
@@ -161,14 +197,14 @@ function scoreResult(result: SearchResult, targetTitle: string, targetYear?: num
   return score;
 }
 
-async function searchMovie(title: string, year?: number | null): Promise<SearchResult | null> {
+async function searchMovie(title: string, year?: number | null, maxRps?: number): Promise<SearchResult | null> {
   const url = new URL(`${API_BASE}/search/movie`);
   url.searchParams.set('api_key', TMDB_API_KEY);
   url.searchParams.set('query', title);
   url.searchParams.set('language', 'es-ES');
   if (year) url.searchParams.set('year', String(year));
 
-  const data = await fetchJson<{ results?: SearchResult[] }>(url.toString());
+  const data = await fetchJson<{ results?: SearchResult[] }>(url.toString(), maxRps);
   if (!data.results?.length) return null;
 
   if (!year) return data.results[0];
@@ -178,10 +214,10 @@ async function searchMovie(title: string, year?: number | null): Promise<SearchR
   return best?.result ?? data.results[0];
 }
 
-async function fetchDetails(id: number): Promise<DetailResult | null> {
+async function fetchDetails(id: number, maxRps?: number): Promise<DetailResult | null> {
   const url = `${API_BASE}/movie/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
-    return await fetchJson<DetailResult>(url);
+    return await fetchJson<DetailResult>(url, maxRps);
   } catch (error) {
     console.warn('TMDb details fetch failed', error);
     return null;
@@ -193,8 +229,15 @@ function buildPosterUrl(base: string, path?: string | null): string | undefined 
   return `${base}w500${path}`;
 }
 
-export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
+type EnrichOptions = {
+  allowStaleCache?: boolean;
+  forceNetwork?: boolean;
+  maxRequestsPerSecond?: number;
+};
+
+export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions): Promise<MovieRecord> {
   const titles = Array.from(new Set([movie.originalTitle, movie.title].filter(Boolean))) as string[];
+  const cacheKey = makeCacheKey(titles, movie.year ?? null);
   const baseStatus: TmdbStatus = {
     source: 'none',
     requestedTitles: titles,
@@ -204,7 +247,20 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
 
   if (titles.length === 0) return { ...movie, tmdbStatus: baseStatus };
 
-  const cached = getCached(titles, movie.year ?? null);
+  const failedAt = options?.forceNetwork ? null : failedCache[cacheKey];
+  if (failedAt && Date.now() - failedAt < SIX_MONTHS_MS) {
+    return {
+      ...movie,
+      tmdbStatus: {
+        ...baseStatus,
+        source: 'error',
+        fetchedAt: failedAt,
+        message: 'Intento previo sin resultados; se omite nueva consulta'
+      }
+    };
+  }
+
+  const cached = options?.forceNetwork ? null : getCached(titles, movie.year ?? null, options?.allowStaleCache ?? true);
   if (cached) {
     const status: TmdbStatus = {
       ...baseStatus,
@@ -221,12 +277,12 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
   try {
     let found: SearchResult | null = null;
     for (const title of titles) {
-      found = await searchMovie(title, movie.year);
+      found = await searchMovie(title, movie.year, options?.maxRequestsPerSecond);
       if (found) break;
     }
     if (!found) {
       for (const title of titles) {
-        found = await searchMovie(title);
+        found = await searchMovie(title, undefined, options?.maxRequestsPerSecond);
         if (found) break;
       }
     }
@@ -245,10 +301,15 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
         };
         return applyEnrichment(movie, stale.enrichment, await getImageBaseUrl(), status);
       }
-      return { ...movie, tmdbStatus: { ...baseStatus, source: 'not-found', message: 'TMDb no devolvió coincidencias' } };
+      failedCache[cacheKey] = Date.now();
+      saveFailedCache(failedCache);
+      return {
+        ...movie,
+        tmdbStatus: { ...baseStatus, source: 'not-found', message: 'TMDb no devolvió coincidencias', fetchedAt: failedCache[cacheKey] }
+      };
     }
 
-    const details = await fetchDetails(found.id);
+    const details = await fetchDetails(found.id, options?.maxRequestsPerSecond);
     const enrichment: TmdbEnrichment = {
       tmdbId: found.id,
       tmdbTitle: found.title,
@@ -260,6 +321,10 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
       tmdbGenres: details?.genres?.map((g) => g.name) ?? undefined
     };
     setCached(titles, movie.year ?? null, enrichment);
+    if (failedCache[cacheKey]) {
+      delete failedCache[cacheKey];
+      saveFailedCache(failedCache);
+    }
     const status: TmdbStatus = {
       ...baseStatus,
       source: 'network',
@@ -317,4 +382,24 @@ function applyEnrichment(
     originalTitle: movie.originalTitle || enrichment.tmdbOriginalTitle || enrichment.tmdbTitle,
     tmdbStatus: status ?? movie.tmdbStatus
   };
+}
+
+export async function enrichMoviesBatch(
+  movies: MovieRecord[],
+  options?: EnrichOptions
+): Promise<MovieRecord[]> {
+  const maxRps = options?.maxRequestsPerSecond ?? DEFAULT_MAX_RPS;
+  const results: MovieRecord[] = [];
+
+  for (const movie of movies) {
+    // Reutiliza caché (incluso expirada) salvo que se fuerce red a través de las opciones
+    const enriched = await enrichWithTmdb(movie, {
+      ...options,
+      allowStaleCache: options?.allowStaleCache ?? true,
+      maxRequestsPerSecond: maxRps
+    });
+    results.push(enriched);
+  }
+
+  return results;
 }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { enrichWithTmdb } from '../services/tmdbApi';
+import { enrichMoviesBatch } from '../services/tmdbApi';
 import {
   applyLocalOverrides,
   clearMovieCache,
@@ -62,7 +62,11 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSheetMeta(result.meta);
       const withLocal = applyLocalOverrides(result.movies);
       setMovies(withLocal);
-      const enriched = await Promise.all(withLocal.map((movie) => enrichWithTmdb(movie)));
+      const enriched = await enrichMoviesBatch(withLocal, {
+        allowStaleCache: !options?.forceNetwork,
+        forceNetwork: options?.invalidateMovieCache,
+        maxRequestsPerSecond: 40
+      });
       setMovies(enriched);
       saveMovieCache(enriched, result.meta);
     } catch (err) {

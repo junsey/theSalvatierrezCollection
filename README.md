@@ -26,6 +26,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
   - Incluye una copia embebida en `src/data/sheet-backup.csv` para que nunca quede en blanco; puedes reemplazarla con un export de la hoja.
   - En la sección **Configuración** hay un botón para regenerar manualmente el documento y forzar un fetch fresco.
 - **Cache de TMDb**: Las respuestas de TMDb se guardan en `localStorage` (clave `salvatierrez-tmdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado. La configuración de imágenes se cachea en `salvatierrez-tmdb-config-v1`.
+- **Límite de peticiones**: El enriquecimiento se procesa en serie con un limitador de 40 req/seg y guarda los IDs ya resueltos (y los fallidos) para no volver a golpear la API salvo que se fuerce desde Configuración.
 - **Cache de películas enriquecidas**: El listado completo ya enriquecido con TMDb se guarda 6 meses (`salvatierrez-movie-cache-v1`). Si todo está en caché, la app arranca al instante sin reconsultar TMDb; si quieres forzar actualización, usa el botón de **Configuración** que regenera el documento y borra esta caché.
 
 ## Deploy en Vercel (evitar 404 en recargas)
@@ -36,10 +37,10 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 
 - Fetches movies from Google Sheets on load and overlays local overrides from `localStorage` (seen status, ratings, notes, view preferences). La columna **Vista** inicializa el estado, y la columna **Puntuacion** inicializa la nota personal.
 - Enriquecimiento TMDb por película (poster, plot, rating, year, genres). Gracefully falls back when data is missing y usa caché de 6 meses.
-- Two browsing modes: poster grid and compact table view, both with search, filtering (genre, section, seen), and sorting options.
+- Two browsing modes: poster grid and compact table view, both with search, filtering (sección, visto/no visto), and sorting options.
 - Detailed modal with poster, plot, TMDb/local metadata, seen toggle, personal star rating (1–10), and notes (all persisted locally).
 - Director and section hubs plus dedicated pages to browse movies within each category.
-- “Ritual of Random Cinema” surprise picker with genre/section filters and “exclude seen” safeguard.
+- “Ritual of Random Cinema” surprise picker with multi-select sección filter and “exclude seen” safeguard.
 - Settings page to ver la procedencia del documento, última sincronización, y regenerar manualmente el CSV.
 - Responsive dark fantasy theme with neon-cinema accents, subtle grain textures, and hover glows.
 

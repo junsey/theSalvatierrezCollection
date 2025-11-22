@@ -9,12 +9,7 @@ export const HomePage: React.FC = () => {
     const seen = movies.filter((m) => m.seen).length;
     const unseen = movies.length - seen;
     const sections = Array.from(new Set(movies.map((m) => m.seccion))).length;
-    const genres = Array.from(
-      new Set(
-        movies.flatMap((m) => [...m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()).filter(Boolean), ...(m.tmdbGenres ?? [])])
-      )
-    ).length;
-    return { total: movies.length, seen, unseen, sections, genres };
+    return { total: movies.length, seen, unseen, sections };
   }, [movies]);
 
   return (
@@ -32,7 +27,6 @@ export const HomePage: React.FC = () => {
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link className="nav-link" to="/movies">Enter the Archive</Link>
-            <Link className="nav-link" to="/genres">Géneros</Link>
             <Link className="nav-link" to="/directors">Directores</Link>
             <Link className="nav-link" to="/surprise">Ritual of Random Cinema</Link>
           </div>
@@ -53,10 +47,6 @@ export const HomePage: React.FC = () => {
           <div className="stat-card">
             <small>Sections</small>
             <h3>{loading ? '...' : stats.sections}</h3>
-          </div>
-          <div className="stat-card">
-            <small>Géneros</small>
-            <h3>{loading ? '...' : stats.genres}</h3>
           </div>
         </div>
       </div>
