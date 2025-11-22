@@ -26,6 +26,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
   - Incluye una copia embebida en `src/data/sheet-backup.csv` para que nunca quede en blanco; puedes reemplazarla con un export de la hoja.
   - En la sección **Configuración** hay un botón para regenerar manualmente el documento y forzar un fetch fresco.
 - **Cache de TMDb**: Las respuestas de TMDb se guardan en `localStorage` (clave `salvatierrez-tmdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado. La configuración de imágenes se cachea en `salvatierrez-tmdb-config-v1`.
+- **Cache de películas enriquecidas**: El listado completo ya enriquecido con TMDb se guarda 6 meses (`salvatierrez-movie-cache-v1`). Si todo está en caché, la app arranca al instante sin reconsultar TMDb; si quieres forzar actualización, usa el botón de **Configuración** que regenera el documento y borra esta caché.
 
 ## Deploy en Vercel (evitar 404 en recargas)
 

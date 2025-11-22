@@ -1,10 +1,21 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { enrichWithTmdb } from '../services/tmdbApi';
-import { applyLocalOverrides, getNotes, getRatingOverrides, getSeenOverrides, setNote, setRating, setSeenOverride } from '../services/localStorage';
+import {
+  applyLocalOverrides,
+  clearMovieCache,
+  getNotes,
+  getRatingOverrides,
+  getSeenOverrides,
+  loadMovieCache,
+  saveMovieCache,
+  setNote,
+  setRating,
+  setSeenOverride
+} from '../services/localStorage';
 import { FetchMoviesResult, SheetMeta, fetchMovies } from '../services/googleSheets';
 import { MovieRecord } from '../types/MovieRecord';
 
-type RefreshOptions = Parameters<typeof fetchMovies>[0];
+type RefreshOptions = Parameters<typeof fetchMovies>[0] & { invalidateMovieCache?: boolean };
 
 interface MovieContextValue {
   movies: MovieRecord[];
@@ -34,6 +45,18 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const refresh = async (options?: RefreshOptions) => {
     setLoading(true);
     setError(null);
+    if (options?.invalidateMovieCache) {
+      clearMovieCache();
+    }
+    if (!options?.forceNetwork) {
+      const cached = loadMovieCache();
+      if (cached) {
+        setSheetMeta(cached.sheetMeta ?? null);
+        setMovies(applyLocalOverrides(cached.movies));
+        setLoading(false);
+        return;
+      }
+    }
     try {
       const result: FetchMoviesResult = await fetchMovies(options);
       setSheetMeta(result.meta);
@@ -41,6 +64,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setMovies(withLocal);
       const enriched = await Promise.all(withLocal.map((movie) => enrichWithTmdb(movie)));
       setMovies(enriched);
+      saveMovieCache(enriched, result.meta);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load movies');
     } finally {
