@@ -3,12 +3,22 @@ import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
 export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER;
 
+// Debug: verificar que las variables se carguen correctamente
+if (import.meta.env.DEV) {
+  console.log('Variables de entorno TMDb:', {
+    hasApiKey: !!TMDB_API_KEY,
+    hasBearer: !!TMDB_BEARER,
+    apiKeyLength: TMDB_API_KEY?.length ?? 0,
+    bearerLength: TMDB_BEARER?.length ?? 0
+  });
+}
+
 if (!TMDB_API_KEY) {
-  console.warn('Falta la variable VITE_TMDB_API_KEY; configura tu clave de TMDb en el entorno.');
+  console.error('❌ Falta la variable VITE_TMDB_API_KEY. Asegúrate de que el archivo .env existe y contiene VITE_TMDB_API_KEY=tu_clave');
 }
 
 if (!TMDB_BEARER) {
-  console.warn('Falta la variable VITE_TMDB_BEARER; configura tu bearer token de TMDb en el entorno.');
+  console.error('❌ Falta la variable VITE_TMDB_BEARER. Asegúrate de que el archivo .env existe y contiene VITE_TMDB_BEARER=tu_token');
 }
 
 const API_BASE = 'https://api.themoviedb.org/3';
@@ -115,6 +125,9 @@ async function rateLimit(maxRps: number = DEFAULT_MAX_RPS) {
 }
 
 export async function tmdbFetchJson<T>(url: string, maxRps?: number): Promise<T> {
+  if (!TMDB_BEARER || typeof TMDB_BEARER !== 'string' || TMDB_BEARER.trim() === '') {
+    throw new Error('❌ TMDB_BEARER no está definida o está vacía. Configura VITE_TMDB_BEARER en tu archivo .env y reinicia el servidor de desarrollo');
+  }
   await rateLimit(maxRps ?? DEFAULT_MAX_RPS);
   const response = await fetch(url, {
     headers: {
@@ -158,6 +171,10 @@ function setCached(titles: string[], year: number | null, data: TmdbEnrichment) 
 async function getImageBaseUrl(): Promise<string> {
   const cached = loadConfigCache();
   if (cached) return cached.secureBaseUrl;
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    console.warn('⚠️ TMDB_API_KEY no está definida, usando URL de fallback para imágenes');
+    return IMG_FALLBACK_BASE;
+  }
   try {
     const url = `${API_BASE}/configuration?api_key=${TMDB_API_KEY}`;
     const data = await tmdbFetchJson<{ images?: { secure_base_url?: string } }>(url);
@@ -204,6 +221,10 @@ function scoreResult(result: SearchResult, targetTitle: string, targetYear?: num
 }
 
 async function searchMovie(title: string, year?: number | null, maxRps?: number): Promise<SearchResult | null> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    console.error('❌ TMDB_API_KEY no está definida o está vacía. No se puede buscar la película:', title);
+    return null;
+  }
   const url = new URL(`${API_BASE}/search/movie`);
   url.searchParams.set('api_key', TMDB_API_KEY);
   url.searchParams.set('query', title);
@@ -221,6 +242,10 @@ async function searchMovie(title: string, year?: number | null, maxRps?: number)
 }
 
 async function fetchDetails(id: number, maxRps?: number): Promise<DetailResult | null> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    console.error('❌ TMDB_API_KEY no está definida o está vacía. No se pueden obtener detalles para la película:', id);
+    return null;
+  }
   const url = `${API_BASE}/movie/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
     return await tmdbFetchJson<DetailResult>(url, maxRps);
