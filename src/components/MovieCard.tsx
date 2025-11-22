@@ -21,9 +21,9 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
         <small>{movie.year ?? 'Year ?'} • {movie.seccion}</small>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="badge">IMDb: {movie.imdbRating ?? 'N/A'}</span>
-          <span className="badge">My rating: {personalRating ?? '—'}</span>
+          <span className="badge">Mi puntuación: {personalRating ?? '—'}</span>
           <span className="badge" style={{ background: movie.seen ? 'rgba(126, 217, 87, 0.2)' : 'rgba(255, 54, 93, 0.2)' }}>
-            {movie.seen ? 'Seen' : 'Unseen'}
+            {movie.seen ? 'Vista' : 'No vista'}
           </span>
         </div>
       </div>

@@ -39,6 +39,11 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
           <div style={{ flex: 1, minWidth: 260 }}>
             <h2>{movie.title}</h2>
             <p>
+              {movie.originalTitle && (
+                <span style={{ display: 'block', color: 'var(--text-muted)' }}>
+                  Título original: {movie.originalTitle}
+                </span>
+              )}
               {movie.imdbTitle && <em style={{ color: 'var(--text-muted)' }}>IMDb: {movie.imdbTitle}</em>} <br />
               <strong>{movie.year ?? 'Year ?'}</strong> • {movie.seccion}
             </p>
@@ -61,10 +66,10 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             </p>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Seen
+                <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Vista
               </label>
               <div>
-                <small>My rating</small>
+                <small>Mi puntuación (columna Puntuacion)</small>
                 <StarRating value={personalRating ?? 0} onChange={onRatingChange} />
               </div>
             </div>

@@ -4,16 +4,17 @@ import { Link, NavLink } from 'react-router-dom';
 const navItems = [
   { to: '/', label: 'Home' },
   { to: '/movies', label: 'All Movies' },
-  { to: '/genres', label: 'Genres' },
+  { to: '/directors', label: 'Directores' },
   { to: '/sections', label: 'Sections' },
-  { to: '/surprise', label: 'Surprise Night' }
+  { to: '/surprise', label: 'Surprise Night' },
+  { to: '/settings', label: 'Configuración' }
 ];
 
 export const Header: React.FC = () => {
   return (
     <header className="navbar">
       <Link to="/" className="logo" style={{ fontFamily: 'UnifrakturMaguntia, serif', color: 'var(--accent-2)', fontSize: 26 }}>
-        Catacombs of Celluloid
+        The Salvatierrez Collection
       </Link>
       <nav className="nav-links">
         {navItems.map((item) => (

@@ -5,6 +5,7 @@ import { getSheetUrl } from '../services/googleSheets';
 
 export const HomePage: React.FC = () => {
   const { movies, loading } = useMovies();
+  const hasOmdbKey = Boolean(import.meta.env.VITE_OMDB_API_KEY);
   const stats = useMemo(() => {
     const seen = movies.filter((m) => m.seen).length;
     const unseen = movies.length - seen;
@@ -16,16 +17,23 @@ export const HomePage: React.FC = () => {
     <div className="panel">
       <div className="hero">
         <div>
-          <h1>Catacombs of Celluloid</h1>
+          <h1>The Salvatierrez Collection</h1>
           <p>
-            A dark archive of adventures, horrors, and legends. Movies descend from the Google Sheets vault and are
-            enriched by the whispers of IMDb. Personal sigils (ratings, notes, seen status) live in your browser only.
+            Un catálogo oscuro con estética dungeon synth para tu videoteca. Las películas descienden en vivo desde Google
+            Sheets, se visten con datos de IMDb/OMDb (portadas, rating, sinopsis) y guardan tus marcas locales de "vista" y
+            "puntuación" (columna Puntuacion) junto a tus notas personales en este navegador.
           </p>
           <p>
-            Sheet source: <code>{getSheetUrl()}</code>
+            Fuente del Excel: <code>{getSheetUrl()}</code>
           </p>
+          {!hasOmdbKey && (
+            <p style={{ color: 'var(--accent)' }}>
+              No hay clave <code>VITE_OMDB_API_KEY</code> cargada: verás portadas genéricas hasta que añadas tu API de OMDb/IMDb.
+            </p>
+          )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link className="nav-link" to="/movies">Enter the Archive</Link>
+            <Link className="nav-link" to="/directors">Directores</Link>
             <Link className="nav-link" to="/surprise">Ritual of Random Cinema</Link>
           </div>
         </div>
