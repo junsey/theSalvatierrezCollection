@@ -1,12 +1,15 @@
 import { tmdbFetchJson, TMDB_API_KEY } from './tmdbApi';
 
 const API_BASE = 'https://api.themoviedb.org/3';
+const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
+const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
+type SearchCacheEntry = { id: number; name: string } | null;
 
 type PersonDetails = {
   id: number;
@@ -24,26 +27,31 @@ type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
+  posterUrl?: string;
+  popularity?: number;
 };
 
 type ConfigCache = { fetchedAt: number; baseUrl: string; size: string };
 
-const personDetailsCache: Record<number, PersonCacheEntry<PersonDetails>> = loadCache<PersonDetails>(PERSON_CACHE_KEY);
-const personCreditsCache: Record<number, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = loadCache<PersonDetails>(PERSON_CACHE_KEY);
+const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
+  PERSON_SEARCH_CACHE_KEY
+);
+const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
 
-function loadCache<T>(key: string): Record<number, PersonCacheEntry<T>> {
+function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return {};
-    return JSON.parse(raw) as Record<number, PersonCacheEntry<T>>;
+    return JSON.parse(raw) as Record<string, PersonCacheEntry<T>>;
   } catch (error) {
     console.warn('No se pudo leer la caché de personas TMDb', error);
     return {};
   }
 }
 
-function saveCache<T>(key: string, payload: Record<number, PersonCacheEntry<T>>) {
+function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
   if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(payload));
@@ -56,6 +64,8 @@ function isFresh(entry?: PersonCacheEntry<any>): boolean {
   if (!entry) return false;
   return Date.now() - entry.fetchedAt < SIX_MONTHS_MS;
 }
+
+const normalizeName = (value: string) => value.trim().toLowerCase();
 
 async function getProfileBase(): Promise<{ baseUrl: string; size: string }> {
   if (typeof localStorage !== 'undefined') {
@@ -120,14 +130,38 @@ export async function getDirectorFromMovie(movieId: number): Promise<{ id: numbe
   }
 }
 
-export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
+export async function searchPersonByName(name: string): Promise<{ id: number; name: string } | null> {
   if (!TMDB_API_KEY) return null;
-  const cached = personDetailsCache[personId];
+  const normalized = normalizeName(name);
+  const cached = personSearchCache[normalized];
   if (isFresh(cached)) return cached.data;
 
   try {
-    const url = `${API_BASE}/person/${personId}?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{
+    const url = new URL(`${API_BASE}/search/person`);
+    url.searchParams.set('api_key', TMDB_API_KEY);
+    url.searchParams.set('query', name.trim());
+    url.searchParams.set('language', 'es-ES');
+    const data = await tmdbFetchJson<{ results?: { id: number; name: string }[] }>(url.toString());
+    const match = data.results?.[0];
+    const payload = match ? { id: match.id, name: match.name } : null;
+    personSearchCache[normalized] = { fetchedAt: Date.now(), data: payload };
+    saveCache(PERSON_SEARCH_CACHE_KEY, personSearchCache);
+    return payload;
+  } catch (error) {
+    console.warn('No se pudo buscar el director en TMDb', error);
+    return null;
+  }
+}
+
+export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
+  if (!TMDB_API_KEY) return null;
+  const cacheKey = String(personId);
+  const cached = personDetailsCache[cacheKey];
+  if (isFresh(cached)) return cached.data;
+
+  const requestDetails = async (language: string) => {
+    const url = `${API_BASE}/person/${personId}?api_key=${TMDB_API_KEY}&language=${language}`;
+    return tmdbFetchJson<{
       id: number;
       name: string;
       biography?: string | null;
@@ -137,19 +171,32 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
       deathday?: string | null;
       also_known_as?: string[];
     }>(url);
+  };
+
+  try {
     const profileBase = await getProfileBase();
+    const primary = await requestDetails('es-ES');
+    const needsFallback = !primary?.biography || primary.biography.trim() === '';
+    const fallback = needsFallback ? await requestDetails('en-US') : null;
+    const chosen = primary ?? fallback;
+
+    if (!chosen) return null;
+
+    const biography = needsFallback ? fallback?.biography ?? primary?.biography : primary?.biography;
+    const profilePath = chosen.profile_path ?? primary?.profile_path ?? fallback?.profile_path;
     const payload: PersonDetails = {
-      id: data.id,
-      name: data.name,
-      biography: data.biography,
-      profilePath: data.profile_path,
-      profileUrl: buildProfileUrl(profileBase, data.profile_path),
-      placeOfBirth: data.place_of_birth,
-      birthday: data.birthday,
-      deathday: data.deathday,
-      alsoKnownAs: data.also_known_as
+      id: chosen.id,
+      name: chosen.name,
+      biography: biography ?? null,
+      profilePath,
+      profileUrl: buildProfileUrl(profileBase, profilePath),
+      placeOfBirth: chosen.place_of_birth ?? primary?.place_of_birth ?? fallback?.place_of_birth,
+      birthday: chosen.birthday ?? primary?.birthday ?? fallback?.birthday,
+      deathday: chosen.deathday ?? primary?.deathday ?? fallback?.deathday,
+      alsoKnownAs: chosen.also_known_as ?? primary?.also_known_as ?? fallback?.also_known_as
     };
-    personDetailsCache[personId] = { fetchedAt: Date.now(), data: payload };
+
+    personDetailsCache[cacheKey] = { fetchedAt: Date.now(), data: payload };
     saveCache(PERSON_CACHE_KEY, personDetailsCache);
     return payload;
   } catch (error) {
@@ -160,16 +207,24 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
 
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY) return [];
-  const cached = personCreditsCache[personId];
+  const cacheKey = String(personId);
+  const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
   try {
     const url = `${API_BASE}/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null }[] }>(url);
+    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null; poster_path?: string | null; popularity?: number }[] }>(url);
     const directed = (data.crew ?? [])
-      .filter((item) => item.job === 'Director')
-      .map((item) => ({ id: item.id, title: item.title, year: parseYear(item.release_date) }));
-    personCreditsCache[personId] = { fetchedAt: Date.now(), data: directed };
+      .filter((item) => item.job?.toLowerCase().includes('director'))
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        year: parseYear(item.release_date),
+        posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
+        popularity: item.popularity
+      }))
+      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: directed };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     return directed;
   } catch (error) {
