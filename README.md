@@ -21,7 +21,8 @@ VITE_OMDB_URL=https://www.omdbapi.com/
 VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/export?format=csv
 ```
 
-- **IMDb/OMDb**: The app llama a OMDb. Pon `VITE_OMDB_API_KEY` para obtener portadas, ratings y sinopsis; sin clave verás placeholders.
+- **IMDb/OMDb**: La app llama a OMDb. Puedes poner `VITE_OMDB_API_KEY` para usar tu propia clave; incluye un fallback (fd2b1d69)
+  para que las portadas/ratings carguen de inmediato.
 - **Google Sheets**: La URL por defecto apunta a la hoja compartida. Cambia `VITE_SHEETS_CSV_URL` si quieres otra. Hay un pequeño fallback offline para demos.
 
 ## Features

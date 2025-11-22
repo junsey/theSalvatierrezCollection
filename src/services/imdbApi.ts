@@ -11,13 +11,11 @@ export type ImdbResult = {
 };
 
 const OMDB_URL = import.meta.env.VITE_OMDB_URL ?? 'https://www.omdbapi.com/';
+// Default key provided by the user as a fallback so posters/ratings load out of the box.
+const DEFAULT_OMDB_KEY = 'fd2b1d69';
 
 async function fetchOmdb(title: string, year?: number | null): Promise<ImdbResult | null> {
-  const apiKey = import.meta.env.VITE_OMDB_API_KEY;
-  if (!apiKey) {
-    console.warn('OMDb key missing - skipping IMDb enrichment. Add VITE_OMDB_API_KEY to .env');
-    return null;
-  }
+  const apiKey = import.meta.env.VITE_OMDB_API_KEY ?? DEFAULT_OMDB_KEY;
 
   const fetchByTitle = async (y?: number | null) => {
     const url = new URL(OMDB_URL);
