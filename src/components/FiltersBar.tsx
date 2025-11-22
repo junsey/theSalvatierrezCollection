@@ -1,0 +1,71 @@
+import React from 'react';
+import { MovieFilters, MovieRecord } from '../types/MovieRecord';
+
+interface Props {
+  filters: MovieFilters;
+  onChange: (patch: Partial<MovieFilters>) => void;
+  movies: MovieRecord[];
+}
+
+const uniqueValues = (items: string[]) => Array.from(new Set(items.filter(Boolean))).sort();
+
+export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
+  const secciones = uniqueValues(movies.map((m) => m.seccion));
+  const genres = uniqueValues(
+    movies
+      .flatMap((m) => [
+        ...m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()),
+        ...(m.tmdbGenres ?? [])
+      ])
+      .filter(Boolean)
+  );
+
+  return (
+    <div className="filters">
+      <input
+        placeholder="Buscar título"
+        value={filters.query}
+        onChange={(e) => onChange({ query: e.target.value })}
+      />
+      <select value={filters.seccion ?? ''} onChange={(e) => onChange({ seccion: e.target.value || null })}>
+        <option value="">Todas las secciones</option>
+        {secciones.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      <select value={filters.genre ?? ''} onChange={(e) => onChange({ genre: e.target.value || null })}>
+        <option value="">Todos los géneros</option>
+        {genres.map((g) => (
+          <option key={g} value={g}>
+            {g}
+          </option>
+        ))}
+      </select>
+      <select value={filters.seen} onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}>
+        <option value="all">Vistas + no vistas</option>
+        <option value="seen">Solo vistas</option>
+        <option value="unseen">Solo no vistas</option>
+      </select>
+      <select value={filters.sort} onChange={(e) => onChange({ sort: e.target.value as MovieFilters['sort'] })}>
+        <option value="title-asc">Título A-Z</option>
+        <option value="title-desc">Título Z-A</option>
+        <option value="year-desc">Año ↓</option>
+        <option value="year-asc">Año ↑</option>
+        <option value="tmdb-desc">TMDb ↓</option>
+        <option value="tmdb-asc">TMDb ↑</option>
+        <option value="rating-desc">Mi puntuación ↓</option>
+        <option value="rating-asc">Mi puntuación ↑</option>
+      </select>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
+          Carteles
+        </button>
+        <button onClick={() => onChange({ view: 'list' })} aria-label="List view">
+          Lista
+        </button>
+      </div>
+    </div>
+  );
+};
