@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, getPersonDirectedMovies, getPersonDetails, searchPersonByName } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
@@ -120,6 +120,11 @@ export const DirectorPage: React.FC = () => {
 
   return (
     <section>
+      <div style={{ marginBottom: 12 }}>
+        <Link to="/directors" className="btn" style={{ padding: '6px 12px' }}>
+          ← Volver a directores
+        </Link>
+      </div>
       <div className="director-hero">
         <div
           className="director-portrait"

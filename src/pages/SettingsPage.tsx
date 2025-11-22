@@ -1,11 +1,22 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
+import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
 
 export const SettingsPage: React.FC = () => {
   const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
+
+  const directorNames = useMemo(() => {
+    const splitDirectors = (value: string) =>
+      value
+        .split(/[,;/&]/g)
+        .map((d) => d.trim())
+        .filter(Boolean);
+
+    return Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort();
+  }, [movies]);
 
   const handleRefreshAll = async () => {
     setStatus(null);
@@ -37,6 +48,18 @@ export const SettingsPage: React.FC = () => {
     } catch (err) {
       console.error(err);
       setStatus('❌ No se pudieron actualizar las películas faltantes.');
+    }
+  };
+
+  const handleRefreshDirectors = async () => {
+    setStatus(null);
+    try {
+      clearPeopleCaches();
+      await buildDirectorProfiles(directorNames, { forceRefresh: true });
+      setStatus('✅ Directores regenerados correctamente.');
+    } catch (err) {
+      console.error(err);
+      setStatus('❌ No se pudieron regenerar los directores.');
     }
   };
 
@@ -118,6 +141,16 @@ export const SettingsPage: React.FC = () => {
             <button className="btn" onClick={handleRefreshMissing} disabled={loading}>
               {loading ? 'Regenerando…' : 'Regenerar faltantes'}
       </button>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar directores</h3>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Limpia la caché de directores y vuelve a solicitar las biografías y retratos basados en los nombres del Excel.
+            </p>
+            <button className="btn" onClick={handleRefreshDirectors} disabled={loading || directorNames.length === 0}>
+              {loading ? 'Regenerando…' : 'Regenerar directores'}
+            </button>
           </div>
         </div>
       </div>

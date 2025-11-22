@@ -1,4 +1,5 @@
 import { tmdbFetchJson, TMDB_API_KEY } from './tmdbApi';
+import { CachedDirector, clearDirectorCache, loadDirectorCache, saveDirectorCache } from './localStorage';
 
 const API_BASE = 'https://api.themoviedb.org/3';
 const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
@@ -29,6 +30,13 @@ type DirectedMovie = {
   year: number | null;
   posterUrl?: string;
   popularity?: number;
+};
+
+export type DirectorProfile = {
+  name: string;
+  displayName: string;
+  tmdbId: number | null;
+  profileUrl?: string | null;
 };
 
 type ConfigCache = { fetchedAt: number; baseUrl: string; size: string };
@@ -231,6 +239,103 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
     console.warn('No se pudo obtener la filmografía del director', error);
     return [];
   }
+}
+
+export async function buildDirectorProfiles(
+  names: string[],
+  options?: { forceRefresh?: boolean }
+): Promise<DirectorProfile[]> {
+  const unique = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
+  if (unique.length === 0) return [];
+  if (!TMDB_API_KEY) {
+    return unique.map((name) => ({ name, displayName: name, tmdbId: null, profileUrl: null }));
+  }
+
+  const cachedPayload = options?.forceRefresh ? null : loadDirectorCache();
+  const cachedMap = new Map<string, CachedDirector>();
+  cachedPayload?.directors.forEach((director) => {
+    cachedMap.set(normalizeName(director.name), director);
+  });
+
+  const missing: string[] = options?.forceRefresh ? [...unique] : [];
+  const now = Date.now();
+
+  if (!options?.forceRefresh) {
+    for (const name of unique) {
+      const cached = cachedMap.get(normalizeName(name));
+      if (!cached) missing.push(name);
+    }
+  }
+
+  const fetched: CachedDirector[] = [];
+  for (const target of missing) {
+    try {
+      const search = await searchPersonByName(target);
+      let profileUrl: string | undefined;
+      let resolvedName = search?.name ?? target;
+      let tmdbId: number | null = search?.id ?? null;
+
+      if (search?.id) {
+        const details = await getPersonDetails(search.id);
+        profileUrl = details?.profileUrl ?? undefined;
+        resolvedName = details?.name ?? resolvedName;
+      }
+
+      fetched.push({
+        name: target,
+        resolvedName,
+        tmdbId,
+        profileUrl: profileUrl ?? null,
+        fetchedAt: now
+      });
+    } catch (error) {
+      console.warn('No se pudo enriquecer al director', target, error);
+      fetched.push({ name: target, resolvedName: target, tmdbId: null, profileUrl: null, fetchedAt: now });
+    }
+  }
+
+  const mergedMap = new Map<string, CachedDirector>();
+  const existing = cachedPayload?.directors ?? [];
+  existing.forEach((entry) => {
+    if (!options?.forceRefresh || missing.includes(entry.name)) {
+      mergedMap.set(normalizeName(entry.name), entry);
+    }
+  });
+  fetched.forEach((entry) => mergedMap.set(normalizeName(entry.name), entry));
+
+  const mergedList = unique.map((name) => {
+    const entry = mergedMap.get(normalizeName(name)) ?? {
+      name,
+      resolvedName: name,
+      tmdbId: null,
+      profileUrl: null,
+      fetchedAt: now
+    };
+    return entry;
+  });
+
+  const savedPayload = options?.forceRefresh ? mergedList : [...mergedMap.values()];
+  saveDirectorCache(savedPayload);
+
+  return mergedList.map((entry) => ({
+    name: entry.name,
+    displayName: entry.resolvedName || entry.name,
+    tmdbId: entry.tmdbId ?? null,
+    profileUrl: entry.profileUrl ?? null
+  }));
+}
+
+export function clearPeopleCaches() {
+  clearDirectorCache();
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(PERSON_CACHE_KEY);
+    localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
+    localStorage.removeItem(CREDITS_CACHE_KEY);
+    localStorage.removeItem(CONFIG_CACHE_KEY);
+  }
+  Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
+  Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
+  Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
 }
 
 export type { PersonDetails, DirectedMovie };
