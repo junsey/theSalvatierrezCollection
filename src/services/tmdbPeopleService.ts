@@ -243,13 +243,17 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
 
 export async function buildDirectorProfiles(
   names: string[],
-  options?: { forceRefresh?: boolean }
+  options?: { forceRefresh?: boolean; onProgress?: (current: number, total: number) => void }
 ): Promise<DirectorProfile[]> {
   const unique = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
   if (unique.length === 0) return [];
   if (!TMDB_API_KEY) {
     return unique.map((name) => ({ name, displayName: name, tmdbId: null, profileUrl: null }));
   }
+
+  const total = unique.length;
+  let completed = 0;
+  const report = () => options?.onProgress?.(completed, total);
 
   const cachedPayload = options?.forceRefresh ? null : loadDirectorCache();
   const cachedMap = new Map<string, CachedDirector>();
@@ -263,9 +267,15 @@ export async function buildDirectorProfiles(
   if (!options?.forceRefresh) {
     for (const name of unique) {
       const cached = cachedMap.get(normalizeName(name));
-      if (!cached) missing.push(name);
+      if (cached) {
+        completed += 1;
+      } else {
+        missing.push(name);
+      }
     }
   }
+
+  report();
 
   const fetched: CachedDirector[] = [];
   for (const target of missing) {
@@ -292,6 +302,9 @@ export async function buildDirectorProfiles(
       console.warn('No se pudo enriquecer al director', target, error);
       fetched.push({ name: target, resolvedName: target, tmdbId: null, profileUrl: null, fetchedAt: now });
     }
+
+    completed += 1;
+    report();
   }
 
   const mergedMap = new Map<string, CachedDirector>();

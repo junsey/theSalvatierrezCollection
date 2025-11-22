@@ -7,6 +7,8 @@ export const SettingsPage: React.FC = () => {
   const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
+  const [directorProgress, setDirectorProgress] = useState<{ current: number; total: number } | null>(null);
+  const [regeneratingDirectors, setRegeneratingDirectors] = useState(false);
 
   const directorNames = useMemo(() => {
     const splitDirectors = (value: string) =>
@@ -53,13 +55,21 @@ export const SettingsPage: React.FC = () => {
 
   const handleRefreshDirectors = async () => {
     setStatus(null);
+    setDirectorProgress({ current: 0, total: directorNames.length });
+    setRegeneratingDirectors(true);
     try {
       clearPeopleCaches();
-      await buildDirectorProfiles(directorNames, { forceRefresh: true });
+      await buildDirectorProfiles(directorNames, {
+        forceRefresh: true,
+        onProgress: (current, total) => setDirectorProgress({ current, total })
+      });
       setStatus('✅ Directores regenerados correctamente.');
     } catch (err) {
       console.error(err);
       setStatus('❌ No se pudieron regenerar los directores.');
+    } finally {
+      setRegeneratingDirectors(false);
+      setDirectorProgress(null);
     }
   };
 
@@ -148,8 +158,12 @@ export const SettingsPage: React.FC = () => {
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
               Limpia la caché de directores y vuelve a solicitar las biografías y retratos basados en los nombres del Excel.
             </p>
-            <button className="btn" onClick={handleRefreshDirectors} disabled={loading || directorNames.length === 0}>
-              {loading ? 'Regenerando…' : 'Regenerar directores'}
+            <button
+              className="btn"
+              onClick={handleRefreshDirectors}
+              disabled={loading || regeneratingDirectors || directorNames.length === 0}
+            >
+              {regeneratingDirectors ? 'Regenerando…' : 'Regenerar directores'}
             </button>
           </div>
         </div>
@@ -171,6 +185,23 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div style={{ marginTop: 8, fontSize: '0.9em', color: 'var(--text-muted)' }}>
             {progress.current} de {progress.total} películas
+          </div>
+        </div>
+      )}
+
+      {directorProgress && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Directores</strong>
+          </div>
+          <div className="progress-bar">
+            <div
+              className="progress-bar-fill"
+              style={{ width: `${(directorProgress.current / Math.max(directorProgress.total, 1)) * 100}%` }}
+            />
+          </div>
+          <div style={{ marginTop: 8, fontSize: '0.9em', color: 'var(--text-muted)' }}>
+            {directorProgress.current} de {directorProgress.total} directores
           </div>
         </div>
       )}

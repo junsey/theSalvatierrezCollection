@@ -28,20 +28,29 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
 
   useEffect(() => {
     let active = true;
     async function hydrate() {
       if (directorNames.length === 0) {
         setProfiles([]);
+        setProgress(null);
         return;
       }
       setLoading(true);
       setError(null);
+      setProgress({ current: 0, total: directorNames.length });
       try {
-        const enriched = await buildDirectorProfiles(directorNames);
+        const enriched = await buildDirectorProfiles(directorNames, {
+          onProgress: (current, total) => {
+            if (!active) return;
+            setProgress({ current, total });
+          }
+        });
         if (!active) return;
         setProfiles(enriched);
+        setProgress(null);
       } catch (err) {
         console.warn('No se pudieron cargar los directores', err);
         if (active) setError('No se pudieron cargar los directores.');
@@ -56,7 +65,26 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   }, [directorNames]);
 
   if (loading) {
-    return <p className="muted">Cargando directores...</p>;
+    return (
+      <div className="panel" style={{ marginBottom: 12 }}>
+        <p style={{ marginBottom: 8 }} className="muted">
+          Cargando directores...
+        </p>
+        {progress && (
+          <>
+            <div className="progress-bar">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${(progress.current / Math.max(progress.total, 1)) * 100}%` }}
+              />
+            </div>
+            <div style={{ marginTop: 6, fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              {progress.current} de {progress.total}
+            </div>
+          </>
+        )}
+      </div>
+    );
   }
 
   if (error) {
