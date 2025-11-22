@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MovieRecord } from '../types/MovieRecord';
+import directorSigil from '../assets/director-sigil.svg';
 
 const splitDirectors = (value: string) =>
   value
@@ -21,6 +22,9 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     <div className="genre-grid">
       {directors.map((director) => (
         <Link key={director} to={`/directors/${encodeURIComponent(director)}`} className="genre-card">
+          <div className="card-crest" aria-hidden="true">
+            <img src={directorSigil} alt="" />
+          </div>
           <strong>{director}</strong>
           <small>{movies.filter((m) => splitDirectors(m.director).some((d) => d.toLowerCase() === director.toLowerCase())).length} películas</small>
         </Link>

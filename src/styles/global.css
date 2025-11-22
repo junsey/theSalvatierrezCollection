@@ -268,6 +268,39 @@ button:hover {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-crest {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto 8px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 54, 93, 0.08), rgba(10, 10, 14, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  position: relative;
+  box-shadow: inset 0 0 18px rgba(255, 54, 93, 0.12), 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.card-crest::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, rgba(224, 160, 64, 0.18), rgba(122, 162, 211, 0.12));
+  mix-blend-mode: screen;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.card-crest img {
+  width: 82%;
+  height: 82%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 12px rgba(224, 160, 64, 0.35)) drop-shadow(0 0 6px rgba(122, 162, 211, 0.28));
+  opacity: 0.95;
 }
 
 .random-area {
