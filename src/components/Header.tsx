@@ -4,7 +4,7 @@ import { Link, NavLink } from 'react-router-dom';
 const navItems = [
   { to: '/', label: 'Home' },
   { to: '/movies', label: 'All Movies' },
-  { to: '/genres', label: 'Genres' },
+  { to: '/directors', label: 'Directores' },
   { to: '/sections', label: 'Sections' },
   { to: '/surprise', label: 'Surprise Night' },
   { to: '/settings', label: 'Configuración' }

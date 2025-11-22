@@ -33,6 +33,7 @@ export const HomePage: React.FC = () => {
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link className="nav-link" to="/movies">Enter the Archive</Link>
+            <Link className="nav-link" to="/directors">Directores</Link>
             <Link className="nav-link" to="/surprise">Ritual of Random Cinema</Link>
           </div>
         </div>

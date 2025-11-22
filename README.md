@@ -34,7 +34,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 - Optional IMDb/OMDb enrichment per movie (poster, plot, rating, year, genres). Gracefully falls back when data is missing o si falta la API key.
 - Two browsing modes: poster grid and compact table view, both with search, filtering (genre, section, seen), and sorting options.
 - Detailed modal with poster, plot, IMDb/local metadata, seen toggle, personal star rating (1–10), and notes (all persisted locally).
-- Genre and section hubs plus dedicated pages to browse movies within each category.
+- Director and section hubs plus dedicated pages to browse movies within each category.
 - “Ritual of Random Cinema” surprise picker with section filter and “exclude seen” safeguard.
 - Settings page to ver la procedencia del documento, última sincronización, y regenerar manualmente el CSV.
 - Responsive dark fantasy theme with neon-cinema accents, subtle grain textures, and hover glows.
