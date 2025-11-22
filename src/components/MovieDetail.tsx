@@ -86,6 +86,62 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
                 onChange={(e) => onNoteChange(e.target.value)}
               />
             </div>
+            <details className="status-accordion">
+              <summary>Status</summary>
+              <div className="status-accordion__body">
+                {movie.tmdbStatus ? (
+                  <ul>
+                    <li>
+                      <strong>Estado:</strong>{' '}
+                      {(() => {
+                        const map: Record<string, string> = {
+                          network: 'Respuesta en línea',
+                          cache: 'Desde caché vigente',
+                          'stale-cache': 'Caché expirada',
+                          'not-found': 'Sin coincidencias',
+                          error: 'Error en TMDb',
+                          none: 'Sin consulta'
+                        };
+                        return map[movie.tmdbStatus?.source] ?? 'Desconocido';
+                      })()}{' '}
+                      {movie.tmdbStatus.message && <span>({movie.tmdbStatus.message})</span>}
+                    </li>
+                    <li>
+                      <strong>Títulos consultados:</strong> {movie.tmdbStatus.requestedTitles.join(' · ') || '—'}
+                    </li>
+                    <li>
+                      <strong>Año enviado:</strong> {movie.tmdbStatus.requestedYear ?? '—'}
+                    </li>
+                    <li>
+                      <strong>Coincidencia TMDb:</strong>{' '}
+                      {movie.tmdbStatus.matchedId ? (
+                        <>
+                          #{movie.tmdbStatus.matchedId} — {movie.tmdbStatus.matchedTitle}
+                          {movie.tmdbStatus.matchedOriginalTitle && (
+                            <span className="muted"> (Original: {movie.tmdbStatus.matchedOriginalTitle})</span>
+                          )}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </li>
+                    {movie.tmdbStatus.fetchedAt && (
+                      <li>
+                        <strong>Última consulta:</strong>{' '}
+                        {new Date(movie.tmdbStatus.fetchedAt).toLocaleString('es-ES')}
+                      </li>
+                    )}
+                    {movie.tmdbStatus.error && (
+                      <li className="status-accordion__error">
+                        <strong>Error:</strong> {movie.tmdbStatus.error}
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="muted">Sin estado TMDb registrado.</p>
+                )}
+              </div>
+            </details>
             <button style={{ marginTop: 12 }} onClick={onClose}>
               Close
             </button>

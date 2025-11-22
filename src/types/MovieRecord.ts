@@ -20,6 +20,19 @@ export type MovieRecord = {
   posterUrl?: string;
   plot?: string;
   tmdbGenres?: string[];
+  tmdbStatus?: TmdbStatus;
+};
+
+export type TmdbStatus = {
+  source: 'network' | 'cache' | 'stale-cache' | 'not-found' | 'error' | 'none';
+  requestedTitles: string[];
+  requestedYear?: number | null;
+  matchedId?: number;
+  matchedTitle?: string;
+  matchedOriginalTitle?: string;
+  fetchedAt?: number;
+  message?: string;
+  error?: string;
 };
 
 export type MovieFilters = {

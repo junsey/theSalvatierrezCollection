@@ -1,4 +1,4 @@
-import { MovieRecord } from '../types/MovieRecord';
+import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY || '69fde1846d54ced5beb027c9f07cf9a5';
 const TMDB_BEARER =
@@ -91,13 +91,20 @@ function makeCacheKey(titles: string[], year?: number | null) {
   return `${normalizedTitles}|${year ?? ''}`;
 }
 
-function getCached(titles: string[], year?: number | null, allowStale = false): TmdbEnrichment | null {
+type CacheHit = {
+  enrichment: TmdbEnrichment;
+  fetchedAt: number;
+  stale: boolean;
+};
+
+function getCached(titles: string[], year?: number | null, allowStale = false): CacheHit | null {
   const key = makeCacheKey(titles, year);
   const entry = cache[key];
   if (!entry) return null;
   const age = Date.now() - entry.fetchedAt;
-  if (allowStale || age <= SIX_MONTHS_MS) return entry.data;
-  return null;
+  const stale = age > SIX_MONTHS_MS;
+  if (!allowStale && stale) return null;
+  return { enrichment: entry.data, fetchedAt: entry.fetchedAt, stale };
 }
 
 function setCached(titles: string[], year: number | null, data: TmdbEnrichment) {
@@ -188,11 +195,27 @@ function buildPosterUrl(base: string, path?: string | null): string | undefined 
 
 export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
   const titles = Array.from(new Set([movie.originalTitle, movie.title].filter(Boolean))) as string[];
-  if (titles.length === 0) return movie;
+  const baseStatus: TmdbStatus = {
+    source: 'none',
+    requestedTitles: titles,
+    requestedYear: movie.year ?? null,
+    message: titles.length ? undefined : 'Sin títulos para consultar'
+  };
+
+  if (titles.length === 0) return { ...movie, tmdbStatus: baseStatus };
 
   const cached = getCached(titles, movie.year ?? null);
   if (cached) {
-    return applyEnrichment(movie, cached, await getImageBaseUrl());
+    const status: TmdbStatus = {
+      ...baseStatus,
+      source: cached.stale ? 'stale-cache' : 'cache',
+      matchedId: cached.enrichment.tmdbId,
+      matchedTitle: cached.enrichment.tmdbTitle,
+      matchedOriginalTitle: cached.enrichment.tmdbOriginalTitle,
+      fetchedAt: cached.fetchedAt,
+      message: cached.stale ? 'Respuesta cacheada expirada reutilizada' : 'Respuesta cacheada'
+    };
+    return applyEnrichment(movie, cached.enrichment, await getImageBaseUrl(), status);
   }
 
   try {
@@ -210,8 +233,19 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
 
     if (!found) {
       const stale = getCached(titles, movie.year ?? null, true);
-      if (stale) return applyEnrichment(movie, stale, await getImageBaseUrl());
-      return movie;
+      if (stale) {
+        const status: TmdbStatus = {
+          ...baseStatus,
+          source: 'stale-cache',
+          matchedId: stale.enrichment.tmdbId,
+          matchedTitle: stale.enrichment.tmdbTitle,
+          matchedOriginalTitle: stale.enrichment.tmdbOriginalTitle,
+          fetchedAt: stale.fetchedAt,
+          message: 'Sin resultados actuales, usando caché expirada'
+        };
+        return applyEnrichment(movie, stale.enrichment, await getImageBaseUrl(), status);
+      }
+      return { ...movie, tmdbStatus: { ...baseStatus, source: 'not-found', message: 'TMDb no devolvió coincidencias' } };
     }
 
     const details = await fetchDetails(found.id);
@@ -226,16 +260,50 @@ export async function enrichWithTmdb(movie: MovieRecord): Promise<MovieRecord> {
       tmdbGenres: details?.genres?.map((g) => g.name) ?? undefined
     };
     setCached(titles, movie.year ?? null, enrichment);
-    return applyEnrichment(movie, enrichment, await getImageBaseUrl());
+    const status: TmdbStatus = {
+      ...baseStatus,
+      source: 'network',
+      matchedId: found.id,
+      matchedTitle: found.title,
+      matchedOriginalTitle: found.original_title,
+      fetchedAt: Date.now(),
+      message: 'Respuesta TMDb correcta'
+    };
+    return applyEnrichment(movie, enrichment, await getImageBaseUrl(), status);
   } catch (error) {
     console.error('TMDb lookup failed for', movie.originalTitle || movie.title, error);
     const stale = getCached(titles, movie.year ?? null, true);
-    if (stale) return applyEnrichment(movie, stale, await getImageBaseUrl());
-    return movie;
+    if (stale) {
+      const status: TmdbStatus = {
+        ...baseStatus,
+        source: 'stale-cache',
+        matchedId: stale.enrichment.tmdbId,
+        matchedTitle: stale.enrichment.tmdbTitle,
+        matchedOriginalTitle: stale.enrichment.tmdbOriginalTitle,
+        fetchedAt: stale.fetchedAt,
+        message: 'Error de red, se usa caché expirada',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+      return applyEnrichment(movie, stale.enrichment, await getImageBaseUrl(), status);
+    }
+    return {
+      ...movie,
+      tmdbStatus: {
+        ...baseStatus,
+        source: 'error',
+        message: 'Error al consultar TMDb',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    };
   }
 }
 
-function applyEnrichment(movie: MovieRecord, enrichment: TmdbEnrichment, baseUrl: string): MovieRecord {
+function applyEnrichment(
+  movie: MovieRecord,
+  enrichment: TmdbEnrichment,
+  baseUrl: string,
+  status?: TmdbStatus
+): MovieRecord {
   return {
     ...movie,
     tmdbId: enrichment.tmdbId,
@@ -246,6 +314,7 @@ function applyEnrichment(movie: MovieRecord, enrichment: TmdbEnrichment, baseUrl
     posterUrl: enrichment.posterPath ? buildPosterUrl(baseUrl, enrichment.posterPath) : movie.posterUrl,
     plot: enrichment.overview ?? movie.plot,
     tmdbGenres: enrichment.tmdbGenres ?? movie.tmdbGenres,
-    originalTitle: movie.originalTitle || enrichment.tmdbOriginalTitle || enrichment.tmdbTitle
+    originalTitle: movie.originalTitle || enrichment.tmdbOriginalTitle || enrichment.tmdbTitle,
+    tmdbStatus: status ?? movie.tmdbStatus
   };
 }
