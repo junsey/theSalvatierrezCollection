@@ -61,10 +61,10 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             </p>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Vista
+                <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Seen
               </label>
               <div>
-                <small>Mi puntuación (columna Puntuacion)</small>
+                <small>My rating</small>
                 <StarRating value={personalRating ?? 0} onChange={onRatingChange} />
               </div>
             </div>

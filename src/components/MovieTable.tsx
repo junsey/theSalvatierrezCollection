@@ -13,13 +13,13 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
       <thead>
         <tr>
           <th>Poster</th>
-          <th>Título</th>
-          <th>Año</th>
-          <th>Sección</th>
-          <th>Género</th>
-          <th>Vista</th>
+          <th>Title</th>
+          <th>Year</th>
+          <th>Section</th>
+          <th>Genre</th>
+          <th>Seen</th>
           <th>IMDb</th>
-          <th>Mi puntuación</th>
+          <th>My rating</th>
         </tr>
       </thead>
       <tbody>
@@ -36,7 +36,7 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
             <td>{movie.year ?? '—'}</td>
             <td>{movie.seccion}</td>
             <td>{movie.genreRaw}</td>
-            <td>{movie.seen ? 'Sí' : 'No'}</td>
+            <td>{movie.seen ? 'Seen' : 'Unseen'}</td>
             <td>{movie.imdbRating ?? 'N/A'}</td>
             <td>{personalRatings[movie.id] ?? '—'}</td>
           </tr>

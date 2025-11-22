@@ -20,12 +20,12 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
   return (
     <div className="filters">
       <input
-        placeholder="Buscar título"
+        placeholder="Search title"
         value={filters.query}
         onChange={(e) => onChange({ query: e.target.value })}
       />
       <select value={filters.seccion ?? ''} onChange={(e) => onChange({ seccion: e.target.value || null })}>
-        <option value="">Todas las secciones</option>
+        <option value="">All Sections</option>
         {secciones.map((s) => (
           <option key={s} value={s}>
             {s}
@@ -33,7 +33,7 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         ))}
       </select>
       <select value={filters.genre ?? ''} onChange={(e) => onChange({ genre: e.target.value || null })}>
-        <option value="">Todos los géneros</option>
+        <option value="">All Genres</option>
         {genres.map((g) => (
           <option key={g} value={g}>
             {g}
@@ -41,26 +41,26 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         ))}
       </select>
       <select value={filters.seen} onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}>
-        <option value="all">Vistas + no vistas</option>
-        <option value="seen">Solo vistas</option>
-        <option value="unseen">Solo no vistas</option>
+        <option value="all">Seen + Unseen</option>
+        <option value="seen">Seen only</option>
+        <option value="unseen">Unseen only</option>
       </select>
       <select value={filters.sort} onChange={(e) => onChange({ sort: e.target.value as MovieFilters['sort'] })}>
-        <option value="title-asc">Título A-Z</option>
-        <option value="title-desc">Título Z-A</option>
-        <option value="year-desc">Año ↓</option>
-        <option value="year-asc">Año ↑</option>
-        <option value="imdb-desc">IMDb ↓</option>
-        <option value="imdb-asc">IMDb ↑</option>
-        <option value="rating-desc">Mi puntuación ↓</option>
-        <option value="rating-asc">Mi puntuación ↑</option>
+        <option value="title-asc">Title A-Z</option>
+        <option value="title-desc">Title Z-A</option>
+        <option value="year-desc">Year ↓</option>
+        <option value="year-asc">Year ↑</option>
+        <option value="imdb-desc">IMDb rating ↓</option>
+        <option value="imdb-asc">IMDb rating ↑</option>
+        <option value="rating-desc">My rating ↓</option>
+        <option value="rating-asc">My rating ↑</option>
       </select>
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
-          Carteles
+          Grid
         </button>
         <button onClick={() => onChange({ view: 'list' })} aria-label="List view">
-          Lista
+          List
         </button>
       </div>
     </div>

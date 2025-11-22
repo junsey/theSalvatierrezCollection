@@ -7,7 +7,7 @@ type StoredState = {
   filters: Partial<MovieFilters>;
 };
 
-const STORAGE_KEY = 'salvatierrez-collection-state-v1';
+const STORAGE_KEY = 'catacombs-movie-state-v1';
 
 function loadState(): StoredState {
   if (typeof localStorage === 'undefined') return { seen: {}, ratings: {}, notes: {}, filters: {} };
@@ -67,7 +67,6 @@ export function setStoredFilters(filters: Partial<MovieFilters>) {
 export function applyLocalOverrides(movies: MovieRecord[]): MovieRecord[] {
   return movies.map((movie) => ({
     ...movie,
-    seen: state.seen[movie.id] ?? movie.seen,
-    rating: state.ratings[movie.id] ?? movie.rating
+    seen: state.seen[movie.id] ?? movie.seen
   }));
 }

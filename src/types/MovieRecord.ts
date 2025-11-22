@@ -8,7 +8,6 @@ export type MovieRecord = {
   director: string;
   group: string;
   seen: boolean;
-  rating?: number | null;
   dubbing: string;
   format: string;
   imdbId?: string;

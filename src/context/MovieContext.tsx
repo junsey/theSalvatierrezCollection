@@ -24,7 +24,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [seenOverrides, setSeenOverridesState] = useState(getSeenOverrides());
-  const [ratingOverrides, setRatings] = useState(getRatingOverrides());
+  const [ratings, setRatings] = useState(getRatingOverrides());
   const [notes, setNotes] = useState(getNotes());
 
   const refresh = async () => {
@@ -63,22 +63,9 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setNotes((prev) => ({ ...prev, [id]: text }));
   };
 
-  const personalRatings = useMemo(() => {
-    const map: Record<string, number> = {};
-    movies.forEach((movie) => {
-      const override = ratingOverrides[movie.id];
-      if (override !== undefined) {
-        map[movie.id] = override;
-      } else if (movie.rating != null) {
-        map[movie.id] = movie.rating;
-      }
-    });
-    return map;
-  }, [movies, ratingOverrides]);
-
   const value = useMemo(
-    () => ({ movies, loading, error, refresh, updateSeen, updateRating, updateNote, seenOverrides, ratings: personalRatings, notes }),
-    [movies, loading, error, seenOverrides, personalRatings, notes]
+    () => ({ movies, loading, error, refresh, updateSeen, updateRating, updateNote, seenOverrides, ratings, notes }),
+    [movies, loading, error, seenOverrides, ratings, notes]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;

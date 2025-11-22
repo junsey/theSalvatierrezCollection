@@ -13,7 +13,7 @@ export const Header: React.FC = () => {
   return (
     <header className="navbar">
       <Link to="/" className="logo" style={{ fontFamily: 'UnifrakturMaguntia, serif', color: 'var(--accent-2)', fontSize: 26 }}>
-        The Salvatierrez Collection
+        Catacombs of Celluloid
       </Link>
       <nav className="nav-links">
         {navItems.map((item) => (
