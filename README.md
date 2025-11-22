@@ -18,12 +18,12 @@ Create a `.env` file (Vite style) in the project root with your API keys and she
 ```
 VITE_OMDB_API_KEY=your_omdb_key_here
 VITE_OMDB_URL=https://www.omdbapi.com/
-VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/export?format=csv
+VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/gviz/tq?tqx=out:csv
 ```
 
 - **IMDb/OMDb**: La app llama a OMDb. Puedes poner `VITE_OMDB_API_KEY` para usar tu propia clave; incluye un fallback (fd2b1d69)
   para que las portadas/ratings carguen de inmediato.
-- **Google Sheets**: La URL por defecto apunta a la hoja compartida. Cambia `VITE_SHEETS_CSV_URL` si quieres otra. Hay un pequeño fallback offline para demos.
+- **Google Sheets**: La app probará en orden `VITE_SHEETS_CSV_URL` (si existe), `gviz/tq?tqx=out:csv`, `export?format=csv&gid=0` y `pub?output=csv` sobre la hoja compartida para esquivar 404/403. Los resultados se guardan en `localStorage` 24h para evitar reintentos.
  - **Cache de IMDb**: Las respuestas de OMDb se guardan en `localStorage` (clave `salvatierrez-imdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado.
 
 ## Features
@@ -33,7 +33,7 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 - Two browsing modes: poster grid and compact table view, both with search, filtering (genre, section, seen), and sorting options.
 - Detailed modal with poster, plot, IMDb/local metadata, seen toggle, personal star rating (1–10), and notes (all persisted locally).
 - Genre and section hubs plus dedicated pages to browse movies within each category.
-- “Ritual of Random Cinema” surprise picker with genre/section filters and “exclude seen” safeguard.
+- “Ritual of Random Cinema” surprise picker with section filter and “exclude seen” safeguard.
 - Responsive dark fantasy theme with neon-cinema accents, subtle grain textures, and hover glows.
 
 ## Project structure

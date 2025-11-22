@@ -10,7 +10,8 @@ export type ImdbResult = {
   Genre?: string;
 };
 
-const OMDB_URL = import.meta.env.VITE_OMDB_URL || 'http://www.omdbapi.com/';
+// Use HTTPS by default to avoid mixed-content blocks in browsers.
+const OMDB_URL = import.meta.env.VITE_OMDB_URL || 'https://www.omdbapi.com/';
 // Default key provided by the user as a fallback so posters/ratings load out of the box.
 const DEFAULT_OMDB_KEY = 'fd2b1d69';
 const CACHE_KEY = 'salvatierrez-imdb-cache-v1';
