@@ -5,6 +5,7 @@ import { MovieCard } from '../components/MovieCard';
 import { MovieDetail } from '../components/MovieDetail';
 import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
+import { getDirectorProfile } from '../data/directorProfiles';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const baseFilters: MovieFilters = {
@@ -34,10 +35,30 @@ export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const directorName = decodeURIComponent(name ?? '');
+  const profile = getDirectorProfile(directorName);
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
   const directorMovies = useMemo(() => movies.filter((m) => matchesDirector(m, directorName)), [movies, directorName]);
+
+  const directorStats = useMemo(() => {
+    const total = directorMovies.length;
+    const seen = directorMovies.filter((m) => m.seen).length;
+    return { total, seen };
+  }, [directorMovies]);
+
+  const collectionTitles = useMemo(
+    () => directorMovies.map((m) => m.title.toLowerCase()),
+    [directorMovies]
+  );
+
+  const suggestedFilmography = useMemo(() => {
+    const planned = profile.filmography ?? [];
+    return planned.map((title) => ({
+      title,
+      inCollection: collectionTitles.includes(title.toLowerCase()),
+    }));
+  }, [profile.filmography, collectionTitles]);
 
   const filtered = useMemo(() => {
     return directorMovies
@@ -85,7 +106,28 @@ export const DirectorPage: React.FC = () => {
 
   return (
     <section>
-      <h1>Director: {directorName}</h1>
+      <div className="director-hero">
+        <div
+          className="director-portrait"
+          style={{ backgroundImage: `url(${profile.image})` }}
+          aria-hidden="true"
+        />
+        <div className="director-legend">
+          <p className="eyebrow">Directores</p>
+          <h1>{directorName}</h1>
+          <p className="text-muted">{profile.bio}</p>
+          <div className="stats-row">
+            <div className="stat-pill">
+              <strong>{directorStats.total}</strong>
+              <span>películas en la colección</span>
+            </div>
+            <div className="stat-pill">
+              <strong>{directorStats.seen}</strong>
+              <span>vistas</span>
+            </div>
+          </div>
+        </div>
+      </div>
       <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={directorMovies} />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
@@ -106,6 +148,22 @@ export const DirectorPage: React.FC = () => {
           onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
+      )}
+      {suggestedFilmography.length > 0 && (
+        <div className="filmography-block">
+          <h2>Filmografía sugerida</h2>
+          <p className="text-muted">
+            Títulos clave del director para completar la colección. Los que ya tienes aparecen como marcados.
+          </p>
+          <ul className="filmography-list">
+            {suggestedFilmography.map((entry) => (
+              <li key={entry.title} className={entry.inCollection ? 'owned' : 'pending'}>
+                <span>{entry.title}</span>
+                <span className="pill">{entry.inCollection ? 'En la colección' : 'Pendiente'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );
