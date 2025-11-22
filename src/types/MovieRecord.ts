@@ -4,6 +4,7 @@ export type MovieRecord = {
   year: number | null;
   saga: string;
   title: string;
+  originalTitle?: string;
   genreRaw: string;
   director: string;
   group: string;

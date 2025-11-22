@@ -1,39 +1,39 @@
 const sectionArtLibrary: { matcher: RegExp; url: string }[] = [
   {
     matcher: /accion|aventura/i,
-    url: 'https://images.unsplash.com/photo-1523821741446-edb2b68bb7a0?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /fantasia/i,
-    url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /ciencia ficcion|ficcion/i,
-    url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /terror|horror/i,
-    url: 'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /drama/i,
-    url: 'https://images.unsplash.com/photo-1529101091764-c3526daf38fe?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /animacion|animación/i,
-    url: 'https://images.unsplash.com/photo-1522178129978-0d82f235010e?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1451933335233-c6b65bd26113?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /comedia/i,
-    url: 'https://images.unsplash.com/photo-1532960400009-1ee5b7c7b144?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1505685296765-3a2736de412f?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /romance/i,
-    url: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1525859331226-4ff030c35c66?auto=format&fit=crop&w=1400&q=80',
   },
   {
     matcher: /biografia|historia/i,
-    url: 'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80',
+    url: 'https://images.unsplash.com/photo-1462212210333-335063b676d4?auto=format&fit=crop&w=1400&q=80',
   },
 ];
 

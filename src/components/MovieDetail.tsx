@@ -39,6 +39,11 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
           <div style={{ flex: 1, minWidth: 260 }}>
             <h2>{movie.title}</h2>
             <p>
+              {movie.originalTitle && (
+                <span style={{ display: 'block', color: 'var(--text-muted)' }}>
+                  Título original: {movie.originalTitle}
+                </span>
+              )}
               {movie.imdbTitle && <em style={{ color: 'var(--text-muted)' }}>IMDb: {movie.imdbTitle}</em>} <br />
               <strong>{movie.year ?? 'Year ?'}</strong> • {movie.seccion}
             </p>

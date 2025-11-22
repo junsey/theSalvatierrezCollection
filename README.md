@@ -57,7 +57,7 @@ src/
 
 ## Notes
 
-- Movie data uses the spreadsheet headers: **Seccion**, **Año**, **Saga**, **Titulo**, **Genero**, **Director**, **Grupo**, **Vista**, **Doblaje**, **Formato**.
+- Movie data uses the spreadsheet headers: **Seccion**, **Año**, **Saga**, **Titulo**, **Titulo Original**, **Genero**, **Director**, **Grupo**, **Vista**, **Doblaje**, **Formato**. La columna **Titulo Original** se usa como título preferido para las llamadas a la API de IMDb/OMDb antes de intentar con **Titulo**.
 - Local overrides are stored under the `salvatierrez-collection-state-v1` key in `localStorage`.
 - Because IMDb enrichment is client-side, consider proxying `VITE_OMDB_URL` through your own backend if you want to hide keys or add caching.
 - If alguna fusión deja la app "en blanco", basta con reinstalar dependencias (`npm install`) y correr `npm run dev`. Todo el tema, las rutas, el fetch de Sheets con caché de 24h y la caché de IMDb de 6 meses ya están en este repo: no hace falta rehacer nada, solo desplegar de nuevo.

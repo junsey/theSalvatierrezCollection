@@ -43,38 +43,50 @@ function saveCache(cache: ImdbCache) {
 
 const imdbCache: ImdbCache = loadCache();
 
+const normalizeTitle = (title: string) => title.trim().toLowerCase();
+
 function makeCacheKey(title: string, year?: number | null) {
-  return `${title.trim().toLowerCase()}|${year ?? ''}`;
+  return `${normalizeTitle(title)}|${year ?? ''}`;
 }
 
-function getCachedResult(title: string, year?: number | null): ImdbResult | null {
-  const key = makeCacheKey(title, year);
-  const entry = imdbCache[key];
-  if (!entry) return null;
-  const age = Date.now() - entry.fetchedAt;
-  // Use fresh cache if younger than six months.
-  if (age <= SIX_MONTHS_MS) return entry.data;
+function getCachedResult(titles: string[], year?: number | null, allowStale = false): ImdbResult | null {
+  for (const title of titles) {
+    const key = makeCacheKey(title, year);
+    const entry = imdbCache[key];
+    if (!entry) continue;
+    const age = Date.now() - entry.fetchedAt;
+    if (allowStale || age <= SIX_MONTHS_MS) {
+      return entry.data;
+    }
+  }
   return null;
 }
 
-function getStaleResult(title: string, year?: number | null): ImdbResult | null {
-  const key = makeCacheKey(title, year);
-  return imdbCache[key]?.data ?? null;
-}
-
-function setCachedResult(title: string, year: number | null, data: ImdbResult) {
-  const key = makeCacheKey(title, year);
-  imdbCache[key] = { fetchedAt: Date.now(), data };
+function setCachedResult(titles: string[], year: number | null, data: ImdbResult) {
+  titles.forEach((title) => {
+    const key = makeCacheKey(title, year);
+    imdbCache[key] = { fetchedAt: Date.now(), data };
+  });
   saveCache(imdbCache);
 }
 
-async function fetchOmdb(title: string, year?: number | null): Promise<ImdbResult | null> {
-  const cached = getCachedResult(title, year);
+async function fetchOmdb(candidateTitles: (string | undefined)[], year?: number | null): Promise<ImdbResult | null> {
+  const titles = Array.from(
+    new Set(
+      candidateTitles
+        .filter((t): t is string => Boolean(t && t.trim()))
+        .map((t) => t.trim())
+    )
+  );
+
+  if (titles.length === 0) return null;
+
+  const cached = getCachedResult(titles, year ?? undefined);
   if (cached) return cached;
 
   const apiKey = import.meta.env.VITE_OMDB_API_KEY || DEFAULT_OMDB_KEY;
 
-  const fetchByTitle = async (y?: number | null) => {
+  const fetchByTitle = async (title: string, y?: number | null) => {
     const url = new URL(OMDB_URL);
     url.searchParams.set('apikey', apiKey);
     url.searchParams.set('t', title);
@@ -102,7 +114,7 @@ async function fetchOmdb(title: string, year?: number | null): Promise<ImdbResul
     return data;
   };
 
-  const searchByTitle = async () => {
+  const searchByTitle = async (title: string) => {
     const url = new URL(OMDB_URL);
     url.searchParams.set('apikey', apiKey);
     url.searchParams.set('s', title);
@@ -114,30 +126,38 @@ async function fetchOmdb(title: string, year?: number | null): Promise<ImdbResul
     return fetchById(data.Search[0].imdbID);
   };
 
-  const withYear = await fetchByTitle(year ?? undefined);
-  if (withYear) {
-    setCachedResult(title, year ?? null, withYear);
-    return withYear;
+  for (const title of titles) {
+    const withYear = await fetchByTitle(title, year ?? undefined);
+    if (withYear) {
+      setCachedResult(titles, year ?? null, withYear);
+      return withYear;
+    }
   }
 
-  const withoutYear = await fetchByTitle();
-  if (withoutYear) {
-    setCachedResult(title, year ?? null, withoutYear);
-    return withoutYear;
+  for (const title of titles) {
+    const withoutYear = await fetchByTitle(title);
+    if (withoutYear) {
+      setCachedResult(titles, year ?? null, withoutYear);
+      return withoutYear;
+    }
   }
 
-  const searched = await searchByTitle();
+  const searched = await searchByTitle(titles[0]);
   if (searched) {
-    setCachedResult(title, year ?? null, searched);
+    setCachedResult(titles, year ?? null, searched);
     return searched;
   }
+
+  const stale = getCachedResult(titles, year ?? undefined, true);
+  if (stale) return stale;
 
   return null;
 }
 
 export async function enrichWithImdb(movie: MovieRecord): Promise<MovieRecord> {
   try {
-    const data = (await fetchOmdb(movie.title, movie.year)) ?? getStaleResult(movie.title, movie.year);
+    const lookupTitles = [movie.originalTitle, movie.title];
+    const data = await fetchOmdb(lookupTitles, movie.year);
     if (!data) return movie;
     const imdbGenres = data.Genre?.split(',').map((g) => g.trim()).filter(Boolean);
     return {
@@ -151,7 +171,7 @@ export async function enrichWithImdb(movie: MovieRecord): Promise<MovieRecord> {
       imdbGenres
     };
   } catch (error) {
-    console.error('IMDb lookup failed for', movie.title, error);
+    console.error('IMDb lookup failed for', movie.originalTitle || movie.title, error);
     return movie;
   }
 }
