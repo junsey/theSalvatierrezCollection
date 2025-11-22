@@ -10,25 +10,19 @@ interface Props {
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
 
 export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeSeenDefault = true }) => {
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
 
-  const genres = useMemo(
-    () => unique(movies.flatMap((m) => m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()))),
-    [movies]
-  );
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
 
   const filtered = useMemo(() => {
     return movies.filter((m) => {
-      const genreMatch = selectedGenres.length === 0 || selectedGenres.some((g) => m.genreRaw.includes(g));
       const sectionMatch = selectedSections.length === 0 || selectedSections.includes(m.seccion);
       const seenMatch = excludeSeen ? !m.seen : true;
-      return genreMatch && sectionMatch && seenMatch;
+      return sectionMatch && seenMatch;
     });
-  }, [movies, selectedGenres, selectedSections, excludeSeen]);
+  }, [movies, selectedSections, excludeSeen]);
 
   const summon = () => {
     if (filtered.length === 0) {
@@ -48,23 +42,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     <div className="panel">
       <h2>Ritual of Random Cinema</h2>
       <div className="filters">
-        <div>
-          <small>Genre</small>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 500 }}>
-            {genres.map((genre) => (
-              <button
-                key={genre}
-                onClick={() => toggleValue(selectedGenres, genre, setSelectedGenres)}
-                style={{
-                  background: selectedGenres.includes(genre) ? 'rgba(255,54,93,0.3)' : undefined,
-                  borderColor: selectedGenres.includes(genre) ? 'rgba(255,54,93,0.6)' : undefined
-                }}
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-        </div>
         <div>
           <small>Sections</small>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 500 }}>
