@@ -277,6 +277,7 @@ type EnrichOptions = {
   allowStaleCache?: boolean;
   forceNetwork?: boolean;
   maxRequestsPerSecond?: number;
+  onProgress?: (current: number, total: number) => void;
 };
 
 export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions): Promise<MovieRecord> {
@@ -434,15 +435,22 @@ export async function enrichMoviesBatch(
 ): Promise<MovieRecord[]> {
   const maxRps = options?.maxRequestsPerSecond ?? DEFAULT_MAX_RPS;
   const results: MovieRecord[] = [];
+  const total = movies.length;
 
-  for (const movie of movies) {
+  for (let i = 0; i < movies.length; i++) {
+    const movie = movies[i];
     // Reutiliza caché (incluso expirada) salvo que se fuerce red a través de las opciones
     const enriched = await enrichWithTmdb(movie, {
-      ...options,
       allowStaleCache: options?.allowStaleCache ?? true,
+      forceNetwork: options?.forceNetwork,
       maxRequestsPerSecond: maxRps
     });
     results.push(enriched);
+    
+    // Reportar progreso
+    if (options?.onProgress) {
+      options.onProgress(i + 1, total);
+    }
   }
 
   return results;
