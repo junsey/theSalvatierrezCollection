@@ -558,3 +558,110 @@ small {
 .status-accordion__error {
   color: #ff8f8f;
 }
+
+.director-section {
+  margin: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.director-section__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+}
+
+.director-card {
+  background: radial-gradient(circle at 20% 20%, rgba(140, 31, 49, 0.18), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(67, 126, 168, 0.15), transparent 45%),
+    linear-gradient(135deg, rgba(8, 8, 12, 0.95), rgba(18, 16, 26, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45), 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.director-card__header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.director-card__portrait {
+  position: relative;
+  width: 120px;
+  height: 160px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.08), inset 0 0 18px rgba(0, 0, 0, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.director-card__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.8) contrast(1.05);
+}
+
+.director-card__sigil {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  color: var(--text-bright);
+  text-shadow: 0 0 12px rgba(255, 72, 132, 0.5);
+  font-size: 18px;
+}
+
+.director-card__meta {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.director-card__meta h3 {
+  margin: 0;
+  font-family: 'Uncial Antiqua', 'EB Garamond', serif;
+  letter-spacing: 0.5px;
+  color: var(--text-bright);
+}
+
+.director-card__facts {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.director-card__aka {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.director-card__films {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  padding-top: 10px;
+}
+
+.director-card__films h4 {
+  margin: 0 0 8px;
+  font-family: 'Uncial Antiqua', 'EB Garamond', serif;
+  letter-spacing: 0.5px;
+}
+
+.film-link {
+  color: var(--text-bright);
+  text-decoration: none;
+}
+
+.film-link:hover {
+  text-decoration: underline;
+}

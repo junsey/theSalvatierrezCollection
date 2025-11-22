@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FiltersBar } from '../components/FiltersBar';
 import { MovieCard } from '../components/MovieCard';
 import { MovieDetail } from '../components/MovieDetail';
@@ -20,6 +21,7 @@ export const AllMoviesPage: React.FC = () => {
   const { movies, loading, error, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
+  const location = useLocation();
 
   const handleChange = (patch: Partial<MovieFilters>) => {
     const next = { ...filters, ...patch };
@@ -64,6 +66,18 @@ export const AllMoviesPage: React.FC = () => {
         }
       });
   }, [movies, filters, ratings]);
+
+  useEffect(() => {
+    if (!movies.length) return;
+    const params = new URLSearchParams(location.search);
+    const tmdbId = params.get('tmdbId');
+    if (tmdbId) {
+      const match = movies.find((m) => m.tmdbId === Number(tmdbId));
+      if (match) {
+        setActiveMovie(match);
+      }
+    }
+  }, [location.search, movies]);
 
   return (
     <section>

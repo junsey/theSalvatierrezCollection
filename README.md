@@ -21,7 +21,7 @@ VITE_TMDB_BEARER=your_tmdb_bearer_here
 VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/gviz/tq?tqx=out:csv
 ```
 
-- **TMDb**: La app consulta TMDb. Puedes dejar las claves por defecto o definir `VITE_TMDB_API_KEY` y `VITE_TMDB_BEARER` si quieres usar tus propias credenciales.
+- **TMDb**: La app consulta TMDb. Debes definir `VITE_TMDB_API_KEY` y `VITE_TMDB_BEARER` en tu `.env`; no se incluyen claves embebidas en el código.
 - **Google Sheets**: La app probará en orden `VITE_SHEETS_CSV_URL` (si existe), `gviz/tq?tqx=out:csv`, `export?format=csv&gid=0` y `pub?output=csv` sobre la hoja compartida para esquivar 404/403. Los resultados se guardan en `localStorage` 24h para evitar reintentos y, si la red falla, se usa la copia guardada aunque esté expirada.
   - Incluye una copia embebida en `src/data/sheet-backup.csv` para que nunca quede en blanco; puedes reemplazarla con un export de la hoja.
   - En la sección **Configuración** hay un botón para regenerar manualmente el documento y forzar un fetch fresco.
@@ -36,10 +36,10 @@ VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDy
 ## Features
 
 - Fetches movies from Google Sheets on load and overlays local overrides from `localStorage` (seen status, ratings, notes, view preferences). La columna **Vista** inicializa el estado, y la columna **Puntuacion** inicializa la nota personal.
-- Enriquecimiento TMDb por película (poster, plot, rating, year, genres). Gracefully falls back when data is missing y usa caché de 6 meses.
+- Enriquecimiento TMDb por película (poster, plot, rating, year, genres). Gracefully falls back cuando falta data y usa caché de 6 meses.
 - Two browsing modes: poster grid and compact table view, both with search, filtering (sección, visto/no visto), and sorting options.
 - Detailed modal with poster, plot, TMDb/local metadata, seen toggle, personal star rating (1–10), and notes (all persisted locally).
-- Director and section hubs plus dedicated pages to browse movies within each category.
+- Director and section hubs plus dedicated pages to browse movies within cada categoría, y tarjetas de director dentro del modal de detalle con biografía (Wikipedia/TMDb), retrato y filmografía enlazada.
 - “Ritual of Random Cinema” surprise picker with multi-select sección filter and “exclude seen” safeguard.
 - Settings page to ver la procedencia del documento, última sincronización, y regenerar manualmente el CSV.
 - Responsive dark fantasy theme with neon-cinema accents, subtle grain textures, and hover glows.

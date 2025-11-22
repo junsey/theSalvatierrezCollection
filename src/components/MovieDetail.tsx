@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MovieRecord } from '../types/MovieRecord';
+import { DirectorCard } from './DirectorCard';
+import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 
 interface Props {
   movie: MovieRecord;
@@ -25,6 +27,28 @@ const StarRating: React.FC<{ value: number; onChange: (val: number) => void }> =
 };
 
 export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onRatingChange, onNoteChange, personalRating, personalNote }) => {
+  const [directors, setDirectors] = useState<{ id: number; name: string }[]>([]);
+  const [loadingDirectors, setLoadingDirectors] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchDirectors() {
+      if (!movie.tmdbId) {
+        setDirectors([]);
+        return;
+      }
+      setLoadingDirectors(true);
+      const found = await getDirectorFromMovie(movie.tmdbId);
+      if (!active) return;
+      setDirectors(found);
+      setLoadingDirectors(false);
+    }
+    fetchDirectors();
+    return () => {
+      active = false;
+    };
+  }, [movie.tmdbId]);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="panel modal" onClick={(e) => e.stopPropagation()}>
@@ -60,7 +84,20 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
               )}
             </p>
             {movie.saga && <p><strong>Saga:</strong> {movie.saga}</p>}
-            <p><strong>Director:</strong> {movie.director}</p>
+            <div className="director-section">
+              <div className="director-section__heading">
+                <strong>Director(es)</strong>
+                <small className="muted">Dato base: {movie.director || '—'}</small>
+              </div>
+              {!movie.tmdbId && <p className="muted">Sin TMDb ID para cruzar créditos.</p>}
+              {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
+              {movie.tmdbId && !loadingDirectors && directors.length === 0 && (
+                <p className="muted">TMDb no devolvió dirección para este título.</p>
+              )}
+              {directors.map((director) => (
+                <DirectorCard key={director.id} directorId={director.id} name={director.name} />
+              ))}
+            </div>
             {movie.group && <p><strong>Group:</strong> {movie.group}</p>}
             <p><strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}</p>
             <p><strong>Plot:</strong> {movie.plot ?? 'No plot available.'}</p>

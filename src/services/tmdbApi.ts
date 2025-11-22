@@ -1,9 +1,11 @@
 import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
 
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY || '69fde1846d54ced5beb027c9f07cf9a5';
-const TMDB_BEARER =
-  import.meta.env.VITE_TMDB_BEARER ||
-  'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2OWZkZTE4NDZkNTRjZWQ1YmViMDI3YzlmMDdjZjlhNSIsIm5iZiI6MTc2Mzg0NDExNS42NDYwMDAxLCJzdWIiOiI2OTIyMjAxM2U0N2UwNjU1ODcwYmExNmEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.-6sK7MbM6MYTU--zkDmwaSNEZ21D5onjxn_wPicFZ0o';
+export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY ?? '';
+export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER ?? '';
+
+if (!TMDB_API_KEY) {
+  console.warn('Falta la variable VITE_TMDB_API_KEY; configura tu clave de TMDb en el entorno.');
+}
 
 const API_BASE = 'https://api.themoviedb.org/3';
 const IMG_FALLBACK_BASE = 'https://image.tmdb.org/t/p/';
@@ -108,7 +110,7 @@ async function rateLimit(maxRps: number = DEFAULT_MAX_RPS) {
   lastRequestAt = Date.now();
 }
 
-async function fetchJson<T>(url: string, maxRps?: number): Promise<T> {
+export async function tmdbFetchJson<T>(url: string, maxRps?: number): Promise<T> {
   await rateLimit(maxRps ?? DEFAULT_MAX_RPS);
   const response = await fetch(url, {
     headers: {
@@ -154,7 +156,7 @@ async function getImageBaseUrl(): Promise<string> {
   if (cached) return cached.secureBaseUrl;
   try {
     const url = `${API_BASE}/configuration?api_key=${TMDB_API_KEY}`;
-    const data = await fetchJson<{ images?: { secure_base_url?: string } }>(url);
+    const data = await tmdbFetchJson<{ images?: { secure_base_url?: string } }>(url);
     const secureBaseUrl = data.images?.secure_base_url ?? IMG_FALLBACK_BASE;
     saveConfigCache({ fetchedAt: Date.now(), secureBaseUrl });
     return secureBaseUrl;
@@ -204,7 +206,7 @@ async function searchMovie(title: string, year?: number | null, maxRps?: number)
   url.searchParams.set('language', 'es-ES');
   if (year) url.searchParams.set('year', String(year));
 
-  const data = await fetchJson<{ results?: SearchResult[] }>(url.toString(), maxRps);
+  const data = await tmdbFetchJson<{ results?: SearchResult[] }>(url.toString(), maxRps);
   if (!data.results?.length) return null;
 
   if (!year) return data.results[0];
@@ -217,7 +219,7 @@ async function searchMovie(title: string, year?: number | null, maxRps?: number)
 async function fetchDetails(id: number, maxRps?: number): Promise<DetailResult | null> {
   const url = `${API_BASE}/movie/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
-    return await fetchJson<DetailResult>(url, maxRps);
+    return await tmdbFetchJson<DetailResult>(url, maxRps);
   } catch (error) {
     console.warn('TMDb details fetch failed', error);
     return null;
