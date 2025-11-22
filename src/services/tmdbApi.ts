@@ -1,37 +1,24 @@
 import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
 
-// Cargar variables de entorno con fallback para debugging
-export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY as string | undefined;
-export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER as string | undefined;
+export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER;
 
 // Debug: verificar que las variables se carguen correctamente
 if (import.meta.env.DEV) {
-  console.log('🔍 Debug - Variables de entorno TMDb:', {
+  console.log('Variables de entorno TMDb:', {
     hasApiKey: !!TMDB_API_KEY,
     hasBearer: !!TMDB_BEARER,
-    apiKeyValue: TMDB_API_KEY ? `${TMDB_API_KEY.substring(0, 8)}...` : 'undefined',
     apiKeyLength: TMDB_API_KEY?.length ?? 0,
-    bearerLength: TMDB_BEARER?.length ?? 0,
-    allEnvKeys: Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'))
+    bearerLength: TMDB_BEARER?.length ?? 0
   });
 }
 
 if (!TMDB_API_KEY) {
-  console.error('❌ Falta la variable VITE_TMDB_API_KEY.');
-  console.error('📝 Solución:');
-  console.error('   1. Verifica que el archivo .env o .env.local existe en la raíz del proyecto');
-  console.error('   2. Asegúrate de que contiene: VITE_TMDB_API_KEY=tu_clave');
-  console.error('   3. ⚠️ IMPORTANTE: Reinicia el servidor de desarrollo (detén con Ctrl+C y ejecuta "npm run dev" de nuevo)');
-  console.error('   4. Vite solo carga las variables de entorno al iniciar, no en caliente');
+  console.error('❌ Falta la variable VITE_TMDB_API_KEY. Asegúrate de que el archivo .env existe y contiene VITE_TMDB_API_KEY=tu_clave');
 }
 
 if (!TMDB_BEARER) {
-  console.error('❌ Falta la variable VITE_TMDB_BEARER.');
-  console.error('📝 Solución:');
-  console.error('   1. Verifica que el archivo .env o .env.local existe en la raíz del proyecto');
-  console.error('   2. Asegúrate de que contiene: VITE_TMDB_BEARER=tu_token');
-  console.error('   3. ⚠️ IMPORTANTE: Reinicia el servidor de desarrollo (detén con Ctrl+C y ejecuta "npm run dev" de nuevo)');
-  console.error('   4. Vite solo carga las variables de entorno al iniciar, no en caliente');
+  console.error('❌ Falta la variable VITE_TMDB_BEARER. Asegúrate de que el archivo .env existe y contiene VITE_TMDB_BEARER=tu_token');
 }
 
 const API_BASE = 'https://api.themoviedb.org/3';
@@ -277,7 +264,6 @@ type EnrichOptions = {
   allowStaleCache?: boolean;
   forceNetwork?: boolean;
   maxRequestsPerSecond?: number;
-  onProgress?: (current: number, total: number) => void;
 };
 
 export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions): Promise<MovieRecord> {
@@ -435,22 +421,15 @@ export async function enrichMoviesBatch(
 ): Promise<MovieRecord[]> {
   const maxRps = options?.maxRequestsPerSecond ?? DEFAULT_MAX_RPS;
   const results: MovieRecord[] = [];
-  const total = movies.length;
 
-  for (let i = 0; i < movies.length; i++) {
-    const movie = movies[i];
+  for (const movie of movies) {
     // Reutiliza caché (incluso expirada) salvo que se fuerce red a través de las opciones
     const enriched = await enrichWithTmdb(movie, {
+      ...options,
       allowStaleCache: options?.allowStaleCache ?? true,
-      forceNetwork: options?.forceNetwork,
       maxRequestsPerSecond: maxRps
     });
     results.push(enriched);
-    
-    // Reportar progreso
-    if (options?.onProgress) {
-      options.onProgress(i + 1, total);
-    }
   }
 
   return results;
