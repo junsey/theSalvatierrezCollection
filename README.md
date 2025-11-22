@@ -16,8 +16,8 @@ Open http://localhost:5173 in your browser.
 Create a `.env` file (Vite style) in the project root with your API keys and sheet URL if you want to override defaults:
 
 ```
-VITE_TMDB_API_KEY=your_tmdb_key_here
-VITE_TMDB_BEARER=your_tmdb_bearer_here
+VITE_TMDB_API_KEY=69fde1846d54ced5beb027c9f07cf9a5
+VITE_TMDB_BEARER=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2OWZkZTE4NDZkNTRjZWQ1YmViMDI3YzlmMDdjZjlhNSIsIm5iZiI6MTc2Mzg0NDExNS42NDYwMDAxLCJzdWIiOiI2OTIyMjAxM2U0N2UwNjU1ODcwYmExNmEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.-6sK7MbM6MYTU--zkDmwaSNEZ21D5onjxn_wPicFZ0o
 VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/gviz/tq?tqx=out:csv
 ```
 
