@@ -17,6 +17,12 @@ import { MovieRecord } from '../types/MovieRecord';
 
 type RefreshOptions = Parameters<typeof fetchMovies>[0] & { invalidateMovieCache?: boolean };
 
+interface ProgressState {
+  current: number;
+  total: number;
+  message: string;
+}
+
 interface MovieContextValue {
   movies: MovieRecord[];
   loading: boolean;
@@ -25,7 +31,11 @@ interface MovieContextValue {
   ratings: Record<string, number>;
   notes: Record<string, string>;
   sheetMeta: SheetMeta | null;
+  progress: ProgressState | null;
   refresh: (options?: RefreshOptions) => Promise<void>;
+  refreshAll: () => Promise<void>;
+  refreshSheet: () => Promise<void>;
+  refreshMissing: () => Promise<void>;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
   updateNote: (id: string, text: string) => void;
@@ -41,6 +51,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [ratingOverrides, setRatings] = useState(getRatingOverrides());
   const [notes, setNotes] = useState(getNotes());
   const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
 
   const refresh = async (options?: RefreshOptions) => {
     setLoading(true);
@@ -68,14 +79,20 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setMovies(withLocal);
           const enriched = await enrichMoviesBatch(withLocal, {
             allowStaleCache: true,
-            maxRequestsPerSecond: 40
+            maxRequestsPerSecond: 40,
+            onProgress: (current, total, movieTitle) => {
+              const title = movieTitle ? `: ${movieTitle}` : '';
+              setProgress({ current, total, message: `Enriqueciendo películas ${current}/${total}${title}` });
+            }
           });
+          setProgress(null);
           setMovies(enriched);
           saveMovieCache(enriched, cached.sheetMeta ?? null);
           setLoading(false);
           return;
         } catch (err) {
           console.warn('Failed to re-enrich cached movies, falling back to cached payload', err);
+          setProgress(null);
           setMovies(withLocal);
           setLoading(false);
           return;
@@ -90,14 +107,131 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const enriched = await enrichMoviesBatch(withLocal, {
         allowStaleCache: !options?.forceNetwork,
         forceNetwork: options?.invalidateMovieCache,
-        maxRequestsPerSecond: 40
+        maxRequestsPerSecond: 40,
+        onProgress: (current, total, movieTitle) => {
+          const title = movieTitle ? `: ${movieTitle}` : '';
+          setProgress({ current, total, message: `Enriqueciendo películas ${current}/${total}${title}` });
+        }
       });
+      setProgress(null);
       setMovies(enriched);
       saveMovieCache(enriched, result.meta);
     } catch (err) {
+      setProgress(null);
       setError(err instanceof Error ? err.message : 'Unable to load movies');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshAll = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress({ current: 0, total: 100, message: 'Iniciando regeneración completa...' });
+    await refresh({ forceNetwork: true, invalidateMovieCache: true });
+  };
+
+  const refreshSheet = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress({ current: 0, total: 100, message: 'Recargando desde Google Sheets...' });
+    try {
+      const result: FetchMoviesResult = await fetchMovies({ forceNetwork: true });
+      setSheetMeta(result.meta);
+      const withLocal = applyLocalOverrides(result.movies);
+      setMovies(withLocal);
+      // Solo enriquece las que no tienen caché
+      const needsEnrichment = withLocal.filter(
+        (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
+      );
+      if (needsEnrichment.length > 0) {
+        setProgress({ current: 0, total: needsEnrichment.length, message: `Enriqueciendo ${needsEnrichment.length} películas nuevas...` });
+        const enriched = await enrichMoviesBatch(needsEnrichment, {
+          allowStaleCache: false,
+          maxRequestsPerSecond: 40,
+          onProgress: (current, total, movieTitle) => {
+            const title = movieTitle ? `: ${movieTitle}` : '';
+            setProgress({ current, total, message: `Enriqueciendo películas ${current}/${total}${title}` });
+          }
+        });
+        // Actualizar solo las películas enriquecidas
+        const enrichedMap = new Map(enriched.map(m => [m.id, m]));
+        const updated = withLocal.map(m => enrichedMap.get(m.id) || m);
+        setMovies(updated);
+        saveMovieCache(updated, result.meta);
+      } else {
+        saveMovieCache(withLocal, result.meta);
+      }
+      setProgress(null);
+      setLoading(false);
+    } catch (err) {
+      setProgress(null);
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Unable to refresh sheet');
+    }
+  };
+
+  const refreshMissing = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress({ current: 0, total: 100, message: 'Identificando películas sin caché...' });
+    try {
+      // Obtener películas actuales
+      const currentMovies = movies.length > 0 ? movies : (() => {
+        const cached = loadMovieCache();
+        if (cached) {
+          return applyLocalOverrides(cached.movies);
+        }
+        return [];
+      })();
+
+      if (currentMovies.length === 0) {
+        setProgress(null);
+        setLoading(false);
+        setError('No hay películas cargadas. Usa "Recargar Excel" primero.');
+        return;
+      }
+
+      // Filtrar películas que necesitan enriquecimiento
+      const needsEnrichment = currentMovies.filter(
+        (movie) => 
+          !movie.tmdbStatus || 
+          movie.tmdbStatus.source === 'none' || 
+          movie.tmdbStatus.source === 'error' ||
+          movie.tmdbStatus.source === 'not-found'
+      );
+
+      if (needsEnrichment.length === 0) {
+        setProgress(null);
+        setLoading(false);
+        return; // Todas tienen caché válido
+      }
+
+      setProgress({ current: 0, total: needsEnrichment.length, message: `Enriqueciendo ${needsEnrichment.length} películas...` });
+      
+      const enriched = await enrichMoviesBatch(needsEnrichment, {
+        allowStaleCache: false,
+        forceNetwork: true, // Forzar red para regenerar películas en error
+        maxRequestsPerSecond: 40,
+        onProgress: (current, total, movieTitle) => {
+          const title = movieTitle ? `: ${movieTitle}` : '';
+          setProgress({ current, total, message: `Enriqueciendo películas ${current}/${total}${title}` });
+        }
+      });
+
+      // Actualizar solo las películas enriquecidas
+      const enrichedMap = new Map(enriched.map(m => [m.id, m]));
+      const updated = currentMovies.map(m => enrichedMap.get(m.id) || m);
+      
+      setMovies(updated);
+      const cached = loadMovieCache();
+      saveMovieCache(updated, cached?.sheetMeta ?? null);
+      setProgress(null);
+      setLoading(false);
+    } catch (err) {
+      setProgress(null);
+      setLoading(false);
+      setError(err instanceof Error ? err.message : 'Unable to refresh missing movies');
     }
   };
 
@@ -135,8 +269,24 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [movies, ratingOverrides]);
 
   const value = useMemo(
-    () => ({ movies, loading, error, refresh, updateSeen, updateRating, updateNote, seenOverrides, ratings: personalRatings, notes, sheetMeta }),
-    [movies, loading, error, seenOverrides, personalRatings, notes, sheetMeta]
+    () => ({ 
+      movies, 
+      loading, 
+      error, 
+      refresh, 
+      refreshAll, 
+      refreshSheet, 
+      refreshMissing,
+      updateSeen, 
+      updateRating, 
+      updateNote, 
+      seenOverrides, 
+      ratings: personalRatings, 
+      notes, 
+      sheetMeta,
+      progress
+    }),
+    [movies, loading, error, seenOverrides, personalRatings, notes, sheetMeta, progress]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;

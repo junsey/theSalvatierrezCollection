@@ -146,6 +146,15 @@ function makeCacheKey(titles: string[], year?: number | null) {
   return `${normalizedTitles}|${year ?? ''}`;
 }
 
+export function clearFailedCacheForMovie(movie: MovieRecord) {
+  const titles = Array.from(new Set([movie.originalTitle, movie.title].filter(Boolean))) as string[];
+  const cacheKey = makeCacheKey(titles, movie.year ?? null);
+  if (failedCache[cacheKey]) {
+    delete failedCache[cacheKey];
+    saveFailedCache(failedCache);
+  }
+}
+
 type CacheHit = {
   enrichment: TmdbEnrichment;
   fetchedAt: number;
@@ -264,6 +273,7 @@ type EnrichOptions = {
   allowStaleCache?: boolean;
   forceNetwork?: boolean;
   maxRequestsPerSecond?: number;
+  onProgress?: (current: number, total: number, movieTitle?: string) => void;
 };
 
 export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions): Promise<MovieRecord> {
@@ -421,15 +431,28 @@ export async function enrichMoviesBatch(
 ): Promise<MovieRecord[]> {
   const maxRps = options?.maxRequestsPerSecond ?? DEFAULT_MAX_RPS;
   const results: MovieRecord[] = [];
+  const total = movies.length;
 
-  for (const movie of movies) {
+  for (let i = 0; i < movies.length; i++) {
+    const movie = movies[i];
+    
+    // Si forceNetwork está activo, limpiar el failedCache para esta película
+    if (options?.forceNetwork) {
+      clearFailedCacheForMovie(movie);
+    }
+    
     // Reutiliza caché (incluso expirada) salvo que se fuerce red a través de las opciones
     const enriched = await enrichWithTmdb(movie, {
-      ...options,
       allowStaleCache: options?.allowStaleCache ?? true,
+      forceNetwork: options?.forceNetwork,
       maxRequestsPerSecond: maxRps
     });
     results.push(enriched);
+    
+    // Reportar progreso con el título de la película
+    if (options?.onProgress) {
+      options.onProgress(i + 1, total, movie.title || movie.originalTitle);
+    }
   }
 
   return results;
