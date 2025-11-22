@@ -52,9 +52,34 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const cached = loadMovieCache();
       if (cached) {
         setSheetMeta(cached.sheetMeta ?? null);
-        setMovies(applyLocalOverrides(cached.movies));
-        setLoading(false);
-        return;
+        const withLocal = applyLocalOverrides(cached.movies);
+
+        const needsEnrichment = withLocal.some(
+          (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
+        );
+
+        if (!needsEnrichment) {
+          setMovies(withLocal);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setMovies(withLocal);
+          const enriched = await enrichMoviesBatch(withLocal, {
+            allowStaleCache: true,
+            maxRequestsPerSecond: 40
+          });
+          setMovies(enriched);
+          saveMovieCache(enriched, cached.sheetMeta ?? null);
+          setLoading(false);
+          return;
+        } catch (err) {
+          console.warn('Failed to re-enrich cached movies, falling back to cached payload', err);
+          setMovies(withLocal);
+          setLoading(false);
+          return;
+        }
       }
     }
     try {
