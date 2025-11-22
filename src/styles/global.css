@@ -408,6 +408,12 @@ button:hover {
   font-size: 18px;
 }
 
+.paw-rating {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
 .director-hero {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

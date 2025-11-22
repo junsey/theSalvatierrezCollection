@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MovieRecord } from '../types/MovieRecord';
 import { DirectorCard } from './DirectorCard';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
+import { PawRating } from './PawRating';
 
 interface Props {
   movie: MovieRecord;
@@ -104,6 +105,39 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             <p>
               <strong>TMDb rating:</strong> {movie.tmdbRating?.toFixed(1) ?? 'N/A'}
             </p>
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <h3 style={{ marginBottom: 12, fontSize: '1.1em' }}>Puntuaciones</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
+                  <>
+                    {movie.ratingGloria != null && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <strong>Gloria:</strong>
+                          <PawRating value={movie.ratingGloria} />
+                        </div>
+                      </div>
+                    )}
+                    {movie.ratingRodrigo != null && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <strong>Rodrigo:</strong>
+                          <PawRating value={movie.ratingRodrigo} />
+                        </div>
+                      </div>
+                    )}
+                    {movie.ratingGloria != null && movie.ratingRodrigo != null && (
+                      <div style={{ paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <strong>Promedio:</strong>
+                          <PawRating value={(movie.ratingGloria + movie.ratingRodrigo) / 2} />
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Vista

@@ -1,10 +1,14 @@
 import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
 
-export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY ?? '';
-export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER ?? '';
+export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER;
 
 if (!TMDB_API_KEY) {
   console.warn('Falta la variable VITE_TMDB_API_KEY; configura tu clave de TMDb en el entorno.');
+}
+
+if (!TMDB_BEARER) {
+  console.warn('Falta la variable VITE_TMDB_BEARER; configura tu bearer token de TMDb en el entorno.');
 }
 
 const API_BASE = 'https://api.themoviedb.org/3';

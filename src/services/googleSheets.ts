@@ -129,6 +129,8 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     group: record['Grupo'] ?? '',
     seen: parseBoolean(record['Vista'] ?? ''),
     rating: safeNumber(record['Puntuacion'] ?? ''),
+    ratingGloria: safeNumber(record['Puntuacion Gloria'] ?? ''),
+    ratingRodrigo: safeNumber(record['Puntuacion Rodrigo'] ?? ''),
     dubbing: record['Doblaje'] ?? '',
     format: record['Formato'] ?? ''
   };

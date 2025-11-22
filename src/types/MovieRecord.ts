@@ -10,6 +10,8 @@ export type MovieRecord = {
   group: string;
   seen: boolean;
   rating?: number | null;
+  ratingGloria?: number | null;
+  ratingRodrigo?: number | null;
   dubbing: string;
   format: string;
   tmdbId?: number;
