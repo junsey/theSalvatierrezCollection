@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { DirectorProfile, buildDirectorProfiles } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
-import directorSigil from '../assets/director-sigil.svg';
-import { getDirectorProfile } from '../data/directorProfiles';
+
+const FALLBACK_PORTRAIT =
+  'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
 const splitDirectors = (value: string) =>
   value
@@ -11,47 +13,103 @@ const splitDirectors = (value: string) =>
     .filter(Boolean);
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
-  const directors = Array.from(
-    new Set(
-      movies
-        .flatMap((m) => splitDirectors(m.director))
-        .filter(Boolean)
-    )
-  ).sort();
+  const directorNames = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          movies
+            .flatMap((m) => splitDirectors(m.director))
+            .filter(Boolean)
+        )
+      ).sort(),
+    [movies]
+  );
 
-  const directorStats = movies.reduce<Record<string, { total: number; seen: number }>>((acc, movie) => {
-    splitDirectors(movie.director).forEach((d) => {
-      if (!acc[d]) {
-        acc[d] = { total: 0, seen: 0 };
+  const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function hydrate() {
+      if (directorNames.length === 0) {
+        setProfiles([]);
+        setProgress(null);
+        return;
       }
-      acc[d].total += 1;
-      if (movie.seen) acc[d].seen += 1;
-    });
-    return acc;
-  }, {});
+      setLoading(true);
+      setError(null);
+      setProgress({ current: 0, total: directorNames.length });
+      try {
+        const enriched = await buildDirectorProfiles(directorNames, {
+          onProgress: (current, total) => {
+            if (!active) return;
+            setProgress({ current, total });
+          }
+        });
+        if (!active) return;
+        setProfiles(enriched);
+        setProgress(null);
+      } catch (err) {
+        console.warn('No se pudieron cargar los directores', err);
+        if (active) setError('No se pudieron cargar los directores.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    hydrate();
+    return () => {
+      active = false;
+    };
+  }, [directorNames]);
+
+  if (loading) {
+    return (
+      <div className="panel" style={{ marginBottom: 12 }}>
+        <p style={{ marginBottom: 8 }} className="muted">
+          Cargando directores...
+        </p>
+        {progress && (
+          <>
+            <div className="progress-bar">
+              <div
+                className="progress-bar-fill"
+                style={{ width: `${(progress.current / Math.max(progress.total, 1)) * 100}%` }}
+              />
+            </div>
+            <div style={{ marginTop: 6, fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              {progress.current} de {progress.total}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <p className="muted">{error}</p>;
+  }
 
   return (
     <div className="director-grid">
-      {directors.map((director) => {
-        const profile = getDirectorProfile(director);
-        return (
-          <Link key={director} to={`/directors/${encodeURIComponent(director)}`} className="director-card">
-            <div
-              className="director-thumb"
-              style={{ backgroundImage: `url(${profile.image})` }}
-              aria-hidden="true"
-            />
-            <div className="card-crest" aria-hidden="true">
-              <img src={directorSigil} alt="" />
-            </div>
-            <div className="section-meta">
-              <strong className="section-title">{director}</strong>
-              <small className="section-count">{directorStats[director]?.total ?? 0} películas</small>
-              <small className="section-count">{directorStats[director]?.seen ?? 0} vistas</small>
-            </div>
-          </Link>
-        );
-      })}
+      {profiles.map((director) => (
+        <Link
+          to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+          className="director-card"
+          key={director.name}
+        >
+          <div
+            className="director-thumb"
+            style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
+            aria-hidden
+          />
+          <div className="section-meta">
+            <strong className="section-title">{director.displayName || director.name}</strong>
+            <small className="section-count">Ver perfil</small>
+          </div>
+        </Link>
+      ))}
     </div>
   );
 };

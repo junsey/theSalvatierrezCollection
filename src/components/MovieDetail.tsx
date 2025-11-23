@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { MovieRecord } from '../types/MovieRecord';
-import { DirectorCard } from './DirectorCard';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { PawRating } from './PawRating';
 
@@ -28,8 +28,15 @@ const StarRating: React.FC<{ value: number; onChange: (val: number) => void }> =
 };
 
 export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onRatingChange, onNoteChange, personalRating, personalNote }) => {
-  const [directors, setDirectors] = useState<{ id: number; name: string }[]>([]);
+  const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
+
+  const fallbackDirectors = movie.director
+    ? movie.director
+        .split(/[,;/&]/g)
+        .map((d) => d.trim())
+        .filter(Boolean)
+    : [];
 
   useEffect(() => {
     let active = true;
@@ -41,7 +48,8 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
       setLoadingDirectors(true);
       const found = await getDirectorFromMovie(movie.tmdbId);
       if (!active) return;
-      setDirectors(found);
+      const names = Array.from(new Set(found.map((entry) => entry.name)));
+      setDirectors(names);
       setLoadingDirectors(false);
     }
     fetchDirectors();
@@ -88,16 +96,19 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             <div className="director-section">
               <div className="director-section__heading">
                 <strong>Director(es)</strong>
-                <small className="muted">Dato base: {movie.director || '—'}</small>
+                {movie.director && <small className="muted">Dato base: {movie.director}</small>}
               </div>
-              {!movie.tmdbId && <p className="muted">Sin TMDb ID para cruzar créditos.</p>}
               {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
-              {movie.tmdbId && !loadingDirectors && directors.length === 0 && (
-                <p className="muted">TMDb no devolvió dirección para este título.</p>
+              {!loadingDirectors && directors.length === 0 && fallbackDirectors.length === 0 && (
+                <p className="muted">No hay directores registrados.</p>
               )}
-              {directors.map((director) => (
-                <DirectorCard key={director.id} directorId={director.id} name={director.name} />
-              ))}
+              <ul className="director-link-list">
+                {(directors.length > 0 ? directors : fallbackDirectors).map((director) => (
+                  <li key={director}>
+                    <Link to={`/directors/${encodeURIComponent(director)}`}>{director}</Link>
+                  </li>
+                ))}
+              </ul>
             </div>
             {movie.group && <p><strong>Group:</strong> {movie.group}</p>}
             <p><strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}</p>
