@@ -91,6 +91,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [letterFilter, setLetterFilter] = useState<string | null>(null);
+  const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
 
   useEffect(() => {
     let active = true;
@@ -174,6 +175,36 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [uniqueProfiles, collectionCounts]);
 
+  const filteredProfiles = useMemo(() => {
+    const filtered = letterFilter
+      ? uniqueProfiles.filter((director) =>
+          (director.displayName || director.name)
+            .trim()
+            .toUpperCase()
+            .startsWith(letterFilter)
+        )
+      : uniqueProfiles;
+
+    const enriched = filtered.map((profile) => {
+      const key = normalizeDirectorName(profile.name);
+      const owned = coverage[key]?.owned ?? collectionCounts.get(key) ?? 0;
+      return { profile, owned };
+    });
+
+    const sorted = [...enriched].sort((a, b) => {
+      if (orderBy === 'owned') {
+        const diff = b.owned - a.owned;
+        if (diff !== 0) return diff;
+      }
+      return collator.compare(
+        a.profile.displayName || a.profile.name,
+        b.profile.displayName || b.profile.name
+      );
+    });
+
+    return sorted.map((entry) => entry.profile);
+  }, [letterFilter, uniqueProfiles, coverage, collectionCounts, orderBy, collator]);
+
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
     const ratio = owned / total;
@@ -210,38 +241,43 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return <p className="muted">{error}</p>;
   }
 
-  const filteredProfiles = letterFilter
-    ? uniqueProfiles.filter((director) =>
-        (director.displayName || director.name)
-          .trim()
-          .toUpperCase()
-          .startsWith(letterFilter)
-      )
-    : uniqueProfiles;
-
   return (
     <>
-      {availableLetters.length > 1 && (
+      {(availableLetters.length > 1 || uniqueProfiles.length > 0) && (
         <div className="panel" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-            <strong style={{ marginRight: 4 }}>Filtrar por letra:</strong>
-            <button
-              type="button"
-              className={`button button--sm ${letterFilter === null ? 'is-primary' : 'is-ghost'}`}
-              onClick={() => setLetterFilter(null)}
-            >
-              Todas
-            </button>
-            {availableLetters.map((letter) => (
-              <button
-                key={letter}
-                type="button"
-                className={`button button--sm ${letterFilter === letter ? 'is-primary' : 'is-ghost'}`}
-                onClick={() => setLetterFilter(letter)}
-              >
-                {letter}
-              </button>
-            ))}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 12,
+              alignItems: 'center',
+              rowGap: 10
+            }}
+          >
+            {availableLetters.length > 1 && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <strong style={{ whiteSpace: 'nowrap' }}>Filtrar por letra:</strong>
+                <select
+                  value={letterFilter ?? ''}
+                  onChange={(e) => setLetterFilter(e.target.value || null)}
+                  style={{ minWidth: 120 }}
+                >
+                  <option value="">Todas</option>
+                  {availableLetters.map((letter) => (
+                    <option key={letter} value={letter}>
+                      {letter}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Ordenar por:</strong>
+              <select value={orderBy} onChange={(e) => setOrderBy(e.target.value as 'alpha' | 'owned')}>
+                <option value="alpha">Alfabético (A-Z)</option>
+                <option value="owned">Mayor cantidad en colección</option>
+              </select>
+            </label>
           </div>
         </div>
       )}
@@ -254,40 +290,40 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           >
             {(() => {
               const key = normalizeDirectorName(director.name);
-            const stats = coverage[key];
-            const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
-            const total = stats?.total ?? null;
-            const medal = getMedal(owned, total);
-            const label = total ? `${owned} de ${total}` : `${owned} en colección`;
-            return (
-              <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
-                <span className="director-coverage__counts">
-                  {owned}
-                  <span className="director-coverage__divider">/</span>
-                  {total ?? '—'}
-                </span>
-                {medal && (
-                  <span
-                    className={`director-coverage__medal director-coverage__medal--${medal}`}
-                    aria-hidden
-                  >
-                    ★
+              const stats = coverage[key];
+              const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
+              const total = stats?.total ?? null;
+              const medal = getMedal(owned, total);
+              const label = total ? `${owned} de ${total}` : `${owned} en colección`;
+              return (
+                <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
+                  <span className="director-coverage__counts">
+                    {owned}
+                    <span className="director-coverage__divider">/</span>
+                    {total ?? '—'}
                   </span>
-                )}
-              </span>
-            );
-          })()}
-          <div
-            className="director-thumb"
-            style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
-            aria-hidden
-          />
-          <div className="section-meta">
-            <strong className="section-title">{director.displayName || director.name}</strong>
-            <small className="section-count">Ver perfil</small>
-          </div>
-          </Link>
-        ))}
+                  {medal && (
+                    <span
+                      className={`director-coverage__medal director-coverage__medal--${medal}`}
+                      aria-hidden
+                    >
+                      ★
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
+              <div
+                className="director-thumb"
+                style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
+                aria-hidden
+              />
+              <div className="section-meta">
+                <strong className="section-title">{director.displayName || director.name}</strong>
+                <small className="section-count">Ver perfil</small>
+              </div>
+            </Link>
+          ))}
         {filteredProfiles.length === 0 && (
           <p className="muted" style={{ padding: '12px 0' }}>
             No hay directores para la letra seleccionada.
