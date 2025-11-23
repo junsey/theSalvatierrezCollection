@@ -7,27 +7,10 @@ import { PawRating } from './PawRating';
 interface Props {
   movie: MovieRecord;
   onClose: () => void;
-  onSeenChange: (seen: boolean) => void;
-  onRatingChange: (rating: number) => void;
   onNoteChange: (note: string) => void;
-  personalRating?: number;
   personalNote?: string;
 }
-
-const StarRating: React.FC<{ value: number; onChange: (val: number) => void }> = ({ value, onChange }) => {
-  const stars = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-  return (
-    <div className="rating-stars">
-      {stars.map((star) => (
-        <button key={star} onClick={() => onChange(star)} aria-label={`Rate ${star}`}>
-          {star <= value ? '★' : '☆'}
-        </button>
-      ))}
-    </div>
-  );
-};
-
-export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onRatingChange, onNoteChange, personalRating, personalNote }) => {
+export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, personalNote }) => {
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
 
@@ -78,7 +61,20 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             </div>
             <div className="movie-detail__content">
               <div className="movie-detail__header">
-                <h2>{movie.title}</h2>
+                <div className="movie-detail__title-row">
+                  <h2>{movie.title}</h2>
+                  {movie.seen && (
+                    <span className="movie-detail__seen-flag" title="Vista">
+                      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path
+                          d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9Zm-1.05 13.44-3.4-3.39 1.41-1.42 1.99 1.99 4.69-4.69 1.41 1.42-6.1 6.09Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                      <span>Vista</span>
+                    </span>
+                  )}
+                </div>
                 <p className="movie-detail__meta">
                   {movie.originalTitle && (
                     <span className="muted">Título original: {movie.originalTitle}</span>
@@ -134,9 +130,6 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
               <p>
                 <strong>Plot:</strong> {movie.plot ?? 'No plot available.'}
               </p>
-              <p>
-                <strong>TMDb rating:</strong> {movie.tmdbRating?.toFixed(1) ?? 'N/A'}
-              </p>
               {movie.tmdbType === 'tv' && (
                 <div className="director-section">
                   <div className="director-section__heading">
@@ -169,43 +162,34 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
               <div className="movie-detail__ratings">
                 <h3>Puntuaciones</h3>
                 <div className="movie-detail__ratings-grid">
+                  <div className="movie-detail__rating-compare">
+                    <div className="movie-detail__rating-chip">
+                      <span className="muted">IMDb / TMDb</span>
+                      <strong>{movie.tmdbRating?.toFixed(1) ?? 'N/A'}</strong>
+                    </div>
+                    {movie.ratingGloria != null && movie.ratingRodrigo != null && (
+                      <div className="movie-detail__rating-chip">
+                        <span className="muted">Promedio paws</span>
+                        <strong>{((movie.ratingGloria + movie.ratingRodrigo) / 2).toFixed(1)}</strong>
+                      </div>
+                    )}
+                  </div>
                   {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
-                    <>
+                    <div className="movie-detail__rating-list">
                       {movie.ratingGloria != null && (
-                        <div>
-                          <div className="movie-detail__rating-row">
-                            <strong>Gloria:</strong>
-                            <PawRating value={movie.ratingGloria} />
-                          </div>
+                        <div className="movie-detail__rating-row">
+                          <strong>Gloria:</strong>
+                          <PawRating value={movie.ratingGloria} />
                         </div>
                       )}
                       {movie.ratingRodrigo != null && (
-                        <div>
-                          <div className="movie-detail__rating-row">
-                            <strong>Rodrigo:</strong>
-                            <PawRating value={movie.ratingRodrigo} />
-                          </div>
+                        <div className="movie-detail__rating-row">
+                          <strong>Rodrigo:</strong>
+                          <PawRating value={movie.ratingRodrigo} />
                         </div>
                       )}
-                      {movie.ratingGloria != null && movie.ratingRodrigo != null && (
-                        <div className="movie-detail__rating-average">
-                          <div className="movie-detail__rating-row">
-                            <strong>Promedio:</strong>
-                            <PawRating value={(movie.ratingGloria + movie.ratingRodrigo) / 2} />
-                          </div>
-                        </div>
-                      )}
-                    </>
+                    </div>
                   )}
-                </div>
-              </div>
-              <div className="movie-detail__toggles">
-                <label className="movie-detail__seen">
-                  <input type="checkbox" checked={movie.seen} onChange={(e) => onSeenChange(e.target.checked)} /> Vista
-                </label>
-                <div>
-                  <small>Mi puntuación (columna Puntuacion)</small>
-                  <StarRating value={personalRating ?? 0} onChange={onRatingChange} />
                 </div>
               </div>
               <div className="movie-detail__notes">

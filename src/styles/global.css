@@ -138,11 +138,24 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: 12px clamp(10px, 3vw, 16px);
+  gap: 12px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 24px;
   background: rgba(10, 12, 19, 0.9);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.logo {
+  font-family: 'Cinzel, serif';
+  color: var(--accent-2);
+  font-size: clamp(18px, 4vw, 22px);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .nav-links {
@@ -519,6 +532,10 @@ button.ghost {
     gap: 10px;
   }
 
+  .logo {
+    max-width: calc(100% - 52px);
+  }
+
   .menu-toggle {
     display: flex;
   }
@@ -703,6 +720,13 @@ button.ghost {
   gap: 6px;
 }
 
+.movie-detail__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .movie-detail__header h2 {
   margin: 0;
   line-height: 1.25;
@@ -713,6 +737,18 @@ button.ghost {
   gap: 4px;
   margin: 0;
   word-break: break-word;
+}
+
+.movie-detail__seen-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--accent-2);
+  font-weight: 700;
 }
 
 .movie-detail__year {
@@ -730,7 +766,7 @@ button.ghost {
 
 .movie-detail__ratings-grid {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .movie-detail__rating-row {
@@ -739,9 +775,30 @@ button.ghost {
   gap: 8px;
 }
 
+.movie-detail__rating-list {
+  display: grid;
+  gap: 8px;
+}
+
 .movie-detail__rating-average {
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+
+.movie-detail__rating-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.movie-detail__rating-chip {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 4px;
+  align-items: center;
 }
 
 .movie-detail__toggles {
@@ -992,8 +1049,19 @@ button.ghost {
 
 .paw-rating {
   display: inline-flex;
-  gap: 4px;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.paw-rating__icons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.paw-rating__value {
+  font-size: 0.9em;
+  color: var(--text-muted);
 }
 
 .progress-bar {

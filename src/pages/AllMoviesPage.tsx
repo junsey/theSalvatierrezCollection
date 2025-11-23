@@ -20,7 +20,7 @@ const defaultFilters: MovieFilters = {
 };
 
 export const AllMoviesPage: React.FC = () => {
-  const { movies, loading, error, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
+  const { movies, loading, error, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
   const location = useLocation();
@@ -121,11 +121,8 @@ export const AllMoviesPage: React.FC = () => {
       {activeMovie && (
         <MovieDetail
           movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
           personalNote={notes[activeMovie.id]}
           onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
       )}

@@ -21,7 +21,7 @@ const baseFilters: MovieFilters = {
 export const SectionPage: React.FC = () => {
   const { name } = useParams();
   const sectionName = decodeURIComponent(name ?? '');
-  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
+  const { movies, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, seccion: sectionName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
@@ -94,11 +94,8 @@ export const SectionPage: React.FC = () => {
       {activeMovie && (
         <MovieDetail
           movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
           personalNote={notes[activeMovie.id]}
           onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
       )}

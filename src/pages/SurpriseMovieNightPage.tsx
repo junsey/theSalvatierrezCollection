@@ -5,7 +5,7 @@ import { useMovies } from '../context/MovieContext';
 import { MovieRecord } from '../types/MovieRecord';
 
 export const SurpriseMovieNightPage: React.FC = () => {
-  const { movies, ratings, notes, updateNote, updateRating, updateSeen } = useMovies();
+  const { movies, notes, updateNote } = useMovies();
   const [active, setActive] = useState<MovieRecord | null>(null);
   return (
     <section>
@@ -15,11 +15,8 @@ export const SurpriseMovieNightPage: React.FC = () => {
       {active && (
         <MovieDetail
           movie={active}
-          personalRating={ratings[active.id]}
           personalNote={notes[active.id]}
           onClose={() => setActive(null)}
-          onSeenChange={(seen) => updateSeen(active.id, seen)}
-          onRatingChange={(rating) => updateRating(active.id, rating)}
           onNoteChange={(note) => updateNote(active.id, note)}
         />
       )}

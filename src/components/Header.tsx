@@ -18,9 +18,7 @@ export const Header: React.FC = () => {
 
   return (
     <header className="navbar">
-      <Link to="/" className="logo" style={{ fontFamily: 'Cinzel, serif', color: 'var(--accent-2)', fontSize: 26 }}>
-        The Salvatierrez Collection
-      </Link>
+      <Link to="/" className="logo">The Salvatierrez Collection</Link>
       <button className={`menu-toggle ${open ? 'open' : ''}`} onClick={toggleMenu} aria-label="Toggle navigation">
         <span />
         <span />
