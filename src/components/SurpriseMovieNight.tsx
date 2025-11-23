@@ -115,6 +115,16 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
   };
 
+  const renderPoster = (movie: MovieRecord) => (
+    <div className="feature-poster-frame" aria-hidden={!movie.posterUrl}>
+      {movie.posterUrl ? (
+        <img className="feature-poster" src={movie.posterUrl} alt={`Póster de ${movie.title}`} loading="lazy" />
+      ) : (
+        <div className="feature-poster placeholder">Sin póster</div>
+      )}
+    </div>
+  );
+
   return (
     <div className="panel">
       <h2>Ritual of Random Cinema</h2>
@@ -142,7 +152,11 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           </div>
           <p className="pill-hint">Selecciona una o varias secciones o invoca todas.</p>
         </div>
-        <button className={`toggle-control ${excludeSeen ? 'on' : ''}`} onClick={() => setExcludeSeen((prev) => !prev)} type="button">
+        <button
+          className={`toggle-control ${excludeSeen ? 'on' : ''}`}
+          onClick={() => setExcludeSeen((prev) => !prev)}
+          type="button"
+        >
           <span className="toggle-track">
             <span className="toggle-thumb" />
           </span>
@@ -151,10 +165,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       </div>
       <div className="random-area">
         <div className="random-actions">
-          <button onClick={summon} style={{ fontSize: 18, padding: '12px 18px' }}>
+          <button onClick={summon} className="action-large">
             Summon a Movie
           </button>
-          <button onClick={summonDoubleFeature} className="secondary" style={{ fontSize: 18, padding: '12px 18px' }}>
+          <button onClick={summonDoubleFeature} className="action-large secondary">
             Summon a Double Feature
           </button>
         </div>
@@ -173,10 +187,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             {chosen && (
               <div className="summon-result minimal">
                 <div className="feature-simple">
+                  {renderPoster(chosen)}
                   <strong>{chosen.title}</strong>
-                  <p className="plot-snippet">{chosen.plot ?? 'Sin descripción disponible.'}</p>
                 </div>
-                <div className="result-actions">
+                <div className="result-actions tight">
                   <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
                   <button onClick={summon}>Volver a invocar</button>
                 </div>
@@ -193,18 +207,16 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                     <div key={item.id} className="feature-card simple">
                       <div className="feature-meta">
                         <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
+                        {renderPoster(item)}
                         <strong>{item.title}</strong>
-                        <p className="plot-snippet">{item.plot ?? 'Sin descripción disponible.'}</p>
                       </div>
-                      <div className="result-actions">
-                        <button className="ghost" onClick={() => onSelect(item)}>
-                          Abrir detalles
-                        </button>
+                      <div className="result-actions tight">
+                        <button onClick={() => onSelect(item)}>Abrir detalles</button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="result-actions">
+                <div className="result-actions tight">
                   <button onClick={summonDoubleFeature}>Volver a invocar</button>
                 </div>
               </div>
