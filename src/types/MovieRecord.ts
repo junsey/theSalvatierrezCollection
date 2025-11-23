@@ -9,6 +9,7 @@ export type MovieRecord = {
   director: string;
   group: string;
   seen: boolean;
+  series?: boolean;
   rating?: number | null;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;

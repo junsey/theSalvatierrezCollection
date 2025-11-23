@@ -21,7 +21,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     return movies.filter((m) => {
       const sectionMatch = selectedSections.length === 0 || selectedSections.includes(m.seccion);
       const seenMatch = excludeSeen ? !m.seen : true;
-      return sectionMatch && seenMatch;
+      const seriesMatch = !m.series;
+      return sectionMatch && seenMatch && seriesMatch;
     });
   }, [movies, selectedSections, excludeSeen]);
 
@@ -162,17 +163,11 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
         </div>
         {filtered.length === 0 && <p>No movies match the ritual filters.</p>}
         {chosen && (
-          <div className="summon-result">
-            <strong>{chosen.title}</strong>
-            <p>
-              {chosen.tmdbYear ?? chosen.year ?? 'Year ?'} • {chosen.seccion}
-              <br /> TMDb: {chosen.tmdbRating?.toFixed(1) ?? 'N/A'}
-            </p>
-            <img
-              src={chosen.posterUrl ?? 'https://via.placeholder.com/200x300/0b0f17/ffffff?text=No+Poster'}
-              alt={chosen.title}
-              style={{ maxWidth: 220, width: '100%', borderRadius: 12 }}
-            />
+          <div className="summon-result minimal">
+            <div className="feature-simple">
+              <strong>{chosen.title}</strong>
+              <p className="plot-snippet">{chosen.plot ?? 'Sin descripción disponible.'}</p>
+            </div>
             <div className="result-actions">
               <button onClick={() => onSelect(chosen)}>Open details</button>
               <button onClick={summon}>Roll again</button>
@@ -180,27 +175,19 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           </div>
         )}
         {doubleFeature && (
-          <div className="double-feature">
+          <div className="double-feature minimal">
             <div className="double-heading">
               <h3>Double Feature</h3>
               <p className="link-reason">Enlace: {doubleFeature.link}</p>
             </div>
-            <div className="double-grid">
+            <div className="feature-duo">
               {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
-                <div key={item.id} className="feature-card">
+                <div key={item.id} className="feature-card simple">
                   <div className="feature-meta">
                     <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
                     <strong>{item.title}</strong>
-                    <p>
-                      {item.tmdbYear ?? item.year ?? 'Year ?'} • {item.seccion}
-                      <br /> Director: {item.director}
-                    </p>
+                    <p className="plot-snippet">{item.plot ?? 'Sin descripción disponible.'}</p>
                   </div>
-                  <img
-                    src={item.posterUrl ?? 'https://via.placeholder.com/200x300/0b0f17/ffffff?text=No+Poster'}
-                    alt={item.title}
-                    className="feature-poster"
-                  />
                   <button className="ghost" onClick={() => onSelect(item)}>
                     Abrir detalles
                   </button>
