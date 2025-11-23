@@ -49,7 +49,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     const random = filtered[Math.floor(Math.random() * filtered.length)];
     setChosen(random);
     setDoubleFeature(null);
-    onSelect(random);
   };
 
   const pickRelated = (base: MovieRecord) => {
@@ -109,13 +108,11 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     if (!secondaryResult) {
       setChosen(primary);
       setDoubleFeature(null);
-      onSelect(primary);
       return;
     }
 
     setChosen(null);
     setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
-    onSelect(primary);
   };
 
   return (
@@ -162,41 +159,59 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           </button>
         </div>
         {filtered.length === 0 && <p>No movies match the ritual filters.</p>}
-        {chosen && (
-          <div className="summon-result minimal">
-            <div className="feature-simple">
-              <strong>{chosen.title}</strong>
-              <p className="plot-snippet">{chosen.plot ?? 'Sin descripción disponible.'}</p>
-            </div>
-            <div className="result-actions">
-              <button onClick={() => onSelect(chosen)}>Open details</button>
-              <button onClick={summon}>Roll again</button>
-            </div>
-          </div>
-        )}
-        {doubleFeature && (
-          <div className="double-feature minimal">
-            <div className="double-heading">
-              <h3>Double Feature</h3>
-              <p className="link-reason">Enlace: {doubleFeature.link}</p>
-            </div>
-            <div className="feature-duo">
-              {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
-                <div key={item.id} className="feature-card simple">
-                  <div className="feature-meta">
-                    <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
-                    <strong>{item.title}</strong>
-                    <p className="plot-snippet">{item.plot ?? 'Sin descripción disponible.'}</p>
-                  </div>
-                  <button className="ghost" onClick={() => onSelect(item)}>
-                    Abrir detalles
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+      {(chosen || doubleFeature) && (
+        <div className="surprise-modal" role="dialog" aria-label="Resultados de Surprise Night">
+          <div className="surprise-card">
+            <div className="surprise-card__header">
+              <h3>{doubleFeature ? 'Double Feature' : 'Selección'}</h3>
+              <button className="ghost" onClick={() => { setChosen(null); setDoubleFeature(null); }}>
+                Cerrar
+              </button>
+            </div>
+
+            {chosen && (
+              <div className="summon-result minimal">
+                <div className="feature-simple">
+                  <strong>{chosen.title}</strong>
+                  <p className="plot-snippet">{chosen.plot ?? 'Sin descripción disponible.'}</p>
+                </div>
+                <div className="result-actions">
+                  <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
+                  <button onClick={summon}>Volver a invocar</button>
+                </div>
+              </div>
+            )}
+
+            {doubleFeature && (
+              <div className="double-feature minimal">
+                <div className="double-heading">
+                  <p className="link-reason">Enlace: {doubleFeature.link}</p>
+                </div>
+                <div className="feature-duo">
+                  {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
+                    <div key={item.id} className="feature-card simple">
+                      <div className="feature-meta">
+                        <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
+                        <strong>{item.title}</strong>
+                        <p className="plot-snippet">{item.plot ?? 'Sin descripción disponible.'}</p>
+                      </div>
+                      <div className="result-actions">
+                        <button className="ghost" onClick={() => onSelect(item)}>
+                          Abrir detalles
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="result-actions">
+                  <button onClick={summonDoubleFeature}>Volver a invocar</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

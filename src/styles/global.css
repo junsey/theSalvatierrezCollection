@@ -367,6 +367,41 @@ button.ghost {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.surprise-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  padding: 12px;
+}
+
+.surprise-card {
+  width: min(100%, 900px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(160deg, rgba(15, 18, 27, 0.95), rgba(10, 12, 19, 0.92));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 0.2s ease;
+  display: grid;
+  gap: 14px;
+}
+
+.surprise-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.surprise-card__header h3 {
+  margin: 0;
+}
+
 .double-heading {
   display: flex;
   align-items: center;
