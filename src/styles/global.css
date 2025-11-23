@@ -543,6 +543,18 @@ button.ghost {
   gap: 16px;
 }
 
+.movie-grid--six {
+  max-width: 1400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1180px) {
+  .movie-grid--six {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   .movie-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

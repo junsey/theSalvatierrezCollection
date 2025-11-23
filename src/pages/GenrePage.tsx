@@ -32,6 +32,8 @@ export const GenrePage: React.FC = () => {
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, genre: genreName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
+  const handleReset = () => setFilters({ ...baseFilters, genre: genreName });
+
   const genreMovies = useMemo(() => movies.filter((m) => hasGenre(m, genreName)), [movies, genreName]);
 
   const filtered = useMemo(() => {
@@ -70,7 +72,12 @@ export const GenrePage: React.FC = () => {
   return (
     <section>
       <h1>Género: {genreName}</h1>
-      <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={genreMovies} />
+      <FiltersBar
+        filters={filters}
+        onChange={(patch) => setFilters({ ...filters, ...patch })}
+        movies={genreMovies}
+        onReset={handleReset}
+      />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
           {filtered.map((movie) => (

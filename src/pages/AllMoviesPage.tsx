@@ -30,6 +30,12 @@ export const AllMoviesPage: React.FC = () => {
     setStoredFilters(next);
   };
 
+  const handleReset = () => {
+    const next = { ...defaultFilters };
+    setFilters(next);
+    setStoredFilters(next);
+  };
+
   const filtered = useMemo(() => {
     return movies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
@@ -96,9 +102,9 @@ export const AllMoviesPage: React.FC = () => {
       <h1>Archive of All Films</h1>
       {loading && <p>Summoning data from the crypt...</p>}
       {error && <p>Error: {error}</p>}
-      <FiltersBar filters={filters} onChange={handleChange} movies={movies} />
+      <FiltersBar filters={filters} onChange={handleChange} movies={movies} onReset={handleReset} />
       {filters.view === 'grid' ? (
-        <div className="movie-grid">
+        <div className="movie-grid movie-grid--six">
           {filtered.map((movie) => (
             <MovieCard key={movie.id} movie={movie} personalRating={ratings[movie.id]} onClick={() => setActiveMovie(movie)} />
           ))}

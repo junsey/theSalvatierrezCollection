@@ -24,6 +24,8 @@ export const SectionPage: React.FC = () => {
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, seccion: sectionName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
+  const handleReset = () => setFilters({ ...baseFilters, seccion: sectionName });
+
   const sectionMovies = useMemo(() => movies.filter((m) => m.seccion === sectionName), [movies, sectionName]);
 
   const filtered = useMemo(() => {
@@ -68,7 +70,12 @@ export const SectionPage: React.FC = () => {
   return (
     <section>
       <h1>Section: {sectionName}</h1>
-      <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={sectionMovies} />
+      <FiltersBar
+        filters={filters}
+        onChange={(patch) => setFilters({ ...filters, ...patch })}
+        movies={sectionMovies}
+        onReset={handleReset}
+      />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
           {filtered.map((movie) => (
