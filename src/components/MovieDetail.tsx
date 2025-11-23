@@ -85,6 +85,11 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
                       <span>Vista</span>
                     </span>
                   )}
+                  {movie.enDeposito && (
+                    <span className="movie-detail__seen-flag" title="En depósito">
+                      <span>En depósito</span>
+                    </span>
+                  )}
                 </div>
                 <p className="movie-detail__meta">
                   {movie.originalTitle && (

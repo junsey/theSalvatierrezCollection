@@ -40,6 +40,11 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
           <span className="badge" style={{ background: movie.seen ? 'rgba(126, 217, 87, 0.2)' : 'rgba(255, 54, 93, 0.2)' }}>
             {movie.seen ? 'Vista' : 'No vista'}
           </span>
+          {movie.enDeposito && (
+            <span className="badge" style={{ background: 'rgba(255, 200, 0, 0.2)', color: '#d7a100' }}>
+              En depósito
+            </span>
+          )}
           {movie.funcionaStatus === 'damaged' && (
             <span className="badge" style={{ background: 'rgba(255, 54, 93, 0.15)', color: 'var(--accent)' }}>
               Dañada

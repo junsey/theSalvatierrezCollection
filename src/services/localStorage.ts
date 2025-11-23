@@ -90,6 +90,7 @@ export function setStoredFilters(filters: Partial<MovieFilters>) {
 export function applyLocalOverrides(movies: MovieRecord[]): MovieRecord[] {
   return movies.map((movie) => ({
     ...movie,
+    enDeposito: movie.enDeposito ?? false,
     funcionaStatus: movie.funcionaStatus ?? 'untested',
     seen: state.seen[movie.id] ?? movie.seen,
     rating: state.ratings[movie.id] ?? movie.rating

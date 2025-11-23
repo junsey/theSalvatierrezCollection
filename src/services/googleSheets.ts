@@ -60,6 +60,7 @@ const fallbackMovies: MovieRecord[] = [
     rating: 7,
     dubbing: 'Español',
     format: 'Blu-ray',
+    enDeposito: false,
     funcionaStatus: 'untested'
   }
 ];
@@ -137,12 +138,17 @@ const parseFunciona = (value: string): 'working' | 'damaged' | 'untested' => {
   return 'untested';
 };
 
+const parseEnDeposito = (value: string): boolean => {
+  return value.trim().length > 0;
+};
+
 function mapToMovie(record: Record<string, string>, index: number): MovieRecord {
   const seriesValue = record['Serie'] ?? record['Series'] ?? '';
   const directorIdField =
     record['Director TMDb Id'] ?? record['DirectorTMDbId'] ?? record['DirectorTMDbID'] ?? '';
   const directorTmdbIds = parseNumberList(directorIdField);
   const funcionaStatus = parseFunciona(record['Funciona'] ?? '');
+  const enDeposito = parseEnDeposito(record['En depósito'] ?? record['En Deposito'] ?? '');
   return {
     id: `${record['Titulo'] ?? 'movie'}-${index}`,
     seccion: record['Seccion'] ?? 'Desconocida',
@@ -163,6 +169,7 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     ratingRodrigo: safeNumber(record['Puntuacion Rodrigo'] ?? ''),
     dubbing: record['Doblaje'] ?? '',
     format: record['Formato'] ?? '',
+    enDeposito,
     funcionaStatus
   };
 }
