@@ -220,21 +220,44 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
   if (isFresh(cached)) return cached.data;
 
   try {
-    const url = `${API_BASE}/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null; poster_path?: string | null; popularity?: number }[] }>(url);
-    const directed = (data.crew ?? [])
-      .filter((item) => item.job?.toLowerCase().includes('director'))
-      .map((item) => ({
-        id: item.id,
-        title: item.title,
-        year: parseYear(item.release_date),
-        posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
-        popularity: item.popularity
-      }))
-      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
-    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: directed };
+    const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{
+      crew?: {
+        id: number;
+        media_type?: string;
+        title?: string;
+        job?: string;
+        release_date?: string | null;
+        poster_path?: string | null;
+        popularity?: number;
+      }[];
+    }>(url);
+
+    const directedMovies = new Map<number, DirectedMovie>();
+
+    (data.crew ?? [])
+      .filter((item) => item.media_type === 'movie' && item.job?.toLowerCase().includes('director'))
+      .forEach((item) => {
+        const entry: DirectedMovie = {
+          id: item.id,
+          title: item.title ?? 'Película sin título',
+          year: parseYear(item.release_date),
+          posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
+          popularity: item.popularity
+        };
+
+        directedMovies.set(item.id, entry);
+      });
+
+    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
+      const byYear = (b.year ?? 0) - (a.year ?? 0);
+      if (byYear !== 0) return byYear;
+      return (b.popularity ?? 0) - (a.popularity ?? 0);
+    });
+
+    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
-    return directed;
+    return sorted;
   } catch (error) {
     console.warn('No se pudo obtener la filmografía del director', error);
     return [];

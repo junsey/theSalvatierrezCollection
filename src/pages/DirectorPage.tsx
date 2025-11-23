@@ -78,8 +78,7 @@ export const DirectorPage: React.FC = () => {
         if (seen.has(movie.id)) return false;
         seen.add(movie.id);
         return true;
-      })
-      .slice(0, 12);
+      });
   }, [knownFor]);
 
   const renderKnownFor = () => {
@@ -141,8 +140,8 @@ export const DirectorPage: React.FC = () => {
       </div>
 
       <div className="filmography-block">
-        <h2>Conocido por</h2>
-        <p className="text-muted">Películas dirigidas según TMDb, resaltando las que ya están en la colección.</p>
+        <h2>Filmografía</h2>
+        <p className="text-muted">Películas dirigidas según TMDb (combinado), resaltando las que ya están en la colección.</p>
         {error ? <p className="muted">{error}</p> : renderKnownFor()}
       </div>
     </section>
