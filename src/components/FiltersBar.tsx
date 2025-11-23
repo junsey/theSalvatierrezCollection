@@ -73,7 +73,7 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
         <option value="rating-desc">Mi puntuación ↓</option>
         <option value="rating-asc">Mi puntuación ↑</option>
       </select>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+      <div className="filters__actions">
         <button onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
           Carteles
         </button>
