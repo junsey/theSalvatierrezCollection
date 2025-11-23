@@ -17,6 +17,22 @@ const splitDirectors = (value: string) =>
     .filter(Boolean);
 
 const normalizeName = (value: string) => value.trim().toLowerCase();
+const normalizeTitle = (value: string) => {
+  const lower = value.trim().toLowerCase();
+  const stripped = lower
+    .replace(/\btemporada\s*\d+\b/g, '')
+    .replace(/\btemp\.?\s*\d+\b/g, '')
+    .replace(/\bseason\s*\d+\b/g, '')
+    .replace(/\bseas\.?\s*\d+\b/g, '')
+    .replace(/\bt\s*\d+\b/g, '');
+  return stripped.replace(/\s+/g, ' ').trim();
+};
+
+const getWorkKey = (movie: MovieRecord) => {
+  const mediaType = movie.tmdbType ?? (movie.series ? 'tv' : 'movie');
+  const base = movie.tmdbId ? `tmdb-${movie.tmdbId}` : `title-${normalizeTitle(movie.title)}`;
+  return `${base}:${mediaType}`;
+};
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
@@ -34,12 +50,21 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
 
   const collectionCounts = useMemo(() => {
     const counts = new Map<string, number>();
+    const workSeenByDirector = new Map<string, Set<string>>();
+
     movies.forEach((movie) => {
+      const workKey = getWorkKey(movie);
       splitDirectors(movie.director).forEach((name) => {
-        const key = normalizeName(name);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+        const directorKey = normalizeName(name);
+        const seen = workSeenByDirector.get(directorKey) ?? new Set<string>();
+        if (!seen.has(workKey)) {
+          seen.add(workKey);
+          workSeenByDirector.set(directorKey, seen);
+          counts.set(directorKey, (counts.get(directorKey) ?? 0) + 1);
+        }
       });
     });
+
     return counts;
   }, [movies]);
 
@@ -98,7 +123,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       const tmdbTotals = totalsCache.current;
       const rows = await Promise.all(
         profiles.map(async (profile) => {
-          const key = normalizeName(profile.displayName || profile.name);
+          const key = normalizeName(profile.name);
           const owned = collectionCounts.get(key) ?? 0;
 
           let total: number | null = null;
@@ -176,7 +201,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           key={director.name}
         >
           {(() => {
-            const key = normalizeName(director.displayName || director.name);
+            const key = normalizeName(director.name);
             const stats = coverage[key];
             const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
             const total = stats?.total ?? null;
