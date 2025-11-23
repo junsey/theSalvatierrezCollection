@@ -12,6 +12,7 @@ const baseFilters: MovieFilters = {
   seccion: null,
   genre: null,
   saga: null,
+  series: 'all',
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -28,7 +29,7 @@ const hasGenre = (movie: MovieRecord, genre: string) => {
 export const GenrePage: React.FC = () => {
   const { name } = useParams();
   const genreName = decodeURIComponent(name ?? '');
-  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
+  const { movies, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, genre: genreName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
@@ -40,6 +41,11 @@ export const GenrePage: React.FC = () => {
     return genreMovies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
+      .filter((m) => {
+        if (filters.series === 'series') return Boolean(m.series);
+        if (filters.series === 'movies') return !m.series;
+        return true;
+      })
       .filter((m) => (filters.genre ? hasGenre(m, filters.genre) : true))
       .filter((m) => (filters.saga ? m.saga === filters.saga : true))
       .filter((m) => {
@@ -90,11 +96,8 @@ export const GenrePage: React.FC = () => {
       {activeMovie && (
         <MovieDetail
           movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
           personalNote={notes[activeMovie.id]}
           onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
       )}

@@ -10,6 +10,7 @@ export type MovieRecord = {
   group: string;
   seen: boolean;
   series?: boolean;
+  season?: number | null;
   rating?: number | null;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
@@ -20,9 +21,16 @@ export type MovieRecord = {
   tmdbYear?: number | null;
   tmdbTitle?: string;
   tmdbOriginalTitle?: string;
+  tmdbType?: 'movie' | 'tv';
   posterUrl?: string;
   plot?: string;
   tmdbGenres?: string[];
+  tmdbSeasons?: {
+    seasonNumber: number;
+    name?: string | null;
+    episodeCount?: number | null;
+    airDate?: string | null;
+  }[];
   tmdbStatus?: TmdbStatus;
 };
 
@@ -43,6 +51,7 @@ export type MovieFilters = {
   seccion: string | null;
   genre: string | null;
   saga: string | null;
+  series: 'all' | 'series' | 'movies';
   seen: 'all' | 'seen' | 'unseen';
   view: 'grid' | 'list';
   sort:

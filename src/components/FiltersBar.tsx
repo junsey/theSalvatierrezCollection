@@ -58,6 +58,11 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
         <option value="seen">Solo vistas</option>
         <option value="unseen">Solo no vistas</option>
       </select>
+      <select value={filters.series} onChange={(e) => onChange({ series: e.target.value as MovieFilters['series'] })}>
+        <option value="all">Películas y series</option>
+        <option value="movies">Solo películas</option>
+        <option value="series">Solo series</option>
+      </select>
       <select value={filters.sort} onChange={(e) => onChange({ sort: e.target.value as MovieFilters['sort'] })}>
         <option value="title-asc">Título A-Z</option>
         <option value="title-desc">Título Z-A</option>
@@ -68,7 +73,7 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
         <option value="rating-desc">Mi puntuación ↓</option>
         <option value="rating-asc">Mi puntuación ↑</option>
       </select>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+      <div className="filters__actions">
         <button onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
           Carteles
         </button>

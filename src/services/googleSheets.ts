@@ -117,6 +117,7 @@ const safeNumber = (value: string): number | null => {
 };
 
 function mapToMovie(record: Record<string, string>, index: number): MovieRecord {
+  const seriesValue = record['Serie'] ?? record['Series'] ?? '';
   return {
     id: `${record['Titulo'] ?? 'movie'}-${index}`,
     seccion: record['Seccion'] ?? 'Desconocida',
@@ -128,7 +129,8 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     director: record['Director'] ?? '',
     group: record['Grupo'] ?? '',
     seen: parseBoolean(record['Vista'] ?? ''),
-    series: parseBoolean(record['Series'] ?? 'no'),
+    series: parseBoolean(seriesValue || 'no'),
+    season: safeNumber(record['Temporada'] ?? ''),
     rating: safeNumber(record['Puntuacion'] ?? ''),
     ratingGloria: safeNumber(record['Puntuacion Gloria'] ?? ''),
     ratingRodrigo: safeNumber(record['Puntuacion Rodrigo'] ?? ''),

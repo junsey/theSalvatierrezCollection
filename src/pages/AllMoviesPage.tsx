@@ -13,13 +13,14 @@ const defaultFilters: MovieFilters = {
   seccion: null,
   genre: null,
   saga: null,
+  series: 'all',
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
 };
 
 export const AllMoviesPage: React.FC = () => {
-  const { movies, loading, error, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
+  const { movies, loading, error, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
   const location = useLocation();
@@ -40,6 +41,11 @@ export const AllMoviesPage: React.FC = () => {
     return movies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
+      .filter((m) => {
+        if (filters.series === 'series') return Boolean(m.series);
+        if (filters.series === 'movies') return !m.series;
+        return true;
+      })
       .filter((m) => {
         if (!filters.genre) return true;
         const genre = filters.genre.toLowerCase();
@@ -115,11 +121,8 @@ export const AllMoviesPage: React.FC = () => {
       {activeMovie && (
         <MovieDetail
           movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
           personalNote={notes[activeMovie.id]}
           onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
       )}
