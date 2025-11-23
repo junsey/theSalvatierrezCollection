@@ -931,6 +931,52 @@ button.ghost {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.director-coverage {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(6, 6, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.director-coverage__counts {
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.director-coverage__divider {
+  opacity: 0.45;
+}
+
+.director-coverage__medal {
+  font-size: 0.95em;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.45);
+}
+
+.director-coverage__medal--bronze {
+  color: #c58b4c;
+}
+
+.director-coverage__medal--silver {
+  color: #cbd5e1;
+}
+
+.director-coverage__medal--gold {
+  color: #f7d251;
+}
+
 .section-thumb {
   position: absolute;
   inset: 0;

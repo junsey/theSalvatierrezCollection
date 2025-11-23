@@ -1,6 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DirectorProfile, buildDirectorProfiles } from '../services/tmdbPeopleService';
+import {
+  DirectorProfile,
+  buildDirectorProfiles,
+  getPersonDirectedMovies
+} from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
 
 const FALLBACK_PORTRAIT =
@@ -11,6 +15,8 @@ const splitDirectors = (value: string) =>
     .split(/[,;/&]/g)
     .map((d) => d.trim())
     .filter(Boolean);
+
+const normalizeName = (value: string) => value.trim().toLowerCase();
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
@@ -26,7 +32,20 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     [movies]
   );
 
+  const collectionCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    movies.forEach((movie) => {
+      splitDirectors(movie.director).forEach((name) => {
+        const key = normalizeName(name);
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      });
+    });
+    return counts;
+  }, [movies]);
+
   const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
+  const totalsCache = useRef<Map<number, number>>(new Map());
+  const [coverage, setCoverage] = useState<Record<string, { owned: number; total: number | null }>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
@@ -68,6 +87,59 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [collator, directorNames]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCoverage() {
+      if (profiles.length === 0) {
+        setCoverage({});
+        return;
+      }
+
+      const tmdbTotals = totalsCache.current;
+      const rows = await Promise.all(
+        profiles.map(async (profile) => {
+          const key = normalizeName(profile.displayName || profile.name);
+          const owned = collectionCounts.get(key) ?? 0;
+
+          let total: number | null = null;
+          if (profile.tmdbId) {
+            if (tmdbTotals.has(profile.tmdbId)) {
+              total = tmdbTotals.get(profile.tmdbId) ?? null;
+            } else {
+              const filmography = await getPersonDirectedMovies(profile.tmdbId);
+              total = filmography.length;
+              tmdbTotals.set(profile.tmdbId, total);
+            }
+          }
+
+          return { key, owned, total };
+        })
+      );
+
+      if (cancelled) return;
+
+      const nextCoverage: Record<string, { owned: number; total: number | null }> = {};
+      rows.forEach(({ key, owned, total }) => {
+        nextCoverage[key] = { owned, total };
+      });
+      setCoverage(nextCoverage);
+    }
+
+    loadCoverage();
+    return () => {
+      cancelled = true;
+    };
+  }, [profiles, collectionCounts]);
+
+  const getMedal = (owned: number, total: number | null) => {
+    if (!total || total <= 0) return null;
+    const ratio = owned / total;
+    if (ratio >= 1) return 'gold';
+    if (ratio > 0.75) return 'silver';
+    if (ratio > 0.5) return 'bronze';
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="panel" style={{ marginBottom: 12 }}>
@@ -103,6 +175,31 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           className="director-card"
           key={director.name}
         >
+          {(() => {
+            const key = normalizeName(director.displayName || director.name);
+            const stats = coverage[key];
+            const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
+            const total = stats?.total ?? null;
+            const medal = getMedal(owned, total);
+            const label = total ? `${owned} de ${total}` : `${owned} en colección`;
+            return (
+              <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
+                <span className="director-coverage__counts">
+                  {owned}
+                  <span className="director-coverage__divider">/</span>
+                  {total ?? '—'}
+                </span>
+                {medal && (
+                  <span
+                    className={`director-coverage__medal director-coverage__medal--${medal}`}
+                    aria-hidden
+                  >
+                    ★
+                  </span>
+                )}
+              </span>
+            );
+          })()}
           <div
             className="director-thumb"
             style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
