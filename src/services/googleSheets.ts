@@ -116,8 +116,19 @@ const safeNumber = (value: string): number | null => {
   return Number.isFinite(num) ? num : null;
 };
 
+const parseNumberList = (value: string): number[] => {
+  if (!value) return [];
+  return value
+    .split(/[,;/&]/g)
+    .map((entry) => safeNumber(entry.trim()) ?? null)
+    .filter((entry): entry is number => entry !== null);
+};
+
 function mapToMovie(record: Record<string, string>, index: number): MovieRecord {
   const seriesValue = record['Serie'] ?? record['Series'] ?? '';
+  const directorIdField =
+    record['Director TMDb Id'] ?? record['DirectorTMDbId'] ?? record['DirectorTMDbID'] ?? '';
+  const directorTmdbIds = parseNumberList(directorIdField);
   return {
     id: `${record['Titulo'] ?? 'movie'}-${index}`,
     seccion: record['Seccion'] ?? 'Desconocida',
@@ -127,6 +138,8 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     originalTitle: record['Titulo Original'] ?? '',
     genreRaw: record['Genero'] ?? '',
     director: record['Director'] ?? '',
+    directorTmdbId: directorTmdbIds[0] ?? null,
+    directorTmdbIds: directorTmdbIds.length > 0 ? directorTmdbIds : undefined,
     group: record['Grupo'] ?? '',
     seen: parseBoolean(record['Vista'] ?? ''),
     series: parseBoolean(seriesValue || 'no'),

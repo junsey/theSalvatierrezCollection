@@ -6,17 +6,11 @@ import {
   getPersonDirectedMovies
 } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
+import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
-const splitDirectors = (value: string) =>
-  value
-    .split(/[,;/&]/g)
-    .map((d) => d.trim())
-    .filter(Boolean);
-
-const normalizeName = (value: string) => value.trim().toLowerCase();
 const normalizeTitle = (value: string) => {
   const lower = value.trim().toLowerCase();
   const stripped = lower
@@ -36,6 +30,7 @@ const getWorkKey = (movie: MovieRecord) => {
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
+  const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const directorNames = useMemo(
     () =>
       Array.from(
@@ -55,7 +50,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     movies.forEach((movie) => {
       const workKey = getWorkKey(movie);
       splitDirectors(movie.director).forEach((name) => {
-        const directorKey = normalizeName(name);
+        const directorKey = normalizeDirectorName(name);
         const seen = workSeenByDirector.get(directorKey) ?? new Set<string>();
         if (!seen.has(workKey)) {
           seen.add(workKey);
@@ -88,6 +83,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       setProgress({ current: 0, total: directorNames.length });
       try {
         const enriched = await buildDirectorProfiles(directorNames, {
+          overrides: directorOverrides,
           onProgress: (current, total) => {
             if (!active) return;
             setProgress({ current, total });
@@ -110,7 +106,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [collator, directorNames]);
+  }, [collator, directorNames, directorOverrides]);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,7 +119,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       const tmdbTotals = totalsCache.current;
       const rows = await Promise.all(
         profiles.map(async (profile) => {
-          const key = normalizeName(profile.name);
+          const key = normalizeDirectorName(profile.name);
           const owned = collectionCounts.get(key) ?? 0;
 
           let total: number | null = null;
@@ -201,7 +197,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           key={director.name}
         >
           {(() => {
-            const key = normalizeName(director.name);
+            const key = normalizeDirectorName(director.name);
             const stats = coverage[key];
             const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
             const total = stats?.total ?? null;

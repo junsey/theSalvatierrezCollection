@@ -7,6 +7,8 @@ export type MovieRecord = {
   originalTitle?: string;
   genreRaw: string;
   director: string;
+  directorTmdbId?: number | null;
+  directorTmdbIds?: number[];
   group: string;
   seen: boolean;
   series?: boolean;

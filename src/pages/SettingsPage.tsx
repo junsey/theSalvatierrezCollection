@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
+import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
 
 export const SettingsPage: React.FC = () => {
   const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
@@ -10,15 +11,11 @@ export const SettingsPage: React.FC = () => {
   const [directorProgress, setDirectorProgress] = useState<{ current: number; total: number } | null>(null);
   const [regeneratingDirectors, setRegeneratingDirectors] = useState(false);
 
-  const directorNames = useMemo(() => {
-    const splitDirectors = (value: string) =>
-      value
-        .split(/[,;/&]/g)
-        .map((d) => d.trim())
-        .filter(Boolean);
-
-    return Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort();
-  }, [movies]);
+  const directorNames = useMemo(
+    () => Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort(),
+    [movies]
+  );
+  const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
 
   const handleRefreshAll = async () => {
     setStatus(null);
@@ -61,6 +58,7 @@ export const SettingsPage: React.FC = () => {
       clearPeopleCaches();
       await buildDirectorProfiles(directorNames, {
         forceRefresh: true,
+        overrides: directorOverrides,
         onProgress: (current, total) => setDirectorProgress({ current, total })
       });
       setStatus('✅ Directores regenerados correctamente.');
