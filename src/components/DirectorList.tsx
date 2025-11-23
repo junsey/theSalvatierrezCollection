@@ -22,6 +22,12 @@ const normalizeTitle = (value: string) => {
   return stripped.replace(/\s+/g, ' ').trim();
 };
 
+const buildDirectorKey = (name: string, tmdbId?: number | null) =>
+  Number.isFinite(tmdbId) ? `tmdb-${tmdbId}` : `name-${normalizeDirectorName(name)}`;
+
+const getOverrideKey = (name: string, overrides: Map<string, number>) =>
+  buildDirectorKey(name, overrides.get(normalizeDirectorName(name)));
+
 const getWorkKey = (movie: MovieRecord) => {
   const mediaType = movie.tmdbType ?? (movie.series ? 'tv' : 'movie');
   const base = movie.tmdbId ? `tmdb-${movie.tmdbId}` : `title-${normalizeTitle(movie.title)}`;
@@ -37,14 +43,14 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       splitDirectors(movie.director)
         .filter(Boolean)
         .forEach((name) => {
-          const normalized = normalizeDirectorName(name);
-          if (!names.has(normalized)) {
-            names.set(normalized, name.trim());
+          const key = getOverrideKey(name, directorOverrides);
+          if (!names.has(key)) {
+            names.set(key, name.trim());
           }
         });
     });
     return Array.from(names.values()).sort((a, b) => collator.compare(a, b));
-  }, [collator, movies]);
+  }, [collator, directorOverrides, movies]);
   const availableLetters = useMemo(() => {
     const letters = new Set<string>();
     directorNames.forEach((name) => {
@@ -61,7 +67,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     movies.forEach((movie) => {
       const workKey = getWorkKey(movie);
       splitDirectors(movie.director).forEach((name) => {
-        const directorKey = normalizeDirectorName(name);
+        const directorKey = getOverrideKey(name, directorOverrides);
         const seen = workSeenByDirector.get(directorKey) ?? new Set<string>();
         if (!seen.has(workKey)) {
           seen.add(workKey);
@@ -72,13 +78,13 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return counts;
-  }, [movies]);
+  }, [directorOverrides, movies]);
 
   const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
   const uniqueProfiles = useMemo(() => {
     const map = new Map<string, DirectorProfile>();
     profiles.forEach((profile) => {
-      const key = normalizeDirectorName(profile.name);
+      const key = buildDirectorKey(profile.name, profile.tmdbId);
       if (!map.has(key)) {
         map.set(key, profile);
       }
@@ -142,7 +148,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       const tmdbTotals = totalsCache.current;
       const rows = await Promise.all(
         uniqueProfiles.map(async (profile) => {
-          const key = normalizeDirectorName(profile.name);
+          const key = buildDirectorKey(profile.name, profile.tmdbId);
           const owned = collectionCounts.get(key) ?? 0;
 
           let total: number | null = null;
@@ -175,6 +181,13 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [uniqueProfiles, collectionCounts]);
 
+  useEffect(() => {
+    const matches = uniqueProfiles.filter((director) =>
+      director.name.toLowerCase().includes('chris carter')
+    );
+    console.log('Chris Carter entries:', matches);
+  }, [uniqueProfiles]);
+
   const filteredProfiles = useMemo(() => {
     const filtered = letterFilter
       ? uniqueProfiles.filter((director) =>
@@ -186,7 +199,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       : uniqueProfiles;
 
     const enriched = filtered.map((profile) => {
-      const key = normalizeDirectorName(profile.name);
+      const key = buildDirectorKey(profile.name, profile.tmdbId);
       const owned = coverage[key]?.owned ?? collectionCounts.get(key) ?? 0;
       return { profile, owned };
     });
@@ -286,10 +299,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           <Link
             to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
             className="director-card"
-            key={normalizeDirectorName(director.name)}
+            key={buildDirectorKey(director.name, director.tmdbId)}
           >
             {(() => {
-              const key = normalizeDirectorName(director.name);
+              const key = buildDirectorKey(director.name, director.tmdbId);
               const stats = coverage[key];
               const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
               const total = stats?.total ?? null;
