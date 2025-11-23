@@ -5,12 +5,14 @@ interface Props {
   filters: MovieFilters;
   onChange: (patch: Partial<MovieFilters>) => void;
   movies: MovieRecord[];
+  onReset?: () => void;
 }
 
 const uniqueValues = (items: string[]) => Array.from(new Set(items.filter(Boolean))).sort();
 
-export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
+export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset }) => {
   const secciones = uniqueValues(movies.map((m) => m.seccion));
+  const sagas = uniqueValues(movies.map((m) => m.saga));
   const genres = uniqueValues(
     movies
       .flatMap((m) => [
@@ -32,6 +34,14 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         {secciones.map((s) => (
           <option key={s} value={s}>
             {s}
+          </option>
+        ))}
+      </select>
+      <select value={filters.saga ?? ''} onChange={(e) => onChange({ saga: e.target.value || null })}>
+        <option value="">Todas las sagas</option>
+        {sagas.map((saga) => (
+          <option key={saga} value={saga}>
+            {saga}
           </option>
         ))}
       </select>
@@ -58,13 +68,18 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         <option value="rating-desc">Mi puntuación ↓</option>
         <option value="rating-asc">Mi puntuación ↑</option>
       </select>
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
         <button onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
           Carteles
         </button>
         <button onClick={() => onChange({ view: 'list' })} aria-label="List view">
           Lista
         </button>
+        {onReset && (
+          <button className="ghost" onClick={onReset} aria-label="Limpiar filtros">
+            Limpiar filtros
+          </button>
+        )}
       </div>
     </div>
   );

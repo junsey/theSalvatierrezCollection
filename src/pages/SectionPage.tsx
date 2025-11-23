@@ -11,6 +11,7 @@ const baseFilters: MovieFilters = {
   query: '',
   seccion: null,
   genre: null,
+  saga: null,
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -22,6 +23,8 @@ export const SectionPage: React.FC = () => {
   const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, seccion: sectionName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
+
+  const handleReset = () => setFilters({ ...baseFilters, seccion: sectionName });
 
   const sectionMovies = useMemo(() => movies.filter((m) => m.seccion === sectionName), [movies, sectionName]);
 
@@ -36,6 +39,7 @@ export const SectionPage: React.FC = () => {
           (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre)
         );
       })
+      .filter((m) => (filters.saga ? m.saga === filters.saga : true))
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
@@ -66,7 +70,12 @@ export const SectionPage: React.FC = () => {
   return (
     <section>
       <h1>Section: {sectionName}</h1>
-      <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={sectionMovies} />
+      <FiltersBar
+        filters={filters}
+        onChange={(patch) => setFilters({ ...filters, ...patch })}
+        movies={sectionMovies}
+        onReset={handleReset}
+      />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
           {filtered.map((movie) => (

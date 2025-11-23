@@ -92,7 +92,12 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
                 </>
               )}
             </p>
-            {movie.saga && <p><strong>Saga:</strong> {movie.saga}</p>}
+            {movie.saga && (
+              <p>
+                <strong>Saga:</strong>{' '}
+                <Link to={`/movies?saga=${encodeURIComponent(movie.saga)}`}>{movie.saga}</Link>
+              </p>
+            )}
             <div className="director-section">
               <div className="director-section__heading">
                 <strong>Director(es)</strong>

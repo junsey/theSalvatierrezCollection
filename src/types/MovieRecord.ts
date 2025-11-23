@@ -9,6 +9,7 @@ export type MovieRecord = {
   director: string;
   group: string;
   seen: boolean;
+  series?: boolean;
   rating?: number | null;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
@@ -41,6 +42,7 @@ export type MovieFilters = {
   query: string;
   seccion: string | null;
   genre: string | null;
+  saga: string | null;
   seen: 'all' | 'seen' | 'unseen';
   view: 'grid' | 'list';
   sort:
