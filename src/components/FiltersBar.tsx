@@ -78,8 +78,8 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
           <option value="year-asc">Año ↑</option>
           <option value="tmdb-desc">TMDb ↓</option>
           <option value="tmdb-asc">TMDb ↑</option>
-          <option value="rating-desc">Mi puntuación ↓</option>
-          <option value="rating-asc">Mi puntuación ↑</option>
+          <option value="rating-desc">Paws ↓</option>
+          <option value="rating-asc">Paws ↑</option>
         </select>
       </div>
       <div className="filters__actions">

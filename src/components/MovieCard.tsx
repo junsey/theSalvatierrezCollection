@@ -4,10 +4,9 @@ import { MovieRecord } from '../types/MovieRecord';
 interface Props {
   movie: MovieRecord;
   onClick?: () => void;
-  personalRating?: number;
 }
 
-export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) => {
+export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
   const pawValue =
     movie.ratingGloria != null && movie.ratingRodrigo != null
       ? (movie.ratingGloria + movie.ratingRodrigo) / 2
@@ -35,7 +34,6 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
         <div className="card-ratings">
           <span className="badge">TMDb: {movie.tmdbRating?.toFixed(1) ?? 'N/A'}</span>
           <span className="badge">Paws: {pawValue != null ? pawValue.toFixed(1) : 'N/A'}</span>
-          {personalRating != null && <span className="badge">Mi puntuación: {personalRating}</span>}
         </div>
         <div className="card-tags">
           {movie.enDeposito && (

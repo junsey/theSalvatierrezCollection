@@ -21,7 +21,7 @@ const baseFilters: MovieFilters = {
 export const SectionPage: React.FC = () => {
   const { name } = useParams();
   const sectionName = decodeURIComponent(name ?? '');
-  const { movies, updateNote, ratings, notes } = useMovies();
+  const { movies, ratings } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, seccion: sectionName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
@@ -85,20 +85,13 @@ export const SectionPage: React.FC = () => {
       {filters.view === 'grid' ? (
         <div className="movie-grid">
           {filtered.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} personalRating={ratings[movie.id]} onClick={() => setActiveMovie(movie)} />
+            <MovieCard key={movie.id} movie={movie} onClick={() => setActiveMovie(movie)} />
           ))}
         </div>
       ) : (
-        <MovieTable movies={filtered} personalRatings={ratings} onSelect={setActiveMovie} />
+        <MovieTable movies={filtered} onSelect={setActiveMovie} />
       )}
-      {activeMovie && (
-        <MovieDetail
-          movie={activeMovie}
-          personalNote={notes[activeMovie.id]}
-          onClose={() => setActiveMovie(null)}
-          onNoteChange={(note) => updateNote(activeMovie.id, note)}
-        />
-      )}
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>
   );
 };

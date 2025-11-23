@@ -7,10 +7,8 @@ import { PawRating } from './PawRating';
 interface Props {
   movie: MovieRecord;
   onClose: () => void;
-  onNoteChange: (note: string) => void;
-  personalNote?: string;
 }
-export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, personalNote }) => {
+export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
 
@@ -210,15 +208,6 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="movie-detail__notes">
-                <small>Personal notes</small>
-                <textarea
-                  rows={4}
-                  placeholder="Write your whispers from the catacombs..."
-                  value={personalNote ?? ''}
-                  onChange={(e) => onNoteChange(e.target.value)}
-                />
               </div>
               <details className="status-accordion">
                 <summary>Status</summary>

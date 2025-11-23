@@ -5,7 +5,7 @@ import { useMovies } from '../context/MovieContext';
 import { MovieRecord } from '../types/MovieRecord';
 
 export const DamagedMoviesPage: React.FC = () => {
-  const { movies, loading, error, ratings, notes, updateNote } = useMovies();
+  const { movies, loading, error } = useMovies();
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
   const damagedMovies = useMemo(
@@ -35,20 +35,12 @@ export const DamagedMoviesPage: React.FC = () => {
               key={movie.id}
               movie={movie}
               onClick={() => setActiveMovie(movie)}
-              personalRating={ratings[movie.id]}
             />
           ))}
         </div>
       )}
 
-      {activeMovie && (
-        <MovieDetail
-          movie={activeMovie}
-          personalNote={notes[activeMovie.id]}
-          onClose={() => setActiveMovie(null)}
-          onNoteChange={(note) => updateNote(activeMovie.id, note)}
-        />
-      )}
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>
   );
 };
