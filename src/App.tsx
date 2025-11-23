@@ -15,8 +15,8 @@ import { DamagedMoviesPage } from './pages/DamagedMoviesPage';
 const App: React.FC = () => {
   return (
     <MovieProvider>
+      <Header />
       <div className="app-shell">
-        <Header />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/movies" element={<AllMoviesPage />} />

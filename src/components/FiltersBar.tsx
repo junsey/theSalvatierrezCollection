@@ -13,24 +13,27 @@ const uniqueValues = (items: string[]) => Array.from(new Set(items.filter(Boolea
 export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset }) => {
   const secciones = uniqueValues(movies.map((m) => m.seccion));
   const sagas = uniqueValues(movies.map((m) => m.saga));
-  const genres = uniqueValues(
-    movies
-      .flatMap((m) => [
-        ...m.genreRaw.split(/[,;\-/]/g).map((g) => g.trim()),
-        ...(m.tmdbGenres ?? [])
-      ])
-      .filter(Boolean)
-  );
 
   return (
     <div className="filters-container">
-      <div className="filters">
+      <div className="filters-row filters-row--primary">
         <input
-          className="filter-control"
+          className="filter-control filter-control--search"
           placeholder="Buscar título"
           value={filters.query}
           onChange={(e) => onChange({ query: e.target.value })}
         />
+        <select
+          className="filter-control filter-control--compact"
+          value={filters.seen}
+          onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}
+        >
+          <option value="all">Vistas + no vistas</option>
+          <option value="seen">Solo vistas</option>
+          <option value="unseen">Solo no vistas</option>
+        </select>
+      </div>
+      <div className="filters-row filters-row--grid">
         <select
           className="filter-control"
           value={filters.seccion ?? ''}
@@ -54,27 +57,6 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
               {saga}
             </option>
           ))}
-        </select>
-        <select
-          className="filter-control"
-          value={filters.genre ?? ''}
-          onChange={(e) => onChange({ genre: e.target.value || null })}
-        >
-          <option value="">Todos los géneros</option>
-          {genres.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
-          ))}
-        </select>
-        <select
-          className="filter-control"
-          value={filters.seen}
-          onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}
-        >
-          <option value="all">Vistas + no vistas</option>
-          <option value="seen">Solo vistas</option>
-          <option value="unseen">Solo no vistas</option>
         </select>
         <select
           className="filter-control"
