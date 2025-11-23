@@ -254,11 +254,12 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
     const directedMovies = new Map<number, DirectedMovie>();
 
     (data.crew ?? [])
-      .filter((item) =>
-        (item.media_type === 'movie' || item.media_type === 'tv') &&
-        item.job?.toLowerCase().includes('director') &&
-        isFeatureLengthProduction(item)
-      )
+      .filter((item) => {
+        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
+        const job = item.job?.trim().toLowerCase();
+        const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
+        return isPrimaryDirector && isFeatureLengthProduction(item);
+      })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
         const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
