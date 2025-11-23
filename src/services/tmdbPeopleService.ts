@@ -250,7 +250,9 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
       });
 
     const sorted = Array.from(directedMovies.values()).sort((a, b) => {
-      const byYear = (b.year ?? 0) - (a.year ?? 0);
+      const yearA = a.year ?? Number.POSITIVE_INFINITY;
+      const yearB = b.year ?? Number.POSITIVE_INFINITY;
+      const byYear = yearA - yearB;
       if (byYear !== 0) return byYear;
       return (b.popularity ?? 0) - (a.popularity ?? 0);
     });
