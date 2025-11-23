@@ -616,14 +616,17 @@ button.ghost {
   display: grid;
   place-items: center;
   z-index: 20;
-  padding: 16px;
+  padding: clamp(12px, 2vw, 18px);
+  overflow-y: auto;
 }
 
 .modal {
   max-width: 900px;
-  width: 95%;
-  max-height: 90vh;
-  overflow-y: auto;
+  width: min(900px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .movie-detail {
@@ -632,11 +635,24 @@ button.ghost {
   gap: 16px;
 }
 
+.movie-detail__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: auto;
+  max-height: calc(100vh - 56px);
+  padding-right: 2px;
+}
+
 .movie-detail__layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 16px;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: clamp(12px, 2.4vw, 18px);
   align-items: start;
+}
+
+.movie-detail__content {
+  min-width: 0;
 }
 
 .movie-detail__poster img {
@@ -644,11 +660,13 @@ button.ghost {
   height: auto;
   display: block;
   border-radius: 12px;
+  object-fit: cover;
 }
 
 .movie-detail__content {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .movie-detail__header {
@@ -656,10 +674,16 @@ button.ghost {
   gap: 6px;
 }
 
+.movie-detail__header h2 {
+  margin: 0;
+  line-height: 1.25;
+}
+
 .movie-detail__meta {
   display: grid;
   gap: 4px;
   margin: 0;
+  word-break: break-word;
 }
 
 .movie-detail__year {
@@ -724,6 +748,7 @@ button.ghost {
     align-items: stretch;
     justify-items: stretch;
     padding: 0;
+    overflow-y: auto;
   }
 
   .modal {
@@ -731,7 +756,7 @@ button.ghost {
     height: 100%;
     max-height: none;
     border-radius: 0;
-    overflow-y: auto;
+    overflow: auto;
   }
 
   .movie-detail__layout {
@@ -741,6 +766,36 @@ button.ghost {
   .movie-detail__poster {
     max-width: min(360px, 90vw);
     justify-self: center;
+  }
+}
+
+@media (max-width: 540px) {
+  .modal {
+    padding: 14px;
+  }
+
+  .movie-detail__body {
+    max-height: none;
+  }
+
+  .movie-detail__header h2 {
+    font-size: 1.3rem;
+  }
+
+  .movie-detail__poster {
+    width: 100%;
+  }
+
+  .movie-detail__ratings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rating-stars {
+    flex-wrap: wrap;
+  }
+
+  .status-accordion__body {
+    word-break: break-word;
   }
 }
 
