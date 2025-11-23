@@ -26,7 +26,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
       case 'working':
         return 'Funciona correctamente';
       case 'damaged':
-        return 'Dañada — se debe recomprar';
+        return 'Dañada';
       default:
         return 'Sin probar';
     }

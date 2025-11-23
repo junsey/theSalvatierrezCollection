@@ -42,7 +42,7 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
           </span>
           {movie.funcionaStatus === 'damaged' && (
             <span className="badge" style={{ background: 'rgba(255, 54, 93, 0.15)', color: 'var(--accent)' }}>
-              Dañada (recomprar)
+              Dañada
             </span>
           )}
           {movie.funcionaStatus === 'untested' && (

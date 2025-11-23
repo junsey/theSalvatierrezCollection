@@ -138,12 +138,11 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px clamp(10px, 3vw, 16px);
-  gap: 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-  background: rgba(10, 12, 19, 0.9);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  padding: 14px clamp(12px, 3vw, 20px);
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(7, 9, 14, 0.95), rgba(14, 16, 24, 0.92));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 20px;
 }
 
 .logo {
@@ -160,7 +159,8 @@ button:hover {
 
 .nav-links {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  align-items: center;
 }
 
 .menu-toggle {
@@ -195,11 +195,16 @@ button:hover {
 }
 
 .nav-link {
-  padding: 8px 12px;
-  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 12px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.02);
   color: var(--text);
+  font-weight: 600;
 }
 
 .nav-link:hover {
@@ -227,29 +232,47 @@ button:hover {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.filters-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
-  align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: center;
 }
 
 .filters input,
-.filters select {
+.filters select,
+.filters__actions button {
   width: 100%;
   min-width: 0;
 }
 
-.filters__actions {
-  display: flex;
-  gap: 6px;
-  align-items: stretch;
-  flex-wrap: wrap;
+.filter-control {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.2;
 }
 
-.filters__actions button {
-  flex: 1 1 150px;
+.filter-control.ghost {
+  background: transparent;
+}
+
+.filters__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  align-items: center;
 }
 
 .section-filter {
