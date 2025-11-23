@@ -13,6 +13,7 @@ const defaultFilters: MovieFilters = {
   seccion: null,
   genre: null,
   saga: null,
+  series: 'all',
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -40,6 +41,11 @@ export const AllMoviesPage: React.FC = () => {
     return movies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
+      .filter((m) => {
+        if (filters.series === 'series') return Boolean(m.series);
+        if (filters.series === 'movies') return !m.series;
+        return true;
+      })
       .filter((m) => {
         if (!filters.genre) return true;
         const genre = filters.genre.toLowerCase();

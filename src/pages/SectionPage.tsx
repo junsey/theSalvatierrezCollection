@@ -12,6 +12,7 @@ const baseFilters: MovieFilters = {
   seccion: null,
   genre: null,
   saga: null,
+  series: 'all',
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -31,6 +32,11 @@ export const SectionPage: React.FC = () => {
   const filtered = useMemo(() => {
     return sectionMovies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
+      .filter((m) => {
+        if (filters.series === 'series') return Boolean(m.series);
+        if (filters.series === 'movies') return !m.series;
+        return true;
+      })
       .filter((m) => {
         if (!filters.genre) return true;
         const genre = filters.genre.toLowerCase();

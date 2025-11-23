@@ -51,6 +51,7 @@ export type MovieFilters = {
   seccion: string | null;
   genre: string | null;
   saga: string | null;
+  series: 'all' | 'series' | 'movies';
   seen: 'all' | 'seen' | 'unseen';
   view: 'grid' | 'list';
   sort:
