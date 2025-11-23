@@ -30,6 +30,7 @@ type DirectedMovie = {
   year: number | null;
   posterUrl?: string;
   popularity?: number;
+  mediaType?: 'movie' | 'tv';
 };
 
 export type DirectorProfile = {
@@ -213,6 +214,19 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
+const isFeatureLengthProduction = (item: {
+  title?: string | null;
+  name?: string | null;
+  video?: boolean | null;
+  genre_ids?: number[];
+}) => {
+  const title = (item.title ?? item.name ?? '').toLowerCase();
+  const isMarkedVideo = item.video === true;
+  const looksLikeShort = /\bshort\b|\bcorto\b/.test(title);
+
+  return !isMarkedVideo && !looksLikeShort;
+};
+
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY) return [];
   const cacheKey = String(personId);
@@ -226,24 +240,35 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         id: number;
         media_type?: string;
         title?: string;
+        name?: string;
         job?: string;
         release_date?: string | null;
+        first_air_date?: string | null;
         poster_path?: string | null;
         popularity?: number;
+        video?: boolean | null;
+        genre_ids?: number[];
       }[];
     }>(url);
 
     const directedMovies = new Map<number, DirectedMovie>();
 
     (data.crew ?? [])
-      .filter((item) => item.media_type === 'movie' && item.job?.toLowerCase().includes('director'))
+      .filter((item) =>
+        (item.media_type === 'movie' || item.media_type === 'tv') &&
+        item.job?.toLowerCase().includes('director') &&
+        isFeatureLengthProduction(item)
+      )
       .forEach((item) => {
+        const title = item.title ?? item.name ?? 'Producción sin título';
+        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
         const entry: DirectedMovie = {
           id: item.id,
-          title: item.title ?? 'Película sin título',
-          year: parseYear(item.release_date),
+          title,
+          year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
-          popularity: item.popularity
+          popularity: item.popularity,
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
         };
 
         directedMovies.set(item.id, entry);

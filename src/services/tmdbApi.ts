@@ -31,6 +31,7 @@ const DEFAULT_MAX_RPS = 40;
 const MIN_INTERVAL_MS = 1000 / DEFAULT_MAX_RPS;
 
 export type TmdbEnrichment = {
+  mediaType: 'movie' | 'tv';
   tmdbId: number;
   tmdbTitle: string;
   tmdbOriginalTitle: string;
@@ -39,6 +40,12 @@ export type TmdbEnrichment = {
   posterPath?: string | null;
   overview?: string | null;
   tmdbGenres?: string[];
+  tmdbSeasons?: {
+    seasonNumber: number;
+    name?: string | null;
+    episodeCount?: number | null;
+    airDate?: string | null;
+  }[];
 };
 
 type CacheEntry = {
@@ -141,14 +148,15 @@ export async function tmdbFetchJson<T>(url: string, maxRps?: number): Promise<T>
   return (await response.json()) as T;
 }
 
-function makeCacheKey(titles: string[], year?: number | null) {
+function makeCacheKey(titles: string[], year: number | null | undefined, mediaType: 'movie' | 'tv') {
   const normalizedTitles = titles.map(normalizeTitle).join('|');
-  return `${normalizedTitles}|${year ?? ''}`;
+  return `${mediaType}|${normalizedTitles}|${year ?? ''}`;
 }
 
 export function clearFailedCacheForMovie(movie: MovieRecord) {
   const titles = Array.from(new Set([movie.originalTitle, movie.title].filter(Boolean))) as string[];
-  const cacheKey = makeCacheKey(titles, movie.year ?? null);
+  const mediaType: 'movie' | 'tv' = movie.series ? 'tv' : 'movie';
+  const cacheKey = makeCacheKey(titles, movie.year ?? null, mediaType);
   if (failedCache[cacheKey]) {
     delete failedCache[cacheKey];
     saveFailedCache(failedCache);
@@ -161,8 +169,13 @@ type CacheHit = {
   stale: boolean;
 };
 
-function getCached(titles: string[], year?: number | null, allowStale = false): CacheHit | null {
-  const key = makeCacheKey(titles, year);
+function getCached(
+  titles: string[],
+  year: number | null | undefined,
+  mediaType: 'movie' | 'tv',
+  allowStale = false
+): CacheHit | null {
+  const key = makeCacheKey(titles, year, mediaType);
   const entry = cache[key];
   if (!entry) return null;
   const age = Date.now() - entry.fetchedAt;
@@ -171,8 +184,8 @@ function getCached(titles: string[], year?: number | null, allowStale = false): 
   return { enrichment: entry.data, fetchedAt: entry.fetchedAt, stale };
 }
 
-function setCached(titles: string[], year: number | null, data: TmdbEnrichment) {
-  const key = makeCacheKey(titles, year);
+function setCached(titles: string[], year: number | null, mediaType: 'movie' | 'tv', data: TmdbEnrichment) {
+  const key = makeCacheKey(titles, year, mediaType);
   cache[key] = { fetchedAt: Date.now(), data };
   saveCache(cache);
 }
@@ -209,6 +222,29 @@ type DetailResult = SearchResult & {
   overview?: string | null;
   genres?: { id: number; name: string }[];
 };
+
+type TvSearchResult = {
+  id: number;
+  name: string;
+  original_name: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+  vote_average?: number;
+};
+
+type TvDetailResult = TvSearchResult & {
+  overview?: string | null;
+  genres?: { id: number; name: string }[];
+  seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null }[];
+};
+
+function isTvResult(result: SearchResult | TvSearchResult | null): result is TvSearchResult {
+  return !!result && 'name' in result;
+}
+
+function isMovieResult(result: SearchResult | TvSearchResult | null): result is SearchResult {
+  return !!result && 'title' in result;
+}
 
 function parseYear(date?: string | null): number | null {
   if (!date) return null;
@@ -264,6 +300,61 @@ async function fetchDetails(id: number, maxRps?: number): Promise<DetailResult |
   }
 }
 
+async function searchTv(title: string, year?: number | null, maxRps?: number): Promise<TvSearchResult | null> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    console.error('❌ TMDB_API_KEY no está definida o está vacía. No se puede buscar la serie:', title);
+    return null;
+  }
+  const url = new URL(`${API_BASE}/search/tv`);
+  url.searchParams.set('api_key', TMDB_API_KEY);
+  url.searchParams.set('query', title);
+  url.searchParams.set('language', 'es-ES');
+  if (year) url.searchParams.set('first_air_date_year', String(year));
+
+  const data = await tmdbFetchJson<{ results?: TvSearchResult[] }>(url.toString(), maxRps);
+  if (!data.results?.length) return null;
+
+  if (!year) return data.results[0];
+  const best = data.results
+    .map((result) => ({ result, score: scoreResult({
+      id: result.id,
+      title: result.name,
+      original_title: result.original_name,
+      release_date: result.first_air_date,
+      poster_path: result.poster_path,
+      vote_average: result.vote_average
+    }, title, year) }))
+    .sort((a, b) => b.score - a.score)[0];
+  return best?.result ?? data.results[0];
+}
+
+async function fetchTvDetails(id: number, maxRps?: number): Promise<TvDetailResult | null> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    console.error('❌ TMDB_API_KEY no está definida o está vacía. No se pueden obtener detalles para la serie:', id);
+    return null;
+  }
+  const url = `${API_BASE}/tv/${id}?api_key=${TMDB_API_KEY}&language=es-ES`;
+  try {
+    return await tmdbFetchJson<TvDetailResult>(url, maxRps);
+  } catch (error) {
+    console.warn('TMDb TV details fetch failed', error);
+    return null;
+  }
+}
+
+async function fetchTvSeasonDetails(id: number, season: number, maxRps?: number) {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    return null;
+  }
+  const url = `${API_BASE}/tv/${id}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
+  try {
+    return await tmdbFetchJson<{ air_date?: string | null; episode_count?: number | null; name?: string | null }>(url, maxRps);
+  } catch (error) {
+    console.warn('TMDb season fetch failed', error);
+    return null;
+  }
+}
+
 function buildPosterUrl(base: string, path?: string | null): string | undefined {
   if (!path) return undefined;
   return `${base}w500${path}`;
@@ -278,7 +369,8 @@ type EnrichOptions = {
 
 export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions): Promise<MovieRecord> {
   const titles = Array.from(new Set([movie.originalTitle, movie.title].filter(Boolean))) as string[];
-  const cacheKey = makeCacheKey(titles, movie.year ?? null);
+  const mediaType: 'movie' | 'tv' = movie.series ? 'tv' : 'movie';
+  const cacheKey = makeCacheKey(titles, movie.year ?? null, mediaType);
   const baseStatus: TmdbStatus = {
     source: 'none',
     requestedTitles: titles,
@@ -301,7 +393,9 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
     };
   }
 
-  const cached = options?.forceNetwork ? null : getCached(titles, movie.year ?? null, options?.allowStaleCache ?? true);
+  const cached = options?.forceNetwork
+    ? null
+    : getCached(titles, movie.year ?? null, mediaType, options?.allowStaleCache ?? true);
   if (cached) {
     const status: TmdbStatus = {
       ...baseStatus,
@@ -316,20 +410,24 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
   }
 
   try {
-    let found: SearchResult | null = null;
+    let found: SearchResult | TvSearchResult | null = null;
     for (const title of titles) {
-      found = await searchMovie(title, movie.year, options?.maxRequestsPerSecond);
+      found = mediaType === 'tv'
+        ? await searchTv(title, movie.year, options?.maxRequestsPerSecond)
+        : await searchMovie(title, movie.year, options?.maxRequestsPerSecond);
       if (found) break;
     }
     if (!found) {
       for (const title of titles) {
-        found = await searchMovie(title, undefined, options?.maxRequestsPerSecond);
+        found = mediaType === 'tv'
+          ? await searchTv(title, undefined, options?.maxRequestsPerSecond)
+          : await searchMovie(title, undefined, options?.maxRequestsPerSecond);
         if (found) break;
       }
     }
 
     if (!found) {
-      const stale = getCached(titles, movie.year ?? null, true);
+      const stale = getCached(titles, movie.year ?? null, mediaType, true);
       if (stale) {
         const status: TmdbStatus = {
           ...baseStatus,
@@ -350,18 +448,83 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
       };
     }
 
-    const details = await fetchDetails(found.id, options?.maxRequestsPerSecond);
-    const enrichment: TmdbEnrichment = {
-      tmdbId: found.id,
-      tmdbTitle: found.title,
-      tmdbOriginalTitle: found.original_title,
-      tmdbYear: parseYear(found.release_date),
-      tmdbRating: found.vote_average ?? null,
-      posterPath: found.poster_path,
-      overview: details?.overview ?? null,
-      tmdbGenres: details?.genres?.map((g) => g.name) ?? undefined
-    };
-    setCached(titles, movie.year ?? null, enrichment);
+    let enrichment: TmdbEnrichment | null = null;
+    if (mediaType === 'tv' && isTvResult(found)) {
+      const tvFound = found;
+      const details = await fetchTvDetails(tvFound.id, options?.maxRequestsPerSecond);
+      const seasonDetails = movie.season
+        ? await fetchTvSeasonDetails(tvFound.id, movie.season, options?.maxRequestsPerSecond)
+        : null;
+      const baseSeasons = details?.seasons?.map((season) => ({
+        seasonNumber: season.season_number,
+        name: season.name,
+        episodeCount: season.episode_count ?? null,
+        airDate: season.air_date ?? null
+      })) ?? [];
+
+      const enrichedSeasons = baseSeasons.map((season) => {
+        if (season.seasonNumber === movie.season && seasonDetails) {
+          return {
+            ...season,
+            name: seasonDetails.name ?? season.name,
+            episodeCount: seasonDetails.episode_count ?? season.episodeCount,
+            airDate: seasonDetails.air_date ?? season.airDate
+          };
+        }
+        return season;
+      });
+
+      enrichment = {
+        mediaType: 'tv',
+        tmdbId: tvFound.id,
+        tmdbTitle: tvFound.name,
+        tmdbOriginalTitle: tvFound.original_name,
+        tmdbYear: parseYear(tvFound.first_air_date),
+        tmdbRating: tvFound.vote_average ?? null,
+        posterPath: tvFound.poster_path,
+        overview: details?.overview ?? null,
+        tmdbGenres: details?.genres?.map((g) => g.name) ?? undefined,
+        tmdbSeasons: enrichedSeasons.length > 0 ? enrichedSeasons : undefined
+      };
+    } else if (isMovieResult(found)) {
+      const movieFound = found;
+      const details = await fetchDetails(movieFound.id, options?.maxRequestsPerSecond);
+      enrichment = {
+        mediaType: 'movie',
+        tmdbId: movieFound.id,
+        tmdbTitle: movieFound.title,
+        tmdbOriginalTitle: movieFound.original_title,
+        tmdbYear: parseYear(movieFound.release_date),
+        tmdbRating: movieFound.vote_average ?? null,
+        posterPath: movieFound.poster_path,
+        overview: details?.overview ?? null,
+        tmdbGenres: details?.genres?.map((g) => g.name) ?? undefined
+      };
+    } else {
+      failedCache[cacheKey] = Date.now();
+      saveFailedCache(failedCache);
+      return {
+        ...movie,
+        tmdbStatus: {
+          ...baseStatus,
+          source: 'error',
+          fetchedAt: failedCache[cacheKey],
+          message: 'TMDb devolvió un tipo de resultado inesperado'
+        }
+      };
+    }
+    if (!enrichment) {
+      return {
+        ...movie,
+        tmdbStatus: {
+          ...baseStatus,
+          source: 'error',
+          message: 'No se pudo construir la respuesta de TMDb'
+        }
+      };
+    }
+
+    setCached(titles, movie.year ?? null, mediaType, enrichment);
     if (failedCache[cacheKey]) {
       delete failedCache[cacheKey];
       saveFailedCache(failedCache);
@@ -369,16 +532,20 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
     const status: TmdbStatus = {
       ...baseStatus,
       source: 'network',
-      matchedId: found.id,
-      matchedTitle: found.title,
-      matchedOriginalTitle: found.original_title,
+      matchedId: found?.id,
+      matchedTitle: isTvResult(found) ? found.name : isMovieResult(found) ? found.title : undefined,
+      matchedOriginalTitle: isTvResult(found)
+        ? found.original_name
+        : isMovieResult(found)
+          ? found.original_title
+          : undefined,
       fetchedAt: Date.now(),
       message: 'Respuesta TMDb correcta'
     };
     return applyEnrichment(movie, enrichment, await getImageBaseUrl(), status);
   } catch (error) {
     console.error('TMDb lookup failed for', movie.originalTitle || movie.title, error);
-    const stale = getCached(titles, movie.year ?? null, true);
+    const stale = getCached(titles, movie.year ?? null, mediaType, true);
     if (stale) {
       const status: TmdbStatus = {
         ...baseStatus,
@@ -416,10 +583,12 @@ function applyEnrichment(
     tmdbTitle: enrichment.tmdbTitle,
     tmdbOriginalTitle: enrichment.tmdbOriginalTitle,
     tmdbYear: enrichment.tmdbYear ?? movie.year,
+    tmdbType: enrichment.mediaType ?? movie.tmdbType ?? (movie.series ? 'tv' : 'movie'),
     tmdbRating: enrichment.tmdbRating,
     posterUrl: enrichment.posterPath ? buildPosterUrl(baseUrl, enrichment.posterPath) : movie.posterUrl,
     plot: enrichment.overview ?? movie.plot,
     tmdbGenres: enrichment.tmdbGenres ?? movie.tmdbGenres,
+    tmdbSeasons: enrichment.tmdbSeasons ?? movie.tmdbSeasons,
     originalTitle: movie.originalTitle || enrichment.tmdbOriginalTitle || enrichment.tmdbTitle,
     tmdbStatus: status ?? movie.tmdbStatus
   };

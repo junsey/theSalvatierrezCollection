@@ -13,6 +13,7 @@ const splitDirectors = (value: string) =>
     .filter(Boolean);
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
+  const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorNames = useMemo(
     () =>
       Array.from(
@@ -49,7 +50,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           }
         });
         if (!active) return;
-        setProfiles(enriched);
+        const sorted = [...enriched].sort((a, b) =>
+          collator.compare(a.displayName || a.name, b.displayName || b.name)
+        );
+        setProfiles(sorted);
         setProgress(null);
       } catch (err) {
         console.warn('No se pudieron cargar los directores', err);
@@ -62,7 +66,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [directorNames]);
+  }, [collator, directorNames]);
 
   if (loading) {
     return (

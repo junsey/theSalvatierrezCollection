@@ -121,6 +121,35 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onSeenChange, onR
             <p>
               <strong>TMDb rating:</strong> {movie.tmdbRating?.toFixed(1) ?? 'N/A'}
             </p>
+            {movie.tmdbType === 'tv' && (
+              <div className="director-section">
+                <div className="director-section__heading">
+                  <strong>Temporadas</strong>
+                  {movie.season != null && (
+                    <small className="muted"> Temporada solicitada: {movie.season}</small>
+                  )}
+                </div>
+                {movie.tmdbSeasons && movie.tmdbSeasons.length > 0 ? (
+                  <ul className="director-link-list">
+                    {movie.tmdbSeasons.map((season) => (
+                      <li key={season.seasonNumber}>
+                        <span>
+                          T{season.seasonNumber}{' '}
+                          {season.name && <em style={{ color: 'var(--text-muted)' }}>({season.name})</em>}
+                          {movie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+                        </span>
+                        <div className="muted" style={{ fontSize: '0.9em' }}>
+                          Episodios: {season.episodeCount ?? '¿?'}{' '}
+                          {season.airDate && <span>• Estreno: {season.airDate}</span>}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">Sin temporadas registradas.</p>
+                )}
+              </div>
+            )}
             <div style={{ marginTop: 16, marginBottom: 16 }}>
               <h3 style={{ marginBottom: 12, fontSize: '1.1em' }}>Puntuaciones</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
