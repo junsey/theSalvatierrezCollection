@@ -37,60 +37,51 @@ const getWorkKey = (movie: MovieRecord) => {
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
-  const directorNames = useMemo(() => {
-    const names = new Map<string, string>();
+  const directors = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        name: string;
+        normalizedName: string;
+        tmdbId?: number;
+        worksCount: number;
+      }
+    >();
+
     movies.forEach((movie) => {
       splitDirectors(movie.director)
         .filter(Boolean)
         .forEach((name) => {
-          const key = getOverrideKey(name, directorOverrides);
-          if (!names.has(key)) {
-            names.set(key, name.trim());
+          const normalizedName = normalizeDirectorName(name);
+          const overrideId = directorOverrides.get(normalizedName);
+          const key = buildDirectorKey(name, overrideId);
+          if (!map.has(key)) {
+            map.set(key, {
+              key,
+              name: name.trim(),
+              normalizedName,
+              tmdbId: overrideId,
+              worksCount: 0
+            });
           }
+          const entry = map.get(key)!;
+          entry.worksCount += 1;
         });
     });
-    return Array.from(names.values()).sort((a, b) => collator.compare(a, b));
+
+    return Array.from(map.values()).sort((a, b) => collator.compare(a.name, b.name));
   }, [collator, directorOverrides, movies]);
   const availableLetters = useMemo(() => {
     const letters = new Set<string>();
-    directorNames.forEach((name) => {
-      const first = name.trim()[0];
+    directors.forEach((director) => {
+      const first = director.name.trim()[0];
       if (first) letters.add(first.toUpperCase());
     });
     return Array.from(letters).sort();
-  }, [directorNames]);
+  }, [directors]);
 
-  const collectionCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    const workSeenByDirector = new Map<string, Set<string>>();
-
-    movies.forEach((movie) => {
-      const workKey = getWorkKey(movie);
-      splitDirectors(movie.director).forEach((name) => {
-        const directorKey = getOverrideKey(name, directorOverrides);
-        const seen = workSeenByDirector.get(directorKey) ?? new Set<string>();
-        if (!seen.has(workKey)) {
-          seen.add(workKey);
-          workSeenByDirector.set(directorKey, seen);
-          counts.set(directorKey, (counts.get(directorKey) ?? 0) + 1);
-        }
-      });
-    });
-
-    return counts;
-  }, [directorOverrides, movies]);
-
-  const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
-  const uniqueProfiles = useMemo(() => {
-    const map = new Map<string, DirectorProfile>();
-    profiles.forEach((profile) => {
-      const key = buildDirectorKey(profile.name, profile.tmdbId);
-      if (!map.has(key)) {
-        map.set(key, profile);
-      }
-    });
-    return Array.from(map.values());
-  }, [profiles]);
+  const [profiles, setProfiles] = useState<(DirectorProfile & { key: string; worksCount: number })[]>([]);
   const totalsCache = useRef<Map<number, number>>(new Map());
   const [coverage, setCoverage] = useState<Record<string, { owned: number; total: number | null }>>({});
   const [loading, setLoading] = useState(false);
@@ -102,24 +93,42 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   useEffect(() => {
     let active = true;
     async function hydrate() {
-      if (directorNames.length === 0) {
+      if (directors.length === 0) {
         setProfiles([]);
         setProgress(null);
         return;
       }
       setLoading(true);
       setError(null);
-      setProgress({ current: 0, total: directorNames.length });
+      setProgress({ current: 0, total: directors.length });
       try {
-        const enriched = await buildDirectorProfiles(directorNames, {
-          overrides: directorOverrides,
-          onProgress: (current, total) => {
-            if (!active) return;
-            setProgress({ current, total });
+        const enriched = await buildDirectorProfiles(
+          directors.map((director) => director.name),
+          {
+            overrides: directorOverrides,
+            onProgress: (current, total) => {
+              if (!active) return;
+              setProgress({ current, total });
+            }
           }
-        });
+        );
         if (!active) return;
-        const sorted = [...enriched].sort((a, b) =>
+        const enrichedMap = new Map<string, DirectorProfile>();
+        enriched.forEach((profile) => {
+          enrichedMap.set(normalizeDirectorName(profile.name), profile);
+        });
+        const merged = directors.map((director) => {
+          const profile = enrichedMap.get(director.normalizedName);
+          return {
+            key: director.key,
+            name: director.name,
+            displayName: profile?.displayName ?? director.name,
+            tmdbId: profile?.tmdbId ?? director.tmdbId ?? null,
+            profileUrl: profile?.profileUrl ?? null,
+            worksCount: director.worksCount
+          };
+        });
+        const sorted = [...merged].sort((a, b) =>
           collator.compare(a.displayName || a.name, b.displayName || b.name)
         );
         setProfiles(sorted);
@@ -135,21 +144,20 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [collator, directorNames, directorOverrides]);
+  }, [collator, directors, directorOverrides]);
 
   useEffect(() => {
     let cancelled = false;
     async function loadCoverage() {
-      if (uniqueProfiles.length === 0) {
+      if (profiles.length === 0) {
         setCoverage({});
         return;
       }
 
       const tmdbTotals = totalsCache.current;
       const rows = await Promise.all(
-        uniqueProfiles.map(async (profile) => {
-          const key = buildDirectorKey(profile.name, profile.tmdbId);
-          const owned = collectionCounts.get(key) ?? 0;
+        profiles.map(async (profile) => {
+          const owned = profile.worksCount;
 
           let total: number | null = null;
           if (profile.tmdbId) {
@@ -162,7 +170,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             }
           }
 
-          return { key, owned, total };
+          return { key: profile.key, owned, total };
         })
       );
 
@@ -179,28 +187,27 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [uniqueProfiles, collectionCounts]);
+  }, [profiles]);
 
   useEffect(() => {
-    const matches = uniqueProfiles.filter((director) =>
+    const matches = profiles.filter((director) =>
       director.name.toLowerCase().includes('chris carter')
     );
     console.log('Chris Carter entries:', matches);
-  }, [uniqueProfiles]);
+  }, [profiles]);
 
   const filteredProfiles = useMemo(() => {
     const filtered = letterFilter
-      ? uniqueProfiles.filter((director) =>
+      ? profiles.filter((director) =>
           (director.displayName || director.name)
             .trim()
             .toUpperCase()
             .startsWith(letterFilter)
         )
-      : uniqueProfiles;
+      : profiles;
 
     const enriched = filtered.map((profile) => {
-      const key = buildDirectorKey(profile.name, profile.tmdbId);
-      const owned = coverage[key]?.owned ?? collectionCounts.get(key) ?? 0;
+      const owned = coverage[profile.key]?.owned ?? profile.worksCount;
       return { profile, owned };
     });
 
@@ -216,7 +223,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return sorted.map((entry) => entry.profile);
-  }, [letterFilter, uniqueProfiles, coverage, collectionCounts, orderBy, collator]);
+  }, [letterFilter, profiles, coverage, orderBy, collator]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
@@ -256,7 +263,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
 
   return (
     <>
-      {(availableLetters.length > 1 || uniqueProfiles.length > 0) && (
+      {(availableLetters.length > 1 || profiles.length > 0) && (
         <div className="panel" style={{ marginBottom: 12 }}>
           <div
             style={{
@@ -302,9 +309,9 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             key={buildDirectorKey(director.name, director.tmdbId)}
           >
             {(() => {
-              const key = buildDirectorKey(director.name, director.tmdbId);
+              const key = director.key;
               const stats = coverage[key];
-              const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
+              const owned = stats?.owned ?? director.worksCount;
               const total = stats?.total ?? null;
               const medal = getMedal(owned, total);
               const label = total ? `${owned} de ${total}` : `${owned} en colección`;
