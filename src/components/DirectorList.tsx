@@ -31,17 +31,28 @@ const getWorkKey = (movie: MovieRecord) => {
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
-  const directorNames = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          movies
-            .flatMap((m) => splitDirectors(m.director))
-            .filter(Boolean)
-        )
-      ).sort(),
-    [movies]
-  );
+  const directorNames = useMemo(() => {
+    const names = new Map<string, string>();
+    movies.forEach((movie) => {
+      splitDirectors(movie.director)
+        .filter(Boolean)
+        .forEach((name) => {
+          const normalized = normalizeDirectorName(name);
+          if (!names.has(normalized)) {
+            names.set(normalized, name.trim());
+          }
+        });
+    });
+    return Array.from(names.values()).sort((a, b) => collator.compare(a, b));
+  }, [collator, movies]);
+  const availableLetters = useMemo(() => {
+    const letters = new Set<string>();
+    directorNames.forEach((name) => {
+      const first = name.trim()[0];
+      if (first) letters.add(first.toUpperCase());
+    });
+    return Array.from(letters).sort();
+  }, [directorNames]);
 
   const collectionCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -69,6 +80,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [letterFilter, setLetterFilter] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -188,16 +200,50 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return <p className="muted">{error}</p>;
   }
 
+  const filteredProfiles = letterFilter
+    ? profiles.filter((director) =>
+        (director.displayName || director.name)
+          .trim()
+          .toUpperCase()
+          .startsWith(letterFilter)
+      )
+    : profiles;
+
   return (
-    <div className="director-grid">
-      {profiles.map((director) => (
-        <Link
-          to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
-          className="director-card"
-          key={director.name}
-        >
-          {(() => {
-            const key = normalizeDirectorName(director.name);
+    <>
+      {availableLetters.length > 1 && (
+        <div className="panel" style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            <strong style={{ marginRight: 4 }}>Filtrar por letra:</strong>
+            <button
+              type="button"
+              className={`button button--sm ${letterFilter === null ? 'is-primary' : 'is-ghost'}`}
+              onClick={() => setLetterFilter(null)}
+            >
+              Todas
+            </button>
+            {availableLetters.map((letter) => (
+              <button
+                key={letter}
+                type="button"
+                className={`button button--sm ${letterFilter === letter ? 'is-primary' : 'is-ghost'}`}
+                onClick={() => setLetterFilter(letter)}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="director-grid">
+        {filteredProfiles.map((director) => (
+          <Link
+            to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+            className="director-card"
+            key={normalizeDirectorName(director.name)}
+          >
+            {(() => {
+              const key = normalizeDirectorName(director.name);
             const stats = coverage[key];
             const owned = stats?.owned ?? collectionCounts.get(key) ?? 0;
             const total = stats?.total ?? null;
@@ -230,8 +276,14 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             <strong className="section-title">{director.displayName || director.name}</strong>
             <small className="section-count">Ver perfil</small>
           </div>
-        </Link>
-      ))}
-    </div>
+          </Link>
+        ))}
+        {filteredProfiles.length === 0 && (
+          <p className="muted" style={{ padding: '12px 0' }}>
+            No hay directores para la letra seleccionada.
+          </p>
+        )}
+      </div>
+    </>
   );
 };
