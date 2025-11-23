@@ -1,24 +1,27 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
+import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
 
 export const SettingsPage: React.FC = () => {
   const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
   const [directorProgress, setDirectorProgress] = useState<{ current: number; total: number } | null>(null);
   const [regeneratingDirectors, setRegeneratingDirectors] = useState(false);
 
-  const directorNames = useMemo(() => {
-    const splitDirectors = (value: string) =>
-      value
-        .split(/[,;/&]/g)
-        .map((d) => d.trim())
-        .filter(Boolean);
-
-    return Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort();
-  }, [movies]);
+  const directorNames = useMemo(
+    () => Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort(),
+    [movies]
+  );
+  const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const damagedMovies = useMemo(
+    () => movies.filter((movie) => movie.funcionaStatus === 'damaged'),
+    [movies]
+  );
 
   const handleRefreshAll = async () => {
     setStatus(null);
@@ -61,6 +64,7 @@ export const SettingsPage: React.FC = () => {
       clearPeopleCaches();
       await buildDirectorProfiles(directorNames, {
         forceRefresh: true,
+        overrides: directorOverrides,
         onProgress: (current, total) => setDirectorProgress({ current, total })
       });
       setStatus('✅ Directores regenerados correctamente.');
@@ -305,6 +309,26 @@ export const SettingsPage: React.FC = () => {
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      <div className="panel" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3>Películas dañadas</h3>
+          <button
+            className="btn"
+            onClick={() => navigate('/damaged')}
+            disabled={damagedMovies.length === 0}
+            style={{ fontSize: '0.9em', padding: '6px 12px' }}
+          >
+            Ver lista ({damagedMovies.length})
+          </button>
+        </div>
+        <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 12 }}>
+          Basado en la columna <strong>Funciona</strong>: "No" = dañada, vacía = sin probar, "Si" = en buen estado.
+        </p>
+        {damagedMovies.length === 0 && (
+          <p style={{ color: 'var(--accent-2)' }}>✅ No hay películas marcadas como dañadas.</p>
         )}
       </div>
     </div>

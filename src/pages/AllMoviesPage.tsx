@@ -20,7 +20,7 @@ const defaultFilters: MovieFilters = {
 };
 
 export const AllMoviesPage: React.FC = () => {
-  const { movies, loading, error, updateNote, ratings, notes } = useMovies();
+  const { movies, loading, error, ratings } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
   const location = useLocation();
@@ -112,20 +112,13 @@ export const AllMoviesPage: React.FC = () => {
       {filters.view === 'grid' ? (
         <div className="movie-grid movie-grid--six">
           {filtered.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} personalRating={ratings[movie.id]} onClick={() => setActiveMovie(movie)} />
+            <MovieCard key={movie.id} movie={movie} onClick={() => setActiveMovie(movie)} />
           ))}
         </div>
       ) : (
-        <MovieTable movies={filtered} personalRatings={ratings} onSelect={(m) => setActiveMovie(m)} />
+        <MovieTable movies={filtered} onSelect={(m) => setActiveMovie(m)} />
       )}
-      {activeMovie && (
-        <MovieDetail
-          movie={activeMovie}
-          personalNote={notes[activeMovie.id]}
-          onClose={() => setActiveMovie(null)}
-          onNoteChange={(note) => updateNote(activeMovie.id, note)}
-        />
-      )}
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>
   );
 };

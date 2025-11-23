@@ -7,6 +7,8 @@ export type MovieRecord = {
   originalTitle?: string;
   genreRaw: string;
   director: string;
+  directorTmdbId?: number | null;
+  directorTmdbIds?: number[];
   group: string;
   seen: boolean;
   series?: boolean;
@@ -16,6 +18,8 @@ export type MovieRecord = {
   ratingRodrigo?: number | null;
   dubbing: string;
   format: string;
+  enDeposito?: boolean;
+  funcionaStatus: 'working' | 'damaged' | 'untested';
   tmdbId?: number;
   tmdbRating?: number | null;
   tmdbYear?: number | null;

@@ -59,7 +59,9 @@ const fallbackMovies: MovieRecord[] = [
     seen: false,
     rating: 7,
     dubbing: 'Español',
-    format: 'Blu-ray'
+    format: 'Blu-ray',
+    enDeposito: false,
+    funcionaStatus: 'untested'
   }
 ];
 
@@ -116,8 +118,37 @@ const safeNumber = (value: string): number | null => {
   return Number.isFinite(num) ? num : null;
 };
 
+const parseNumberList = (value: string): number[] => {
+  if (!value) return [];
+  return value
+    .split(/[,;/&]/g)
+    .map((entry) => safeNumber(entry.trim()) ?? null)
+    .filter((entry): entry is number => entry !== null);
+};
+
+const parseFunciona = (value: string): 'working' | 'damaged' | 'untested' => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'untested';
+
+  const workingTokens = ['si', 'sí', 'yes', 'y', 'true', 'ok', 'bueno', 'funciona', 'bien'];
+  const damagedTokens = ['no', 'dañado', 'daniado', 'malo', 'broken', 'defectuoso'];
+
+  if (workingTokens.includes(normalized)) return 'working';
+  if (damagedTokens.includes(normalized)) return 'damaged';
+  return 'untested';
+};
+
+const parseEnDeposito = (value: string): boolean => {
+  return value.trim().length > 0;
+};
+
 function mapToMovie(record: Record<string, string>, index: number): MovieRecord {
   const seriesValue = record['Serie'] ?? record['Series'] ?? '';
+  const directorIdField =
+    record['Director TMDb Id'] ?? record['DirectorTMDbId'] ?? record['DirectorTMDbID'] ?? '';
+  const directorTmdbIds = parseNumberList(directorIdField);
+  const funcionaStatus = parseFunciona(record['Funciona'] ?? '');
+  const enDeposito = parseEnDeposito(record['En depósito'] ?? record['En Deposito'] ?? '');
   return {
     id: `${record['Titulo'] ?? 'movie'}-${index}`,
     seccion: record['Seccion'] ?? 'Desconocida',
@@ -127,6 +158,8 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     originalTitle: record['Titulo Original'] ?? '',
     genreRaw: record['Genero'] ?? '',
     director: record['Director'] ?? '',
+    directorTmdbId: directorTmdbIds[0] ?? null,
+    directorTmdbIds: directorTmdbIds.length > 0 ? directorTmdbIds : undefined,
     group: record['Grupo'] ?? '',
     seen: parseBoolean(record['Vista'] ?? ''),
     series: parseBoolean(seriesValue || 'no'),
@@ -135,7 +168,9 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     ratingGloria: safeNumber(record['Puntuacion Gloria'] ?? ''),
     ratingRodrigo: safeNumber(record['Puntuacion Rodrigo'] ?? ''),
     dubbing: record['Doblaje'] ?? '',
-    format: record['Formato'] ?? ''
+    format: record['Formato'] ?? '',
+    enDeposito,
+    funcionaStatus
   };
 }
 

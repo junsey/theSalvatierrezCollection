@@ -18,30 +18,32 @@ export const Header: React.FC = () => {
 
   return (
     <header className="navbar">
-      <Link to="/" className="logo">The Salvatierrez Collection</Link>
-      <button className={`menu-toggle ${open ? 'open' : ''}`} onClick={toggleMenu} aria-label="Toggle navigation">
-        <span />
-        <span />
-        <span />
-      </button>
-      <nav className={`nav-links ${open ? 'open' : ''}`}>
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={closeMenu}
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-            style={({ isActive }) => ({
-              color: isActive ? 'var(--accent)' : undefined,
-              borderColor: isActive ? 'rgba(255, 54, 93, 0.5)' : undefined
-            })}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <div className="navbar__inner">
+        <Link to="/" className="logo">The Salvatierrez Collection</Link>
+        <button className={`menu-toggle ${open ? 'open' : ''}`} onClick={toggleMenu} aria-label="Toggle navigation">
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav className={`nav-links ${open ? 'open' : ''}`}>
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={closeMenu}
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'active' : ''}`
+              }
+              style={({ isActive }) => ({
+                color: isActive ? 'var(--accent)' : undefined,
+                borderColor: isActive ? 'rgba(255, 54, 93, 0.5)' : undefined
+              })}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </header>
   );
 };

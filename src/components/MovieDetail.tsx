@@ -7,10 +7,8 @@ import { PawRating } from './PawRating';
 interface Props {
   movie: MovieRecord;
   onClose: () => void;
-  onNoteChange: (note: string) => void;
-  personalNote?: string;
 }
-export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, personalNote }) => {
+export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
 
@@ -20,6 +18,17 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
         .map((d) => d.trim())
         .filter(Boolean)
     : [];
+
+  const funcionaLabel = (() => {
+    switch (movie.funcionaStatus) {
+      case 'working':
+        return 'Funciona correctamente';
+      case 'damaged':
+        return 'Dañada';
+      default:
+        return 'Sin probar';
+    }
+  })();
 
   useEffect(() => {
     let active = true;
@@ -74,6 +83,11 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
                       <span>Vista</span>
                     </span>
                   )}
+                  {movie.enDeposito && (
+                    <span className="movie-detail__seen-flag" title="En depósito">
+                      <span>En depósito</span>
+                    </span>
+                  )}
                 </div>
                 <p className="movie-detail__meta">
                   {movie.originalTitle && (
@@ -126,6 +140,9 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
               )}
               <p>
                 <strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}
+              </p>
+              <p>
+                <strong>Estado físico:</strong> {funcionaLabel}
               </p>
               <p>
                 <strong>Plot:</strong> {movie.plot ?? 'No plot available.'}
@@ -191,15 +208,6 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="movie-detail__notes">
-                <small>Personal notes</small>
-                <textarea
-                  rows={4}
-                  placeholder="Write your whispers from the catacombs..."
-                  value={personalNote ?? ''}
-                  onChange={(e) => onNoteChange(e.target.value)}
-                />
               </div>
               <details className="status-accordion">
                 <summary>Status</summary>

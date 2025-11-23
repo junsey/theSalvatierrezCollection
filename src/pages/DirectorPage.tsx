@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
-import { DirectedMovie, getPersonDirectedMovies, getPersonDetails, searchPersonByName } from '../services/tmdbPeopleService';
+import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
+import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -15,6 +16,7 @@ export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const directorName = decodeURIComponent(name ?? '').trim();
   const { movies } = useMovies();
+  const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,24 +41,20 @@ export const DirectorPage: React.FC = () => {
       }
 
       try {
-        const search = await searchPersonByName(directorName);
+        const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
+        const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: overrideTmdbId });
         if (!active) return;
-        if (!search) {
+
+        if (!result) {
           setError('No se encontró al director en TMDb.');
           setLoading(false);
           return;
         }
-        setPersonName(search.name);
 
-        const [details, filmography] = await Promise.all([
-          getPersonDetails(search.id),
-          getPersonDirectedMovies(search.id)
-        ]);
-        if (!active) return;
-
-        setBiography(details?.biography ?? null);
-        setProfileUrl(details?.profileUrl ?? undefined);
-        setKnownFor(filmography);
+        setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
+        setBiography(result.person?.biography ?? null);
+        setProfileUrl(result.person?.profileUrl ?? undefined);
+        setKnownFor(result.credits);
       } catch (err) {
         console.warn('Error al cargar el director', err);
         if (active) setError('No se pudieron obtener los datos del director.');
@@ -69,7 +67,7 @@ export const DirectorPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [directorName]);
+  }, [directorName, directorOverrides]);
 
   const curatedKnownFor = useMemo(() => {
     const seen = new Set<number>();

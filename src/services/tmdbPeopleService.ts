@@ -40,6 +40,11 @@ export type DirectorProfile = {
   profileUrl?: string | null;
 };
 
+export type DirectorLookup = {
+  name: string;
+  tmdbId?: number | null;
+};
+
 type ConfigCache = { fetchedAt: number; baseUrl: string; size: string };
 
 const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = loadCache<PersonDetails>(PERSON_CACHE_KEY);
@@ -75,6 +80,27 @@ function isFresh(entry?: PersonCacheEntry<any>): boolean {
 }
 
 const normalizeName = (value: string) => value.trim().toLowerCase();
+
+const buildOverrideMap = (
+  overrides?: Map<string, number | null> | Record<string, number | null | undefined>
+): Map<string, number> => {
+  if (!overrides) return new Map();
+
+  const map = new Map<string, number>();
+  const addEntry = (key: string, value?: number | null) => {
+    if (value == null) return;
+    if (!Number.isFinite(value)) return;
+    map.set(normalizeName(key), value);
+  };
+
+  if (overrides instanceof Map) {
+    overrides.forEach((value, key) => addEntry(key, value ?? null));
+  } else {
+    Object.entries(overrides).forEach(([key, value]) => addEntry(key, value ?? null));
+  }
+
+  return map;
+};
 
 async function getProfileBase(): Promise<{ baseUrl: string; size: string }> {
   if (typeof localStorage !== 'undefined') {
@@ -292,9 +318,49 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
   }
 }
 
+export async function fetchDirectorFromTMDb(
+  director: DirectorLookup
+): Promise<{ person: PersonDetails | null; credits: DirectedMovie[]; resolvedName: string; tmdbId: number | null } | null> {
+  if (!TMDB_API_KEY) return null;
+
+  const loadById = async (id: number) => {
+    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonDirectedMovies(id)]);
+    return {
+      person,
+      credits,
+      resolvedName: person?.name ?? director.name,
+      tmdbId: id
+    };
+  };
+
+  try {
+    if (director.tmdbId) {
+      return await loadById(director.tmdbId);
+    }
+
+    const match = await searchPersonByName(director.name);
+    if (!match) return null;
+
+    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonDirectedMovies(match.id)]);
+    return {
+      person,
+      credits,
+      resolvedName: person?.name ?? match.name ?? director.name,
+      tmdbId: match.id
+    };
+  } catch (error) {
+    console.warn('No se pudo obtener al director desde TMDb', director.name, error);
+    return null;
+  }
+}
+
 export async function buildDirectorProfiles(
   names: string[],
-  options?: { forceRefresh?: boolean; onProgress?: (current: number, total: number) => void }
+  options?: {
+    forceRefresh?: boolean;
+    onProgress?: (current: number, total: number) => void;
+    overrides?: Map<string, number | null> | Record<string, number | null | undefined>;
+  }
 ): Promise<DirectorProfile[]> {
   const unique = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
   if (unique.length === 0) return [];
@@ -305,6 +371,8 @@ export async function buildDirectorProfiles(
   const total = unique.length;
   let completed = 0;
   const report = () => options?.onProgress?.(completed, total);
+
+  const overrideMap = buildOverrideMap(options?.overrides);
 
   const cachedPayload = options?.forceRefresh ? null : loadDirectorCache();
   const cachedMap = new Map<string, CachedDirector>();
@@ -318,7 +386,9 @@ export async function buildDirectorProfiles(
   if (!options?.forceRefresh) {
     for (const name of unique) {
       const cached = cachedMap.get(normalizeName(name));
-      if (cached) {
+      const overrideId = overrideMap.get(normalizeName(name));
+      const cacheMatchesOverride = overrideId === undefined || cached?.tmdbId === overrideId;
+      if (cached && cacheMatchesOverride) {
         completed += 1;
       } else {
         missing.push(name);
@@ -331,15 +401,26 @@ export async function buildDirectorProfiles(
   const fetched: CachedDirector[] = [];
   for (const target of missing) {
     try {
-      const search = await searchPersonByName(target);
       let profileUrl: string | undefined;
-      let resolvedName = search?.name ?? target;
-      let tmdbId: number | null = search?.id ?? null;
+      let resolvedName = target;
+      let tmdbId: number | null = null;
+      const overrideTmdbId = overrideMap.get(normalizeName(target));
 
-      if (search?.id) {
-        const details = await getPersonDetails(search.id);
+      if (overrideTmdbId !== undefined) {
+        tmdbId = overrideTmdbId;
+        const details = await getPersonDetails(overrideTmdbId);
         profileUrl = details?.profileUrl ?? undefined;
         resolvedName = details?.name ?? resolvedName;
+      } else {
+        const search = await searchPersonByName(target);
+        resolvedName = search?.name ?? target;
+        tmdbId = search?.id ?? null;
+
+        if (search?.id) {
+          const details = await getPersonDetails(search.id);
+          profileUrl = details?.profileUrl ?? undefined;
+          resolvedName = details?.name ?? resolvedName;
+        }
       }
 
       fetched.push({
@@ -371,7 +452,7 @@ export async function buildDirectorProfiles(
     const entry = mergedMap.get(normalizeName(name)) ?? {
       name,
       resolvedName: name,
-      tmdbId: null,
+      tmdbId: overrideMap.get(normalizeName(name)) ?? null,
       profileUrl: null,
       fetchedAt: now
     };
