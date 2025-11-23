@@ -22,7 +22,7 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
         <small>{movie.tmdbYear ?? movie.year ?? 'Year ?'} • {movie.seccion}</small>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="badge">TMDb: {movie.tmdbRating?.toFixed(1) ?? 'N/A'}</span>
-          {personalRating && (
+          {personalRating != null && (
             <span className="badge">Mi puntuación: {personalRating}</span>
           )}
           {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
@@ -40,6 +40,16 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick, personalRating }) =
           <span className="badge" style={{ background: movie.seen ? 'rgba(126, 217, 87, 0.2)' : 'rgba(255, 54, 93, 0.2)' }}>
             {movie.seen ? 'Vista' : 'No vista'}
           </span>
+          {movie.funcionaStatus === 'damaged' && (
+            <span className="badge" style={{ background: 'rgba(255, 54, 93, 0.15)', color: 'var(--accent)' }}>
+              Dañada (recomprar)
+            </span>
+          )}
+          {movie.funcionaStatus === 'untested' && (
+            <span className="badge" style={{ background: 'rgba(255, 200, 0, 0.2)', color: '#b58100' }}>
+              Sin probar
+            </span>
+          )}
         </div>
       </div>
     </div>

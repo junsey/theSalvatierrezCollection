@@ -18,6 +18,7 @@ export type MovieRecord = {
   ratingRodrigo?: number | null;
   dubbing: string;
   format: string;
+  funcionaStatus: 'working' | 'damaged' | 'untested';
   tmdbId?: number;
   tmdbRating?: number | null;
   tmdbYear?: number | null;

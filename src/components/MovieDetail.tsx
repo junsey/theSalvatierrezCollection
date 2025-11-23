@@ -21,6 +21,17 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
         .filter(Boolean)
     : [];
 
+  const funcionaLabel = (() => {
+    switch (movie.funcionaStatus) {
+      case 'working':
+        return 'Funciona correctamente';
+      case 'damaged':
+        return 'Dañada — se debe recomprar';
+      default:
+        return 'Sin probar';
+    }
+  })();
+
   useEffect(() => {
     let active = true;
     async function fetchDirectors() {
@@ -126,6 +137,9 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose, onNoteChange, per
               )}
               <p>
                 <strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}
+              </p>
+              <p>
+                <strong>Estado físico:</strong> {funcionaLabel}
               </p>
               <p>
                 <strong>Plot:</strong> {movie.plot ?? 'No plot available.'}
