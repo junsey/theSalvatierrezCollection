@@ -11,6 +11,7 @@ const uniqueValues = (items: string[]) => Array.from(new Set(items.filter(Boolea
 
 export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
   const secciones = uniqueValues(movies.map((m) => m.seccion));
+  const sagas = uniqueValues(movies.map((m) => m.saga));
   const genres = uniqueValues(
     movies
       .flatMap((m) => [
@@ -32,6 +33,14 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies }) => {
         {secciones.map((s) => (
           <option key={s} value={s}>
             {s}
+          </option>
+        ))}
+      </select>
+      <select value={filters.saga ?? ''} onChange={(e) => onChange({ saga: e.target.value || null })}>
+        <option value="">Todas las sagas</option>
+        {sagas.map((saga) => (
+          <option key={saga} value={saga}>
+            {saga}
           </option>
         ))}
       </select>

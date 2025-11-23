@@ -42,6 +42,7 @@ export type MovieFilters = {
   query: string;
   seccion: string | null;
   genre: string | null;
+  saga: string | null;
   seen: 'all' | 'seen' | 'unseen';
   view: 'grid' | 'list';
   sort:

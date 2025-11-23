@@ -12,6 +12,7 @@ const defaultFilters: MovieFilters = {
   query: '',
   seccion: null,
   genre: null,
+  saga: null,
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -40,6 +41,7 @@ export const AllMoviesPage: React.FC = () => {
         const tmdbMatch = (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre);
         return rawMatch || tmdbMatch;
       })
+      .filter((m) => (filters.saga ? m.saga === filters.saga : true))
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
@@ -71,11 +73,21 @@ export const AllMoviesPage: React.FC = () => {
     if (!movies.length) return;
     const params = new URLSearchParams(location.search);
     const tmdbId = params.get('tmdbId');
+    const saga = params.get('saga');
     if (tmdbId) {
       const match = movies.find((m) => m.tmdbId === Number(tmdbId));
       if (match) {
         setActiveMovie(match);
       }
+    }
+
+    if (saga !== null) {
+      setFilters((prev) => {
+        if (prev.saga === saga) return prev;
+        const next = { ...prev, saga: saga || null };
+        setStoredFilters(next);
+        return next;
+      });
     }
   }, [location.search, movies]);
 

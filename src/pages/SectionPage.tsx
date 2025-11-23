@@ -11,6 +11,7 @@ const baseFilters: MovieFilters = {
   query: '',
   seccion: null,
   genre: null,
+  saga: null,
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -36,6 +37,7 @@ export const SectionPage: React.FC = () => {
           (m.tmdbGenres ?? []).some((g) => g.toLowerCase() === genre)
         );
       })
+      .filter((m) => (filters.saga ? m.saga === filters.saga : true))
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
