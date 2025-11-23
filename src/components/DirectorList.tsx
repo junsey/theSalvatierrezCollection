@@ -75,6 +75,16 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   }, [movies]);
 
   const [profiles, setProfiles] = useState<DirectorProfile[]>([]);
+  const uniqueProfiles = useMemo(() => {
+    const map = new Map<string, DirectorProfile>();
+    profiles.forEach((profile) => {
+      const key = normalizeDirectorName(profile.name);
+      if (!map.has(key)) {
+        map.set(key, profile);
+      }
+    });
+    return Array.from(map.values());
+  }, [profiles]);
   const totalsCache = useRef<Map<number, number>>(new Map());
   const [coverage, setCoverage] = useState<Record<string, { owned: number; total: number | null }>>({});
   const [loading, setLoading] = useState(false);
@@ -123,14 +133,14 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   useEffect(() => {
     let cancelled = false;
     async function loadCoverage() {
-      if (profiles.length === 0) {
+      if (uniqueProfiles.length === 0) {
         setCoverage({});
         return;
       }
 
       const tmdbTotals = totalsCache.current;
       const rows = await Promise.all(
-        profiles.map(async (profile) => {
+        uniqueProfiles.map(async (profile) => {
           const key = normalizeDirectorName(profile.name);
           const owned = collectionCounts.get(key) ?? 0;
 
@@ -162,7 +172,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles, collectionCounts]);
+  }, [uniqueProfiles, collectionCounts]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
@@ -201,13 +211,13 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   }
 
   const filteredProfiles = letterFilter
-    ? profiles.filter((director) =>
+    ? uniqueProfiles.filter((director) =>
         (director.displayName || director.name)
           .trim()
           .toUpperCase()
           .startsWith(letterFilter)
       )
-    : profiles;
+    : uniqueProfiles;
 
   return (
     <>
