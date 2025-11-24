@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
 import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
-import { buildOriginalTitleMap, matchLocalMovieByTitle } from '../utils/titleMatching';
+import { buildOriginalTitleMap, buildOwnedTmdbIdSet, isCreditOwned } from '../utils/titleMatching';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -23,6 +23,7 @@ export const DirectorPage: React.FC = () => {
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
+  const ownedIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +49,7 @@ export const DirectorPage: React.FC = () => {
 
       try {
         const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
-        const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: overrideTmdbId });
+        const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: overrideTmdbId }, { ownedIds });
         if (!active) return;
 
         if (!result) {
@@ -73,7 +74,7 @@ export const DirectorPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [directorName, directorOverrides]);
+  }, [directorName, directorOverrides, ownedIds]);
 
   const { ownedCredits, unownedCredits } = useMemo(() => {
     const owned: DirectedMovie[] = [];
@@ -83,8 +84,8 @@ export const DirectorPage: React.FC = () => {
     credits.forEach((credit) => {
       if (seen.has(credit.id)) return;
       seen.add(credit.id);
-      const match = matchLocalMovieByTitle(credit, titleLookup);
-      if (match) {
+      const isOwned = isCreditOwned(credit, ownedIds, titleLookup);
+      if (isOwned) {
         owned.push(credit);
       } else {
         unowned.push(credit);
@@ -92,7 +93,7 @@ export const DirectorPage: React.FC = () => {
     });
 
     return { ownedCredits: owned, unownedCredits: unowned };
-  }, [credits, titleLookup]);
+  }, [credits, ownedIds, titleLookup]);
 
   const worksCount = ownedCredits.length + unownedCredits.length;
   const ownedCount = ownedCredits.length;

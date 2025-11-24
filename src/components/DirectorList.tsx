@@ -8,7 +8,7 @@ import {
 } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
-import { buildOriginalTitleMap, matchLocalMovieByTitle } from '../utils/titleMatching';
+import { buildOriginalTitleMap, buildOwnedTmdbIdSet, isCreditOwned } from '../utils/titleMatching';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -48,6 +48,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
+  const ownedIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
   const directors = useMemo(() => {
     const map = new Map<
       string,
@@ -109,6 +110,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [letterFilter, setLetterFilter] = useState<string | null>(null);
   const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
+
+  useEffect(() => {
+    filmographyCache.current.clear();
+  }, [ownedIds]);
 
   useEffect(() => {
     let active = true;
@@ -185,13 +190,13 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             if (tmdbFilmographies.has(profile.tmdbId)) {
               filmography = tmdbFilmographies.get(profile.tmdbId);
             } else {
-              filmography = await getPersonDirectedMovies(profile.tmdbId);
+              filmography = await getPersonDirectedMovies(profile.tmdbId, { ownedIds });
               tmdbFilmographies.set(profile.tmdbId, filmography);
             }
 
             if (filmography) {
               total = filmography.length;
-              owned = filmography.filter((item) => Boolean(matchLocalMovieByTitle(item, titleLookup))).length;
+              owned = filmography.filter((item) => isCreditOwned(item, ownedIds, titleLookup)).length;
             }
           }
 
@@ -212,7 +217,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles, movies, titleLookup]);
+  }, [profiles, movies, ownedIds, titleLookup]);
 
   useEffect(() => {
     const matches = profiles.filter((director) =>

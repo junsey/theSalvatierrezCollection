@@ -5,7 +5,7 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
-const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v2';
+const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v3';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
@@ -35,6 +35,23 @@ type DirectedMovie = {
   mediaType?: 'movie' | 'tv';
 };
 
+type CrewCredit = {
+  id: number;
+  media_type?: string;
+  title?: string;
+  name?: string;
+  original_title?: string | null;
+  original_name?: string | null;
+  job?: string;
+  release_date?: string | null;
+  first_air_date?: string | null;
+  poster_path?: string | null;
+  popularity?: number;
+  video?: boolean | null;
+  vote_count?: number | null;
+  genre_ids?: number[];
+};
+
 export type DirectorProfile = {
   name: string;
   displayName: string;
@@ -53,7 +70,8 @@ const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = load
 const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
   PERSON_SEARCH_CACHE_KEY
 );
-const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personCreditsCache: Record<string, PersonCacheEntry<CrewCredit[]>> = loadCache<CrewCredit[]>(CREDITS_CACHE_KEY);
+const movieRuntimeCache = new Map<number, number | null>();
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -145,6 +163,27 @@ function parseYear(date?: string | null): number | null {
   const [yearStr] = date.split('-');
   const year = Number(yearStr);
   return Number.isFinite(year) ? year : null;
+}
+
+async function getMovieRuntime(movieId: number): Promise<number | null> {
+  if (movieRuntimeCache.has(movieId)) {
+    const cached = movieRuntimeCache.get(movieId);
+    return cached ?? null;
+  }
+
+  if (!TMDB_API_KEY) return null;
+
+  const url = `${API_BASE}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+  try {
+    const data = await tmdbFetchJson<{ runtime?: number | null }>(url);
+    const runtime = typeof data.runtime === 'number' ? data.runtime : null;
+    movieRuntimeCache.set(movieId, runtime);
+    return runtime;
+  } catch (error) {
+    console.warn('No se pudo obtener el runtime de la película', movieId, error);
+    movieRuntimeCache.set(movieId, null);
+    return null;
+  }
 }
 
 export async function getDirectorFromMovie(movieId: number): Promise<{ id: number; name: string }[]> {
@@ -242,75 +281,96 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
-export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
+async function fetchRelevantCredits(personId: number): Promise<CrewCredit[]> {
   if (!TMDB_API_KEY) return [];
   const cacheKey = String(personId);
   const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
+  const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
-    const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{
-      crew?: {
-        id: number;
-        media_type?: string;
-        title?: string;
-        name?: string;
-        original_title?: string | null;
-        original_name?: string | null;
-        job?: string;
-        release_date?: string | null;
-        first_air_date?: string | null;
-        poster_path?: string | null;
-        popularity?: number;
-        video?: boolean | null;
-        vote_count?: number | null;
-        genre_ids?: number[];
-      }[];
-    }>(url);
+    const data = await tmdbFetchJson<{ crew?: CrewCredit[] }>(url);
+    const filtered = new Map<number, CrewCredit>();
 
-    const directedMovies = new Map<number, DirectedMovie>();
+    (data.crew ?? []).forEach((item) => {
+      if (item.media_type !== 'movie' && item.media_type !== 'tv') return;
+      const job = item.job?.trim().toLowerCase();
+      const isDirectorOrCreator =
+        job === 'director' || job === 'creator' || job === 'series director' || job === 'director de la serie';
+      if (!isDirectorOrCreator) return;
+      if (item.video === true) return;
+      if (filtered.has(item.id)) return;
+      filtered.set(item.id, item);
+    });
 
-    (data.crew ?? [])
-      .filter((item) => {
-        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
-        const job = item.job?.trim().toLowerCase();
-        const isDirectorOrCreator =
-          job === 'director' || job === 'creator' || job === 'series director' || job === 'director de la serie';
-        if (!isDirectorOrCreator) return false;
-        if (item.video === true) return false;
-        return true;
-      })
-      .forEach((item) => {
-        const title = item.title ?? item.name ?? 'Producción sin título';
-        const originalTitle =
-          item.media_type === 'tv'
+    const payload = Array.from(filtered.values());
+    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: payload };
+    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
+    return payload;
+  } catch (error) {
+    console.warn('No se pudo obtener la filmografía del director', error);
+    return [];
+  }
+}
+
+export async function getPersonDirectedMovies(
+  personId: number,
+  options?: { ownedIds?: Set<number> }
+): Promise<DirectedMovie[]> {
+  if (!TMDB_API_KEY) return [];
+  const ownedIds = options?.ownedIds ?? new Set<number>();
+
+  try {
+    const credits = await fetchRelevantCredits(personId);
+    const filtered: DirectedMovie[] = [];
+
+    for (const item of credits) {
+      const mediaType: 'movie' | 'tv' = item.media_type === 'tv' ? 'tv' : 'movie';
+      const baseEntry: DirectedMovie = {
+        id: item.id,
+        title: item.title ?? item.name ?? 'Producción sin título',
+        originalTitle:
+          mediaType === 'tv'
             ? item.original_name ?? item.name ?? null
-            : item.original_title ?? item.title ?? null;
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
-        const entry: DirectedMovie = {
-          id: item.id,
-          title,
-          originalTitle,
-          year,
-          posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
-          popularity: item.popularity,
-          voteCount: item.vote_count ?? undefined,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
-        };
+            : item.original_title ?? item.title ?? null,
+        year: mediaType === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date),
+        posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
+        popularity: item.popularity,
+        voteCount: item.vote_count ?? undefined,
+        mediaType
+      };
 
-        directedMovies.set(item.id, entry);
-      });
+      const isOwned = ownedIds.has(item.id);
+      if (isOwned) {
+        filtered.push(baseEntry);
+        continue;
+      }
 
-    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
+      if (mediaType === 'tv') {
+        filtered.push(baseEntry);
+        continue;
+      }
+
+      const runtime = await getMovieRuntime(item.id);
+
+      if (runtime !== null && runtime < 40) {
+        continue;
+      }
+
+      if (runtime === null && (item.vote_count ?? 0) < 5) {
+        continue;
+      }
+
+      filtered.push(baseEntry);
+    }
+
+    const sorted = filtered.sort((a, b) => {
       const byPopularity = (b.popularity ?? 0) - (a.popularity ?? 0);
       if (byPopularity !== 0) return byPopularity;
       const byYear = (b.year ?? 0) - (a.year ?? 0);
       return byYear;
     });
 
-    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
-    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     return sorted;
   } catch (error) {
     console.warn('No se pudo obtener la filmografía del director', error);
@@ -319,12 +379,13 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
 }
 
 export async function fetchDirectorFromTMDb(
-  director: DirectorLookup
+  director: DirectorLookup,
+  options?: { ownedIds?: Set<number> }
 ): Promise<{ person: PersonDetails | null; credits: DirectedMovie[]; resolvedName: string; tmdbId: number | null } | null> {
   if (!TMDB_API_KEY) return null;
 
   const loadById = async (id: number) => {
-    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonDirectedMovies(id)]);
+    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonDirectedMovies(id, options)]);
     return {
       person,
       credits,
@@ -341,7 +402,7 @@ export async function fetchDirectorFromTMDb(
     const match = await searchPersonByName(director.name);
     if (!match) return null;
 
-    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonDirectedMovies(match.id)]);
+    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonDirectedMovies(match.id, options)]);
     return {
       person,
       credits,

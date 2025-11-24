@@ -14,6 +14,17 @@ export function normalizeTitle(raw?: string | null): string | null {
   return cleaned || null;
 }
 
+export function buildOwnedTmdbIdSet(movies: MovieRecord[]): Set<number> {
+  const ownedIds = new Set<number>();
+  movies.forEach((movie) => {
+    const tmdbId = Number(movie.tmdbId);
+    if (Number.isFinite(tmdbId)) {
+      ownedIds.add(tmdbId);
+    }
+  });
+  return ownedIds;
+}
+
 export function buildOriginalTitleMap(movies: MovieRecord[]): Map<string, MovieRecord> {
   const map = new Map<string, MovieRecord>();
 
@@ -43,4 +54,13 @@ export function matchLocalMovieByTitle(
   if (preferred && lookup.has(preferred)) return lookup.get(preferred);
   if (fallback && lookup.has(fallback)) return lookup.get(fallback);
   return undefined;
+}
+
+export function isCreditOwned(
+  credit: { id: number; title?: string | null; originalTitle?: string | null },
+  ownedIds: Set<number>,
+  lookup: Map<string, MovieRecord>
+): boolean {
+  if (ownedIds.has(credit.id)) return true;
+  return Boolean(matchLocalMovieByTitle(credit, lookup));
 }

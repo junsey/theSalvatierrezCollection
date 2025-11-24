@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, getPersonDirectedMovies, getPersonDetails } from '../services/tmdbPeopleService';
 import { getWikipediaSummaryAndThumbnail, searchWikipediaArticle } from '../services/wikipediaService';
-import { buildOriginalTitleMap, matchLocalMovieByTitle } from '../utils/titleMatching';
+import { buildOriginalTitleMap, buildOwnedTmdbIdSet, isCreditOwned } from '../utils/titleMatching';
 
 type DirectorCardProps = {
   directorId: number;
@@ -35,6 +35,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
   const [state, setState] = useState<DirectorProfileState>({ biography: null, filmography: [], loading: true });
 
   const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
+  const ownedIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +44,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
       try {
         const [details, directed] = await Promise.all([
           getPersonDetails(directorId),
-          getPersonDirectedMovies(directorId)
+          getPersonDirectedMovies(directorId, { ownedIds })
         ]);
 
         const resolvedName = details?.name ?? name;
@@ -71,7 +72,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
     return () => {
       active = false;
     };
-  }, [directorId, name]);
+  }, [directorId, name, ownedIds]);
 
   const portrait =
     state.photoUrl ||
@@ -132,8 +133,8 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
             const owned: DirectedMovie[] = [];
             const unowned: DirectedMovie[] = [];
             sorted.forEach((film) => {
-              const match = matchLocalMovieByTitle(film, titleLookup);
-              if (match) {
+              const isOwned = isCreditOwned(film, ownedIds, titleLookup);
+              if (isOwned) {
                 owned.push(film);
               } else {
                 unowned.push(film);
