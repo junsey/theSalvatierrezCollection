@@ -71,25 +71,49 @@ const MetricCard: React.FC<{
   return content;
 };
 
+const formatPalette = [
+  'linear-gradient(90deg, rgba(224, 160, 64, 0.9), rgba(255, 213, 128, 0.8))',
+  'linear-gradient(90deg, rgba(137, 200, 255, 0.95), rgba(84, 133, 203, 0.9))',
+  'linear-gradient(90deg, rgba(255, 160, 197, 0.92), rgba(255, 110, 160, 0.9))',
+  'linear-gradient(90deg, rgba(156, 235, 184, 0.95), rgba(88, 185, 141, 0.92))',
+  'linear-gradient(90deg, rgba(210, 175, 255, 0.9), rgba(150, 114, 210, 0.85))',
+  'linear-gradient(90deg, rgba(255, 190, 125, 0.9), rgba(230, 124, 78, 0.85))'
+];
+
 const FormatMiniChart: React.FC<{
-  data: { entries: [string, number][]; max: number };
+  data: { entries: [string, number][]; total: number };
 }> = ({ data }) => {
   if (!data.entries.length) return <p className="muted">Sin formatos registrados.</p>;
 
   return (
-    <div className="format-chart">
-      {data.entries.map(([label, value]) => (
-        <div key={label} className="format-chart__row">
-          <span className="format-chart__label">{label}</span>
-          <div className="format-chart__bar-track">
-            <div
-              className="format-chart__bar-fill"
-              style={{ width: `${data.max ? (value / data.max) * 100 : 0}%` }}
-            />
+    <div className="format-chart" aria-label="Distribución de formatos">
+      <div className="format-chart__stack">
+        {data.entries.map(([label, value], index) => (
+          <div
+            key={label}
+            className="format-chart__segment"
+            style={{
+              width: `${data.total ? (value / data.total) * 100 : 0}%`,
+              background: formatPalette[index % formatPalette.length]
+            }}
+            title={`${label}: ${value}`}
+          >
+            {value > 6 && <span className="format-chart__segment-value">{value}</span>}
           </div>
-          <span className="format-chart__value">{value}</span>
-        </div>
-      ))}
+        ))}
+      </div>
+      <div className="format-chart__legend">
+        {data.entries.map(([label, value], index) => (
+          <div key={label} className="format-chart__legend-item">
+            <span
+              className="format-chart__dot"
+              style={{ background: formatPalette[index % formatPalette.length] }}
+            />
+            <span className="format-chart__legend-label">{label}</span>
+            <span className="format-chart__legend-value">{value}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -124,7 +148,6 @@ export const HomePage: React.FC = () => {
     sections,
     directors,
     topRated,
-    oldestYear,
     formatBreakdown,
     watchedCount,
     unseenCount,
@@ -159,11 +182,6 @@ export const HomePage: React.FC = () => {
       .slice(0, 5)
       .map(({ movie }) => movie);
 
-    const years = movies
-      .map((m) => m.year ?? m.tmdbYear)
-      .filter((y): y is number => typeof y === 'number');
-    const oldestYear = years.length ? Math.min(...years) : null;
-
     const watchChart: DonutDatum[] = [
       { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
       { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
@@ -179,7 +197,6 @@ export const HomePage: React.FC = () => {
       sections,
       directors,
       topRated: ratedByHouse,
-      oldestYear,
       formatBreakdown: formatCounts,
       watchedCount: watched,
       unseenCount: unseen,
@@ -189,10 +206,11 @@ export const HomePage: React.FC = () => {
   }, [movies]);
 
   const formatChartData = useMemo(() => {
-    const entries = Object.entries(formatBreakdown).sort((a, b) => b[1] - a[1]);
-    const limited = entries.slice(0, 6);
-    const max = limited.length ? limited[0][1] : 0;
-    return { entries: limited, max };
+    const entries = Object.entries(formatBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+    const total = entries.reduce((sum, [, value]) => sum + value, 0);
+    return { entries, total };
   }, [formatBreakdown]);
 
   return (
@@ -269,12 +287,6 @@ export const HomePage: React.FC = () => {
             caption="Salas del Archivo"
             href="/sections"
           />
-          {oldestYear != null && (
-            <MetricCard
-              title={oldestYear}
-              caption="Reliquia Más Antigua"
-            />
-          )}
           <MetricCard title="Inventario" caption="Formatos">
             <FormatMiniChart data={formatChartData} />
           </MetricCard>
