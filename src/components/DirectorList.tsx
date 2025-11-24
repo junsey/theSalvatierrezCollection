@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   DirectorProfile,
+  DirectedMovie,
   buildDirectorProfiles,
   getPersonDirectedMovies
 } from '../services/tmdbPeopleService';
@@ -99,7 +100,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   }, [directors]);
 
   const [profiles, setProfiles] = useState<(DirectorProfile & { key: string; worksCount: number })[]>([]);
-  const totalsCache = useRef<Map<number, number>>(new Map());
+  const filmographyCache = useRef<Map<number, DirectedMovie[]>>(new Map());
   const [coverage, setCoverage] = useState<Record<string, { owned: number; total: number | null }>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,19 +172,24 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         return;
       }
 
-      const tmdbTotals = totalsCache.current;
+      const tmdbFilmographies = filmographyCache.current;
       const rows = await Promise.all(
         profiles.map(async (profile) => {
-          const owned = profile.worksCount;
-
+          let owned = profile.worksCount;
           let total: number | null = null;
+          let filmography: DirectedMovie[] | undefined;
+
           if (profile.tmdbId) {
-            if (tmdbTotals.has(profile.tmdbId)) {
-              total = tmdbTotals.get(profile.tmdbId) ?? null;
+            if (tmdbFilmographies.has(profile.tmdbId)) {
+              filmography = tmdbFilmographies.get(profile.tmdbId);
             } else {
-              const filmography = await getPersonDirectedMovies(profile.tmdbId);
+              filmography = await getPersonDirectedMovies(profile.tmdbId);
+              tmdbFilmographies.set(profile.tmdbId, filmography);
+            }
+
+            if (filmography) {
               total = filmography.length;
-              tmdbTotals.set(profile.tmdbId, total);
+              owned = filmography.filter((item) => movies.some((movie) => movie.tmdbId === item.id)).length;
             }
           }
 
@@ -204,7 +210,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles]);
+  }, [profiles, movies]);
 
   useEffect(() => {
     const matches = profiles.filter((director) =>

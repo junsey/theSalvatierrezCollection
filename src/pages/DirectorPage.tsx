@@ -79,6 +79,8 @@ export const DirectorPage: React.FC = () => {
       });
   }, [knownFor]);
 
+  const worksCount = curatedKnownFor.length;
+
   const renderKnownFor = () => {
     if (loading) {
       return <p className="muted">Cargando filmografía destacada...</p>;
@@ -131,6 +133,9 @@ export const DirectorPage: React.FC = () => {
         <div className="director-legend">
           <p className="eyebrow">Directores</p>
           <h1>{personName || directorName}</h1>
+          {!loading && (
+            <p className="text-muted">Obras en filmografía: {worksCount}</p>
+          )}
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted">{biography}</p>}
           {!loading && !biography && <p className="text-muted">Biografía no disponible.</p>}

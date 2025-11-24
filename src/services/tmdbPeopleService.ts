@@ -30,6 +30,7 @@ type DirectedMovie = {
   year: number | null;
   posterUrl?: string;
   popularity?: number;
+  voteCount?: number;
   mediaType?: 'movie' | 'tv';
 };
 
@@ -240,17 +241,21 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
+const MIN_VOTE_COUNT = 5;
+
 const isFeatureLengthProduction = (item: {
   title?: string | null;
   name?: string | null;
   video?: boolean | null;
   genre_ids?: number[];
+  vote_count?: number | null;
 }) => {
   const title = (item.title ?? item.name ?? '').toLowerCase();
   const isMarkedVideo = item.video === true;
   const looksLikeShort = /\bshort\b|\bcorto\b/.test(title);
+  const hasEnoughVotes = (item.vote_count ?? MIN_VOTE_COUNT) >= MIN_VOTE_COUNT;
 
-  return !isMarkedVideo && !looksLikeShort;
+  return !isMarkedVideo && !looksLikeShort && hasEnoughVotes;
 };
 
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
@@ -273,6 +278,7 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         poster_path?: string | null;
         popularity?: number;
         video?: boolean | null;
+        vote_count?: number | null;
         genre_ids?: number[];
       }[];
     }>(url);
@@ -283,8 +289,10 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
       .filter((item) => {
         if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
         const job = item.job?.trim().toLowerCase();
-        const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
+        const isDirectorOrCreator =
+          job === 'director' || job === 'creator' || job === 'series director' || job === 'director de la serie';
+        if (!isDirectorOrCreator) return false;
+        return isFeatureLengthProduction(item);
       })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
@@ -295,19 +303,21 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
           year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
           popularity: item.popularity,
+          voteCount: item.vote_count ?? undefined,
           mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
         };
 
         directedMovies.set(item.id, entry);
       });
 
-    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
-      const yearA = a.year ?? Number.POSITIVE_INFINITY;
-      const yearB = b.year ?? Number.POSITIVE_INFINITY;
-      const byYear = yearA - yearB;
-      if (byYear !== 0) return byYear;
-      return (b.popularity ?? 0) - (a.popularity ?? 0);
-    });
+    const sorted = Array.from(directedMovies.values())
+      .sort((a, b) => {
+        const byPopularity = (b.popularity ?? 0) - (a.popularity ?? 0);
+        if (byPopularity !== 0) return byPopularity;
+        const byYear = (b.year ?? 0) - (a.year ?? 0);
+        return byYear;
+      })
+      .slice(0, 15);
 
     personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
