@@ -11,14 +11,14 @@ type DonutDatum = {
 };
 
 const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, total }) => {
-  const radius = 42;
+  const radius = 48;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
 
   return (
     <div className="donut">
-      <svg viewBox="0 0 120 120" role="presentation">
-        <circle className="donut__track" cx="60" cy="60" r={radius} />
+      <svg viewBox="0 0 140 140" role="presentation">
+        <circle className="donut__track" cx="70" cy="70" r={radius} />
         {data.map((slice) => {
           const fraction = total > 0 ? slice.value / total : 0;
           const dash = fraction * circumference;
@@ -26,8 +26,8 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
           const circle = (
             <circle
               key={slice.label}
-              cx="60"
-              cy="60"
+              cx="70"
+              cy="70"
               r={radius}
               strokeDasharray={`${dash} ${gap}`}
               strokeDashoffset={-offset}
@@ -42,15 +42,6 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
       <div className="donut__center">
         <span className="donut__number">{total}</span>
         <span className="donut__label">Títulos</span>
-      </div>
-      <div className="donut__legend">
-        {data.map((slice) => (
-          <div key={slice.label} className="donut__legend-item">
-            <span className="dot" style={{ background: slice.color, boxShadow: `0 0 10px ${slice.color}` }} />
-            <span>{slice.label}</span>
-            <strong>{slice.value}</strong>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -124,9 +115,9 @@ export const HomePage: React.FC = () => {
     const newestYear = years.length ? Math.max(...years) : null;
 
     const watchChart: DonutDatum[] = [
-      { label: 'Vista', value: watched, color: 'rgba(126, 217, 87, 0.9)' },
-      { label: 'No vista', value: unseen, color: 'rgba(255, 86, 138, 0.9)' },
-      { label: 'Sin probar', value: untested, color: 'rgba(224, 160, 64, 0.85)' }
+      { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
+      { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
+      { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' }
     ];
 
     return {
@@ -143,77 +134,103 @@ export const HomePage: React.FC = () => {
   }, [movies]);
 
   return (
-    <section className="panel panel--veil">
-      <div className="home-hero">
-        <div className="home-hero__text">
-          <p className="eyebrow">Gran Hall del Archivo</p>
-          <h1>Castillo Salvatiérrez</h1>
+    <main className="grand-hall">
+      <section className="grand-hall__banner">
+        <div className="banner__text">
+          <p className="eyebrow">Castillo Salvatiérrez — Grand Hall of the Archive</p>
+          <h1>Castillo Salvatiérrez — Grand Hall of the Archive</h1>
           <p className="lore">
-            Bienvenido al Gran Archivo del Castillo Salvatiérrez. Aquí reposan las reliquias cinematográficas de eras
-            pasadas: preservadas, restauradas y custodiadas bajo el fulgor de lámparas arcano-lúgubres. Que los espíritus
-            del celuloide guíen tu exploración.
+            Welcome to the Grand Archive of Castillo Salvatíerrez. Here lie the cinematic relics of bygone eras:
+            preserved, restored, and safeguarded beneath arcane-lit lanterns. May the spirits of celluloid guide your
+            exploration.
           </p>
           <div className="hero-actions">
-            <Link className="nav-link" to="/movies">Ingresar al Archivo</Link>
-            <Link className="nav-link" to="/surprise">Ritual Aleatorio</Link>
+            <Link className="nav-link nav-link--solid" to="/movies">Enter the Archive</Link>
+            <Link className="nav-link nav-link--ghost" to="/surprise">Random Ritual</Link>
           </div>
         </div>
-        <div className="home-hero__metrics">
-          <StatDonut data={watchChart} total={movies.length} />
+        <div className="banner__chart">
+          <div className="chart-panel">
+            <header className="chart-panel__header">
+              <div>
+                <p className="eyebrow">Inventario Total</p>
+                <h2>Tesoros Custodiados</h2>
+              </div>
+              <span className="chart-total">{movies.length.toLocaleString()} títulos</span>
+            </header>
+            <div className="chart-panel__body">
+              <StatDonut data={watchChart} total={movies.length} />
+              <div className="chart-panel__legend">
+                <div className="status-pill status-pill--watched">
+                  <span>Vistas</span>
+                  <strong>{watchChart[0].value}</strong>
+                </div>
+                <div className="status-pill status-pill--unwatched">
+                  <span>No vistas</span>
+                  <strong>{watchChart[1].value}</strong>
+                </div>
+                <div className="status-pill status-pill--untested">
+                  <span>Sin probar</span>
+                  <strong>{watchChart[2].value}</strong>
+                </div>
+                <div className="status-pill status-pill--damaged">
+                  <span>Dañadas</span>
+                  <strong>{damaged}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="metrics-grid">
-        <MetricCard
-          title={loading ? '...' : totalMovies.toLocaleString()}
-          caption="Pergaminos Archivados"
-          value={<span className="metric-number">Películas</span>}
-        />
-        <MetricCard
-          title={loading ? '...' : totalSeries.toLocaleString()}
-          caption="Crónicas Seriadas"
-          value={<span className="metric-number">Series</span>}
-        />
-        <MetricCard
-          title={loading ? '...' : damaged.toLocaleString()}
-          caption="Reliquias Heridas"
-          value={<span className="metric-number">Copias</span>}
-        />
-        <MetricCard
-          title={loading ? '...' : sections.toLocaleString()}
-          caption="Salas del Archivo"
-          value={<span className="metric-number">Colecciones</span>}
-          href="/sections"
-        />
-        <MetricCard
-          title={loading ? '...' : directors.toLocaleString()}
-          caption="Maestros del Arte"
-          value={<span className="metric-number">Directores</span>}
-          href="/directors"
-        />
-        {oldestYear && (
+      <section className="metrics-section">
+        <div className="metrics-grid">
           <MetricCard
-            title={oldestYear}
-            caption="Más Antiguo"
-            value={<span className="metric-number">Año</span>}
+            title={loading ? '…' : totalMovies.toLocaleString()}
+            caption="Pergaminos Archivados"
+            value={<span className="metric-number">Películas</span>}
           />
-        )}
-        {newestYear && (
           <MetricCard
-            title={newestYear}
-            caption="Registro Más Joven"
-            value={<span className="metric-number">Año</span>}
+            title={loading ? '…' : totalSeries.toLocaleString()}
+            caption="Crónicas Seriadas"
+            value={<span className="metric-number">Series</span>}
           />
-        )}
-      </div>
+          <MetricCard
+            title={loading ? '…' : directors.toLocaleString()}
+            caption="Maestros del Arte"
+            value={<span className="metric-number">Directores</span>}
+            href="/directors"
+          />
+          <MetricCard
+            title={loading ? '…' : sections.toLocaleString()}
+            caption="Salas del Archivo"
+            value={<span className="metric-number">Secciones</span>}
+            href="/sections"
+          />
+          {oldestYear && (
+            <MetricCard
+              title={oldestYear}
+              caption="Reliquia Más Antigua"
+              value={<span className="metric-number">Año</span>}
+            />
+          )}
+          {newestYear && (
+            <MetricCard
+              title={newestYear}
+              caption="Registro Más Joven"
+              value={<span className="metric-number">Año</span>}
+            />
+          )}
+        </div>
+      </section>
 
-      <div className="treasure-section">
+      <section className="treasure-section">
         <div className="treasure-section__header">
           <div>
             <p className="eyebrow">Selección de la Casa</p>
             <h2>Los Cinco Tesoros Mejor Valorados del Castillo</h2>
           </div>
-          <Link className="nav-link" to="/movies">Ver todo el catálogo</Link>
+          <Link className="nav-link nav-link--ghost" to="/movies">Ver todo el catálogo</Link>
         </div>
         {loading ? (
           <p className="muted">Invocando reliquias...</p>
@@ -222,7 +239,7 @@ export const HomePage: React.FC = () => {
         ) : (
           <TreasuresGrid movies={topRated} />
         )}
-      </div>
-    </section>
+      </section>
+    </main>
   );
 };
