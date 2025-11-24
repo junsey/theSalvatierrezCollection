@@ -51,7 +51,8 @@ const MetricCard: React.FC<{
   title: React.ReactNode;
   caption: string;
   href?: string;
-}> = ({ title, caption, href }) => {
+  children?: React.ReactNode;
+}> = ({ title, caption, href, children }) => {
   const content = (
     <div className="metric-card">
       <div className="metric-card__glow" />
@@ -59,6 +60,7 @@ const MetricCard: React.FC<{
         <small>{caption}</small>
         <h3>{title}</h3>
       </div>
+      {children && <div className="metric-card__body">{children}</div>}
     </div>
   );
 
@@ -67,6 +69,29 @@ const MetricCard: React.FC<{
   }
 
   return content;
+};
+
+const FormatMiniChart: React.FC<{
+  data: { entries: [string, number][]; max: number };
+}> = ({ data }) => {
+  if (!data.entries.length) return <p className="muted">Sin formatos registrados.</p>;
+
+  return (
+    <div className="format-chart">
+      {data.entries.map(([label, value]) => (
+        <div key={label} className="format-chart__row">
+          <span className="format-chart__label">{label}</span>
+          <div className="format-chart__bar-track">
+            <div
+              className="format-chart__bar-fill"
+              style={{ width: `${data.max ? (value / data.max) * 100 : 0}%` }}
+            />
+          </div>
+          <span className="format-chart__value">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
@@ -91,52 +116,84 @@ const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
 export const HomePage: React.FC = () => {
   const { movies, loading } = useMovies();
 
-  const { totalMovies, totalSeries, watchChart, damaged, sections, directors, topRated, oldestYear, newestYear } =
-    useMemo(() => {
-      const totalMovies = movies.filter((m) => !m.series).length;
-      const totalSeries = movies.filter((m) => m.series).length;
-      const watched = movies.filter((m) => m.seen).length;
-      const untested = movies.filter((m) => !m.seen && m.funcionaStatus === 'untested').length;
-      const unseen = Math.max(movies.length - watched - untested, 0);
-      const damaged = movies.filter((m) => m.funcionaStatus === 'damaged').length;
-      const sections = Array.from(new Set(movies.map((m) => m.seccion.trim()).filter(Boolean))).length;
-      const directors = Array.from(new Set(movies.map((m) => m.director.trim()).filter(Boolean))).length;
+  const {
+    totalMovies,
+    totalSeries,
+    watchChart,
+    damaged,
+    sections,
+    directors,
+    topRated,
+    oldestYear,
+    formatBreakdown,
+    watchedCount,
+    unseenCount,
+    untestedCount,
+    depositCount
+  } = useMemo(() => {
+    const totalMovies = movies.filter((m) => !m.series).length;
+    const totalSeries = movies.filter((m) => m.series).length;
+    const enDeposito = movies.filter((m) => m.enDeposito).length;
+    const nonDepositoMovies = movies.filter((m) => !m.enDeposito);
+    const watched = nonDepositoMovies.filter((m) => m.seen).length;
+    const untested = nonDepositoMovies.filter((m) => !m.seen && m.funcionaStatus === 'untested').length;
+    const unseen = Math.max(nonDepositoMovies.length - watched - untested, 0);
+    const damaged = movies.filter((m) => m.funcionaStatus === 'damaged').length;
+    const sections = Array.from(new Set(movies.map((m) => m.seccion.trim()).filter(Boolean))).length;
+    const directors = Array.from(new Set(movies.map((m) => m.director.trim()).filter(Boolean))).length;
 
-      const ratedByHouse = movies
-        .map((movie) => {
-          if (movie.ratingGloria == null || movie.ratingRodrigo == null) return null;
-          const houseAverage = (movie.ratingGloria + movie.ratingRodrigo) / 2;
-          return { movie, houseAverage };
-        })
-        .filter((entry): entry is { movie: MovieRecord; houseAverage: number } => entry !== null)
-        .sort((a, b) => b.houseAverage - a.houseAverage)
-        .slice(0, 5)
-        .map(({ movie }) => movie);
+    const formatCounts = movies.reduce<Record<string, number>>((acc, movie) => {
+      const key = movie.format && movie.format.trim() ? movie.format.trim() : 'Sin identificar';
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
 
-      const years = movies
-        .map((m) => m.year ?? m.tmdbYear)
-        .filter((y): y is number => typeof y === 'number');
-      const oldestYear = years.length ? Math.min(...years) : null;
-      const newestYear = years.length ? Math.max(...years) : null;
+    const ratedByHouse = movies
+      .map((movie) => {
+        if (movie.ratingGloria == null || movie.ratingRodrigo == null) return null;
+        const houseAverage = (movie.ratingGloria + movie.ratingRodrigo) / 2;
+        return { movie, houseAverage };
+      })
+      .filter((entry): entry is { movie: MovieRecord; houseAverage: number } => entry !== null)
+      .sort((a, b) => b.houseAverage - a.houseAverage)
+      .slice(0, 5)
+      .map(({ movie }) => movie);
 
-      const watchChart: DonutDatum[] = [
-        { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
-        { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
-        { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' }
-      ];
+    const years = movies
+      .map((m) => m.year ?? m.tmdbYear)
+      .filter((y): y is number => typeof y === 'number');
+    const oldestYear = years.length ? Math.min(...years) : null;
 
-      return {
-        totalMovies,
-        totalSeries,
-        watchChart,
-        damaged,
-        sections,
-        directors,
-        topRated: ratedByHouse,
-        oldestYear,
-        newestYear
-      };
-    }, [movies]);
+    const watchChart: DonutDatum[] = [
+      { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
+      { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
+      { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' },
+      { label: 'En depósito', value: enDeposito, color: 'rgba(98, 174, 255, 0.9)' }
+    ];
+
+    return {
+      totalMovies,
+      totalSeries,
+      watchChart,
+      damaged,
+      sections,
+      directors,
+      topRated: ratedByHouse,
+      oldestYear,
+      formatBreakdown: formatCounts,
+      watchedCount: watched,
+      unseenCount: unseen,
+      untestedCount: untested,
+      depositCount: enDeposito
+    };
+  }, [movies]);
+
+  const formatChartData = useMemo(() => {
+    const entries = Object.entries(formatBreakdown).sort((a, b) => b[1] - a[1]);
+    const limited = entries.slice(0, 6);
+    const max = limited.length ? limited[0][1] : 0;
+    return { entries: limited, max };
+  }, [formatBreakdown]);
 
   return (
     <main className="grand-hall">
@@ -168,15 +225,19 @@ export const HomePage: React.FC = () => {
               <div className="chart-panel__legend">
                 <div className="status-pill status-pill--watched">
                   <span>Vistas</span>
-                  <strong>{watchChart[0].value}</strong>
+                  <strong>{watchedCount}</strong>
                 </div>
                 <div className="status-pill status-pill--unwatched">
                   <span>No vistas</span>
-                  <strong>{watchChart[1].value}</strong>
+                  <strong>{unseenCount}</strong>
                 </div>
                 <div className="status-pill status-pill--untested">
                   <span>Sin probar</span>
-                  <strong>{watchChart[2].value}</strong>
+                  <strong>{untestedCount}</strong>
+                </div>
+                <div className="status-pill status-pill--deposit">
+                  <span>En depósito</span>
+                  <strong>{depositCount}</strong>
                 </div>
                 <div className="status-pill status-pill--damaged">
                   <span>Dañadas</span>
@@ -214,12 +275,9 @@ export const HomePage: React.FC = () => {
               caption="Reliquia Más Antigua"
             />
           )}
-          {newestYear != null && (
-            <MetricCard
-              title={newestYear}
-              caption="Registro Más Joven"
-            />
-          )}
+          <MetricCard title="Inventario" caption="Formatos">
+            <FormatMiniChart data={formatChartData} />
+          </MetricCard>
         </div>
       </section>
 

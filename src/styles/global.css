@@ -377,9 +377,59 @@ button:hover {
   gap: 8px;
 }
 
+.metric-card__body {
+  position: relative;
+  margin-top: 12px;
+}
+
 .metric-number {
   color: var(--text-muted);
   font-size: 14px;
+}
+
+.format-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.format-chart__row {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.format-chart__label {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.format-chart__bar-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.format-chart__bar-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(224, 160, 64, 0.65), rgba(255, 108, 150, 0.5));
+  box-shadow: 0 0 12px rgba(224, 160, 64, 0.28);
+}
+
+.format-chart__value {
+  color: var(--text-muted);
+  font-weight: 700;
+  min-width: 32px;
+  text-align: right;
 }
 
 .donut {
@@ -667,6 +717,11 @@ button:hover {
 .status-pill--untested {
   border-color: rgba(230, 176, 64, 0.5);
   box-shadow: 0 0 12px rgba(230, 176, 64, 0.2);
+}
+
+.status-pill--deposit {
+  border-color: rgba(98, 174, 255, 0.5);
+  box-shadow: 0 0 12px rgba(98, 174, 255, 0.22);
 }
 
 .status-pill--damaged {
