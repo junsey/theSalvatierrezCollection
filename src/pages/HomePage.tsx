@@ -208,10 +208,8 @@ export const HomePage: React.FC = () => {
   }, [movies]);
 
   const formatChartData = useMemo(() => {
-    const entries = Object.entries(formatBreakdown)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6);
-    const total = entries.reduce((sum, [, value]) => sum + value, 0);
+    const entries = Object.entries(formatBreakdown).sort((a, b) => b[1] - a[1]);
+    const total = Object.values(formatBreakdown).reduce((sum, value) => sum + value, 0);
     return { entries, total };
   }, [formatBreakdown]);
 
