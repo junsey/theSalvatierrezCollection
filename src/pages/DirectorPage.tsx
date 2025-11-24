@@ -12,6 +12,15 @@ const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean
   return collection.some((item) => item.tmdbId === tmdbId);
 };
 
+const getMedal = (owned: number, total: number | null) => {
+  if (!total || total <= 0) return null;
+  const ratio = owned / total;
+  if (ratio >= 1) return 'gold';
+  if (ratio > 0.75) return 'silver';
+  if (ratio > 0.5) return 'bronze';
+  return null;
+};
+
 export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const directorName = decodeURIComponent(name ?? '').trim();
@@ -80,6 +89,11 @@ export const DirectorPage: React.FC = () => {
   }, [knownFor]);
 
   const worksCount = curatedKnownFor.length;
+  const ownedCount = useMemo(
+    () => curatedKnownFor.filter((movie) => isMovieInCollection(movie.id, movies)).length,
+    [curatedKnownFor, movies]
+  );
+  const medal = getMedal(ownedCount, worksCount);
 
   const renderKnownFor = () => {
     if (loading) {
@@ -134,7 +148,23 @@ export const DirectorPage: React.FC = () => {
           <p className="eyebrow">Directores</p>
           <h1>{personName || directorName}</h1>
           {!loading && (
-            <p className="text-muted">Obras en filmografía: {worksCount}</p>
+            <p className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Obras en filmografía: {worksCount}</span>
+              {worksCount > 0 && (
+                <span className="pill" aria-label={`En colección ${ownedCount} de ${worksCount}`}>
+                  En colección: {ownedCount}/{worksCount}
+                </span>
+              )}
+              {medal && (
+                <span
+                  className={`director-coverage__medal director-coverage__medal--${medal}`}
+                  title={`Nivel ${medal}`}
+                  aria-label={`Nivel ${medal}`}
+                >
+                  ★
+                </span>
+              )}
+            </p>
           )}
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted">{biography}</p>}
