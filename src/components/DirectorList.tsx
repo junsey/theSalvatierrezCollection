@@ -30,7 +30,15 @@ const getOverrideKey = (name: string, overrides: Map<string, number>) =>
 
 const getWorkKey = (movie: MovieRecord) => {
   const mediaType = movie.tmdbType ?? (movie.series ? 'tv' : 'movie');
-  const base = movie.tmdbId ? `tmdb-${movie.tmdbId}` : `title-${normalizeTitle(movie.title)}`;
+  const normalizedTitle = normalizeTitle(movie.title);
+  const isSeriesEntry = mediaType === 'tv' || movie.series || movie.season != null;
+
+  if (isSeriesEntry) {
+    // Para series, colapsa múltiples temporadas bajo la misma clave de título.
+    return `series-${normalizedTitle}`;
+  }
+
+  const base = movie.tmdbId ? `tmdb-${movie.tmdbId}` : `title-${normalizedTitle}`;
   return `${base}:${mediaType}`;
 };
 
@@ -48,6 +56,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         worksCount: number;
       }
     >();
+    const worksByDirector = new Map<string, Set<string>>();
 
     movies.forEach((movie) => {
       splitDirectors(movie.director)
@@ -66,7 +75,15 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             });
           }
           const entry = map.get(key)!;
-          entry.worksCount += 1;
+          const workKey = getWorkKey(movie);
+          const workKeys = worksByDirector.get(key) ?? new Set<string>();
+          if (!worksByDirector.has(key)) {
+            worksByDirector.set(key, workKeys);
+          }
+          if (!workKeys.has(workKey)) {
+            entry.worksCount += 1;
+            workKeys.add(workKey);
+          }
         });
     });
 
