@@ -95,13 +95,13 @@ const FormatMiniChart: React.FC<{
             key={label}
             className="format-chart__segment"
             style={{
-              width: `${data.total ? (value / data.total) * 100 : 0}%`,
+              flexGrow: value,
+              flexBasis: 0,
+              minWidth: value > 0 ? 4 : 0,
               background: formatPalette[index % formatPalette.length]
             }}
             title={`${label}: ${value}`}
-          >
-            {value > 6 && <span className="format-chart__segment-value">{value}</span>}
-          </div>
+          />
         ))}
       </div>
       <div className="format-chart__legend">
