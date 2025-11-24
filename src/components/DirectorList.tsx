@@ -8,6 +8,7 @@ import {
 } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
+import { buildOriginalTitleMap, matchLocalMovieByTitle } from '../utils/titleMatching';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -46,6 +47,7 @@ const getWorkKey = (movie: MovieRecord) => {
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
   const directors = useMemo(() => {
     const map = new Map<
       string,
@@ -189,7 +191,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
 
             if (filmography) {
               total = filmography.length;
-              owned = filmography.filter((item) => movies.some((movie) => movie.tmdbId === item.id)).length;
+              owned = filmography.filter((item) => Boolean(matchLocalMovieByTitle(item, titleLookup))).length;
             }
           }
 
@@ -210,7 +212,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles, movies]);
+  }, [profiles, movies, titleLookup]);
 
   useEffect(() => {
     const matches = profiles.filter((director) =>

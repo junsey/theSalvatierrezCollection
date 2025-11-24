@@ -5,7 +5,7 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
-const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
+const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v2';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
@@ -27,6 +27,7 @@ type PersonDetails = {
 type DirectedMovie = {
   id: number;
   title: string;
+  originalTitle?: string | null;
   year: number | null;
   posterUrl?: string;
   popularity?: number;
@@ -241,23 +242,6 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
-const MIN_VOTE_COUNT = 5;
-
-const isFeatureLengthProduction = (item: {
-  title?: string | null;
-  name?: string | null;
-  video?: boolean | null;
-  genre_ids?: number[];
-  vote_count?: number | null;
-}) => {
-  const title = (item.title ?? item.name ?? '').toLowerCase();
-  const isMarkedVideo = item.video === true;
-  const looksLikeShort = /\bshort\b|\bcorto\b/.test(title);
-  const hasEnoughVotes = (item.vote_count ?? MIN_VOTE_COUNT) >= MIN_VOTE_COUNT;
-
-  return !isMarkedVideo && !looksLikeShort && hasEnoughVotes;
-};
-
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY) return [];
   const cacheKey = String(personId);
@@ -272,6 +256,8 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         media_type?: string;
         title?: string;
         name?: string;
+        original_title?: string | null;
+        original_name?: string | null;
         job?: string;
         release_date?: string | null;
         first_air_date?: string | null;
@@ -292,14 +278,20 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         const isDirectorOrCreator =
           job === 'director' || job === 'creator' || job === 'series director' || job === 'director de la serie';
         if (!isDirectorOrCreator) return false;
-        return isFeatureLengthProduction(item);
+        if (item.video === true) return false;
+        return true;
       })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
+        const originalTitle =
+          item.media_type === 'tv'
+            ? item.original_name ?? item.name ?? null
+            : item.original_title ?? item.title ?? null;
         const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
         const entry: DirectedMovie = {
           id: item.id,
           title,
+          originalTitle,
           year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
           popularity: item.popularity,
@@ -310,14 +302,12 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         directedMovies.set(item.id, entry);
       });
 
-    const sorted = Array.from(directedMovies.values())
-      .sort((a, b) => {
-        const byPopularity = (b.popularity ?? 0) - (a.popularity ?? 0);
-        if (byPopularity !== 0) return byPopularity;
-        const byYear = (b.year ?? 0) - (a.year ?? 0);
-        return byYear;
-      })
-      .slice(0, 15);
+    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
+      const byPopularity = (b.popularity ?? 0) - (a.popularity ?? 0);
+      if (byPopularity !== 0) return byPopularity;
+      const byYear = (b.year ?? 0) - (a.year ?? 0);
+      return byYear;
+    });
 
     personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);

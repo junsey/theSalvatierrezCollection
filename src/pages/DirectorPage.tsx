@@ -2,15 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
-import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
+import { buildOriginalTitleMap, matchLocalMovieByTitle } from '../utils/titleMatching';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
-
-const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean => {
-  return collection.some((item) => item.tmdbId === tmdbId);
-};
 
 const getMedal = (owned: number, total: number | null) => {
   if (!total || total <= 0) return null;
@@ -26,13 +22,14 @@ export const DirectorPage: React.FC = () => {
   const directorName = decodeURIComponent(name ?? '').trim();
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [personName, setPersonName] = useState<string>(directorName);
   const [biography, setBiography] = useState<string | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
-  const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
+  const [credits, setCredits] = useState<DirectedMovie[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +38,7 @@ export const DirectorPage: React.FC = () => {
       setError(null);
       setBiography(null);
       setProfileUrl(undefined);
-      setKnownFor([]);
+      setCredits([]);
 
       if (!directorName) {
         setError('No se especificó director.');
@@ -63,7 +60,7 @@ export const DirectorPage: React.FC = () => {
         setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
         setBiography(result.person?.biography ?? null);
         setProfileUrl(result.person?.profileUrl ?? undefined);
-        setKnownFor(result.credits);
+        setCredits(result.credits);
       } catch (err) {
         console.warn('Error al cargar el director', err);
         if (active) setError('No se pudieron obtener los datos del director.');
@@ -78,34 +75,58 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorName, directorOverrides]);
 
-  const curatedKnownFor = useMemo(() => {
+  const { ownedCredits, unownedCredits } = useMemo(() => {
+    const owned: DirectedMovie[] = [];
+    const unowned: DirectedMovie[] = [];
     const seen = new Set<number>();
-    return knownFor
-      .filter((movie) => {
-        if (seen.has(movie.id)) return false;
-        seen.add(movie.id);
-        return true;
-      });
-  }, [knownFor]);
 
-  const worksCount = curatedKnownFor.length;
-  const ownedCount = useMemo(
-    () => curatedKnownFor.filter((movie) => isMovieInCollection(movie.id, movies)).length,
-    [curatedKnownFor, movies]
-  );
+    credits.forEach((credit) => {
+      if (seen.has(credit.id)) return;
+      seen.add(credit.id);
+      const match = matchLocalMovieByTitle(credit, titleLookup);
+      if (match) {
+        owned.push(credit);
+      } else {
+        unowned.push(credit);
+      }
+    });
+
+    return { ownedCredits: owned, unownedCredits: unowned };
+  }, [credits, titleLookup]);
+
+  const worksCount = ownedCredits.length + unownedCredits.length;
+  const ownedCount = ownedCredits.length;
   const medal = getMedal(ownedCount, worksCount);
+
+  const MAX_DISPLAY = 30;
+  const filmographyToDisplay = useMemo(() => {
+    if (worksCount === 0) return [] as { credit: DirectedMovie; owned: boolean }[];
+    const entries: { credit: DirectedMovie; owned: boolean }[] = [
+      ...ownedCredits.map((credit) => ({ credit, owned: true })),
+      ...unownedCredits.map((credit) => ({ credit, owned: false }))
+    ];
+
+    if (ownedCredits.length >= MAX_DISPLAY) {
+      return entries.filter((entry) => entry.owned);
+    }
+
+    const allowedUnowned = Math.max(MAX_DISPLAY - ownedCredits.length, 0);
+    const ownedEntries = entries.filter((entry) => entry.owned);
+    const unownedEntries = entries.filter((entry) => !entry.owned).slice(0, allowedUnowned);
+    return [...ownedEntries, ...unownedEntries];
+  }, [ownedCredits, unownedCredits, worksCount]);
 
   const renderKnownFor = () => {
     if (loading) {
       return <p className="muted">Cargando filmografía destacada...</p>;
     }
-    if (curatedKnownFor.length === 0) {
+    if (filmographyToDisplay.length === 0) {
       return <p className="muted">No hay películas para mostrar.</p>;
     }
     return (
       <div className="known-for-grid">
-        {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
+        {filmographyToDisplay.map(({ credit, owned }) => {
+          const movie = credit;
           return (
             <div
               key={movie.id}
