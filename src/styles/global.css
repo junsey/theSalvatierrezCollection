@@ -314,6 +314,7 @@ button:hover {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-bottom: clamp(20px, 4vw, 32px);
+  align-items: stretch;
 }
 
 .metric-card__link {
@@ -327,8 +328,10 @@ button:hover {
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(224, 160, 64, 0.03));
   overflow: hidden;
-  min-height: 120px;
+  min-height: 140px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .metric-card:hover {
@@ -348,10 +351,14 @@ button:hover {
 
 .metric-card__header {
   position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
   gap: 10px;
+}
+
+.metric-card__header--single {
+  grid-template-columns: 1fr;
 }
 
 .metric-card__header small {
@@ -380,6 +387,10 @@ button:hover {
 .metric-card__body {
   position: relative;
   margin-top: 12px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .metric-number {
@@ -389,7 +400,7 @@ button:hover {
 
 .format-chart {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .format-chart__stack {
@@ -421,8 +432,9 @@ button:hover {
 
 .format-chart__legend {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 6px 10px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 4px 8px;
+  font-size: 12px;
 }
 
 .format-chart__legend-item {
@@ -434,8 +446,8 @@ button:hover {
 }
 
 .format-chart__dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   box-shadow: 0 0 8px rgba(224, 160, 64, 0.4);
 }

@@ -48,17 +48,19 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
 };
 
 const MetricCard: React.FC<{
-  title: React.ReactNode;
+  title?: React.ReactNode;
   caption: string;
   href?: string;
   children?: React.ReactNode;
 }> = ({ title, caption, href, children }) => {
+  const headerClass = title !== undefined ? 'metric-card__header' : 'metric-card__header metric-card__header--single';
+
   const content = (
     <div className="metric-card">
       <div className="metric-card__glow" />
-      <div className="metric-card__header">
+      <div className={headerClass}>
         <small>{caption}</small>
-        <h3>{title}</h3>
+        {title !== undefined && <h3>{title}</h3>}
       </div>
       {children && <div className="metric-card__body">{children}</div>}
     </div>
@@ -287,7 +289,7 @@ export const HomePage: React.FC = () => {
             caption="Salas del Archivo"
             href="/sections"
           />
-          <MetricCard title="Inventario" caption="Formatos">
+          <MetricCard title={loading ? '…' : formatChartData.total.toLocaleString()} caption="Formatos">
             <FormatMiniChart data={formatChartData} />
           </MetricCard>
         </div>
