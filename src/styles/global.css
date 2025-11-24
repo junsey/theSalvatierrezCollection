@@ -498,6 +498,37 @@ button:hover {
   margin-top: 12px;
 }
 
+.treasure-placeholder {
+  position: relative;
+  min-height: 320px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.02), rgba(224, 160, 64, 0.04));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 16px;
+  overflow: hidden;
+}
+
+.treasure-placeholder__veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 40% 30%, rgba(255, 54, 93, 0.08), transparent 45%),
+    radial-gradient(circle at 70% 70%, rgba(224, 160, 64, 0.08), transparent 45%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.treasure-placeholder p {
+  position: relative;
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .muted {
   color: var(--text-muted);
 }

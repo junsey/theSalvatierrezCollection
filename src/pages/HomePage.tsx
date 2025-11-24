@@ -49,10 +49,9 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
 
 const MetricCard: React.FC<{
   title: React.ReactNode;
-  value: React.ReactNode;
   caption: string;
   href?: string;
-}> = ({ title, value, caption, href }) => {
+}> = ({ title, caption, href }) => {
   const content = (
     <div className="metric-card">
       <div className="metric-card__glow" />
@@ -60,7 +59,6 @@ const MetricCard: React.FC<{
         <small>{caption}</small>
         <h3>{title}</h3>
       </div>
-      <div className="metric-card__value">{value}</div>
     </div>
   );
 
@@ -71,67 +69,74 @@ const MetricCard: React.FC<{
   return content;
 };
 
-const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => (
-  <div className="treasure-grid">
-    {movies.map((movie) => (
-      <MovieCard key={movie.id} movie={movie} />
-    ))}
-  </div>
-);
+const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
+  const slots = Array.from({ length: 5 }, (_, index) => movies[index] ?? null);
+
+  return (
+    <div className="treasure-grid">
+      {slots.map((movie, index) =>
+        movie ? (
+          <MovieCard key={movie.id} movie={movie} />
+        ) : (
+          <div key={`placeholder-${index}`} className="treasure-placeholder">
+            <div className="treasure-placeholder__veil" />
+            <p>Espacio reservado para futuras reliquias.</p>
+          </div>
+        )
+      )}
+    </div>
+  );
+};
 
 export const HomePage: React.FC = () => {
   const { movies, loading } = useMovies();
 
-  const {
-    totalMovies,
-    totalSeries,
-    watchChart,
-    damaged,
-    sections,
-    directors,
-    topRated,
-    oldestYear,
-    newestYear
-  } = useMemo(() => {
-    const totalMovies = movies.filter((m) => !m.series).length;
-    const totalSeries = movies.filter((m) => m.series).length;
-    const watched = movies.filter((m) => m.seen).length;
-    const untested = movies.filter((m) => !m.seen && m.funcionaStatus === 'untested').length;
-    const unseen = Math.max(movies.length - watched - untested, 0);
-    const damaged = movies.filter((m) => m.funcionaStatus === 'damaged').length;
-    const sections = Array.from(new Set(movies.map((m) => m.seccion.trim()).filter(Boolean))).length;
-    const directors = Array.from(new Set(movies.map((m) => m.director.trim()).filter(Boolean))).length;
+  const { totalMovies, totalSeries, watchChart, damaged, sections, directors, topRated, oldestYear, newestYear } =
+    useMemo(() => {
+      const totalMovies = movies.filter((m) => !m.series).length;
+      const totalSeries = movies.filter((m) => m.series).length;
+      const watched = movies.filter((m) => m.seen).length;
+      const untested = movies.filter((m) => !m.seen && m.funcionaStatus === 'untested').length;
+      const unseen = Math.max(movies.length - watched - untested, 0);
+      const damaged = movies.filter((m) => m.funcionaStatus === 'damaged').length;
+      const sections = Array.from(new Set(movies.map((m) => m.seccion.trim()).filter(Boolean))).length;
+      const directors = Array.from(new Set(movies.map((m) => m.director.trim()).filter(Boolean))).length;
 
-    const ratingCandidates = movies.filter((m) => m.rating != null);
-    const topRated = ratingCandidates
-      .slice()
-      .sort((a, b) => Number(b.rating) - Number(a.rating))
-      .slice(0, 5);
+      const ratedByHouse = movies
+        .map((movie) => {
+          if (movie.ratingGloria == null || movie.ratingRodrigo == null) return null;
+          const houseAverage = (movie.ratingGloria + movie.ratingRodrigo) / 2;
+          return { movie, houseAverage };
+        })
+        .filter((entry): entry is { movie: MovieRecord; houseAverage: number } => entry !== null)
+        .sort((a, b) => b.houseAverage - a.houseAverage)
+        .slice(0, 5)
+        .map(({ movie }) => movie);
 
-    const years = movies
-      .map((m) => m.year ?? m.tmdbYear)
-      .filter((y): y is number => typeof y === 'number');
-    const oldestYear = years.length ? Math.min(...years) : null;
-    const newestYear = years.length ? Math.max(...years) : null;
+      const years = movies
+        .map((m) => m.year ?? m.tmdbYear)
+        .filter((y): y is number => typeof y === 'number');
+      const oldestYear = years.length ? Math.min(...years) : null;
+      const newestYear = years.length ? Math.max(...years) : null;
 
-    const watchChart: DonutDatum[] = [
-      { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
-      { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
-      { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' }
-    ];
+      const watchChart: DonutDatum[] = [
+        { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
+        { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
+        { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' }
+      ];
 
-    return {
-      totalMovies,
-      totalSeries,
-      watchChart,
-      damaged,
-      sections,
-      directors,
-      topRated,
-      oldestYear,
-      newestYear
-    };
-  }, [movies]);
+      return {
+        totalMovies,
+        totalSeries,
+        watchChart,
+        damaged,
+        sections,
+        directors,
+        topRated: ratedByHouse,
+        oldestYear,
+        newestYear
+      };
+    }, [movies]);
 
   return (
     <main className="grand-hall">
@@ -187,38 +192,32 @@ export const HomePage: React.FC = () => {
         <div className="metrics-grid">
           <MetricCard
             title={loading ? '…' : totalMovies.toLocaleString()}
-            caption="Pergaminos Archivados"
-            value={<span className="metric-number">Películas</span>}
+            caption="Archivo de Películas"
           />
           <MetricCard
             title={loading ? '…' : totalSeries.toLocaleString()}
             caption="Crónicas Seriadas"
-            value={<span className="metric-number">Series</span>}
           />
           <MetricCard
             title={loading ? '…' : directors.toLocaleString()}
             caption="Maestros del Arte"
-            value={<span className="metric-number">Directores</span>}
             href="/directors"
           />
           <MetricCard
             title={loading ? '…' : sections.toLocaleString()}
             caption="Salas del Archivo"
-            value={<span className="metric-number">Secciones</span>}
             href="/sections"
           />
           {oldestYear && (
             <MetricCard
               title={oldestYear}
               caption="Reliquia Más Antigua"
-              value={<span className="metric-number">Año</span>}
             />
           )}
           {newestYear && (
             <MetricCard
               title={newestYear}
               caption="Registro Más Joven"
-              value={<span className="metric-number">Año</span>}
             />
           )}
         </div>
@@ -234,10 +233,11 @@ export const HomePage: React.FC = () => {
         </div>
         {loading ? (
           <p className="muted">Invocando reliquias...</p>
-        ) : topRated.length === 0 ? (
-          <p className="muted">Aún no hay puntuaciones registradas.</p>
         ) : (
-          <TreasuresGrid movies={topRated} />
+          <>
+            {topRated.length === 0 && <p className="muted">Aún no hay puntuaciones registradas.</p>}
+            <TreasuresGrid movies={topRated} />
+          </>
         )}
       </section>
     </main>
