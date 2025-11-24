@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, getPersonDirectedMovies, getPersonDetails } from '../services/tmdbPeopleService';
 import { getWikipediaSummaryAndThumbnail, searchWikipediaArticle } from '../services/wikipediaService';
+import { buildOriginalTitleMap, buildOwnedTmdbIdSet, isCreditOwned } from '../utils/titleMatching';
 
 type DirectorCardProps = {
   directorId: number;
@@ -33,15 +34,8 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
   const { movies } = useMovies();
   const [state, setState] = useState<DirectorProfileState>({ biography: null, filmography: [], loading: true });
 
-  const inCollection = useMemo(() => {
-    const map = new Map<number, string>();
-    movies.forEach((m) => {
-      if (m.tmdbId) {
-        map.set(m.tmdbId, m.id);
-      }
-    });
-    return map;
-  }, [movies]);
+  const titleLookup = useMemo(() => buildOriginalTitleMap(movies), [movies]);
+  const ownedIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
 
   useEffect(() => {
     let active = true;
@@ -50,7 +44,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
       try {
         const [details, directed] = await Promise.all([
           getPersonDetails(directorId),
-          getPersonDirectedMovies(directorId)
+          getPersonDirectedMovies(directorId, { ownedIds })
         ]);
 
         const resolvedName = details?.name ?? name;
@@ -78,7 +72,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
     return () => {
       active = false;
     };
-  }, [directorId, name]);
+  }, [directorId, name, ownedIds]);
 
   const portrait =
     state.photoUrl ||
@@ -134,25 +128,45 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
         {state.loading && <p className="muted">Consultando obeliscos de celuloide...</p>}
         {!state.loading && state.filmography.length === 0 && <p className="muted">Sin registros de dirección.</p>}
         <ul className="filmography-list">
-          {state.filmography
-            .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
-            .slice(0, 12)
-            .map((film) => {
-              const ownedId = inCollection.get(film.id);
+          {(() => {
+            const sorted = [...state.filmography].sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+            const owned: DirectedMovie[] = [];
+            const unowned: DirectedMovie[] = [];
+            sorted.forEach((film) => {
+              const isOwned = isCreditOwned(film, ownedIds, titleLookup);
+              if (isOwned) {
+                owned.push(film);
+              } else {
+                unowned.push(film);
+              }
+            });
+
+            const MAX_ITEMS = 12;
+            const entries =
+              owned.length >= MAX_ITEMS
+                ? owned.map((film) => ({ film, owned: true }))
+                : [
+                    ...owned.map((film) => ({ film, owned: true })),
+                    ...unowned.slice(0, Math.max(MAX_ITEMS - owned.length, 0)).map((film) => ({ film, owned: false }))
+                  ];
+
+            return entries.map(({ film, owned }) => {
               const label = film.year ? `${film.title} (${film.year})` : film.title;
+              const linkTarget = owned ? `/movies?tmdbId=${film.id}` : undefined;
               return (
-                <li key={`${film.id}-${film.title}`} className={ownedId ? 'owned' : 'pending'}>
-                  {ownedId ? (
-                    <Link to={`/movies?tmdbId=${film.id}`} className="film-link">
+                <li key={`${film.id}-${film.title}`} className={owned ? 'owned' : 'pending'}>
+                  {linkTarget ? (
+                    <Link to={linkTarget} className="film-link">
                       {label}
                     </Link>
                   ) : (
                     <span className="film-link muted">{label}</span>
                   )}
-                  <span className="pill">{ownedId ? 'En colección' : 'Pendiente'}</span>
+                  <span className="pill">{owned ? 'En colección' : 'Pendiente'}</span>
                 </li>
               );
-            })}
+            });
+          })()}
         </ul>
       </div>
     </div>
