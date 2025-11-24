@@ -208,13 +208,13 @@ export const HomePage: React.FC = () => {
             caption="Salas del Archivo"
             href="/sections"
           />
-          {oldestYear && (
+          {oldestYear != null && (
             <MetricCard
               title={oldestYear}
               caption="Reliquia Más Antigua"
             />
           )}
-          {newestYear && (
+          {newestYear != null && (
             <MetricCard
               title={newestYear}
               caption="Registro Más Joven"
