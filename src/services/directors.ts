@@ -8,6 +8,14 @@ export const splitDirectors = (value: string) =>
 
 export const normalizeDirectorName = (value: string) => value.trim().toLowerCase();
 
+export const buildOwnedTmdbIdSet = (movies: MovieRecord[]): Set<number> =>
+  new Set(
+    movies
+      .map((movie) => Number(movie.tmdbId))
+      .filter((id) => Number.isFinite(id))
+      .map((id) => Number(id))
+  );
+
 export const buildDirectorOverrideMap = (movies: MovieRecord[]): Map<string, number> => {
   const overrides = new Map<string, number>();
 

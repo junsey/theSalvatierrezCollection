@@ -321,7 +321,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       <div className="director-grid">
         {filteredProfiles.map((director) => (
           <Link
-            to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+            to={director.tmdbId ? `/directors/${director.tmdbId}` : `/directors/${encodeURIComponent(director.displayName || director.name)}`}
             className="director-card"
             key={buildDirectorKey(director.name, director.tmdbId)}
           >

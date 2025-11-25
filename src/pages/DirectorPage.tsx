@@ -2,21 +2,20 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
-import { MovieRecord } from '../types/MovieRecord';
-import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
+import { buildDirectorOverrideMap, buildOwnedTmdbIdSet, normalizeDirectorName } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
-const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean => {
-  return collection.some((item) => item.tmdbId === tmdbId);
-};
-
 export const DirectorPage: React.FC = () => {
-  const { name } = useParams();
-  const directorName = decodeURIComponent(name ?? '').trim();
+  const { id } = useParams();
+  const decodedParam = decodeURIComponent(id ?? '').trim();
+  const resolvedId = Number(decodedParam);
+  const hasNumericId = Number.isFinite(resolvedId);
+  const directorName = hasNumericId ? '' : decodedParam;
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const ownedTmdbIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +23,8 @@ export const DirectorPage: React.FC = () => {
   const [biography, setBiography] = useState<string | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
   const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
+
+  const displayName = personName || directorName || decodedParam;
 
   useEffect(() => {
     let active = true;
@@ -34,15 +35,18 @@ export const DirectorPage: React.FC = () => {
       setProfileUrl(undefined);
       setKnownFor([]);
 
-      if (!directorName) {
+      if (!decodedParam) {
         setError('No se especificó director.');
         setLoading(false);
         return;
       }
 
       try {
-        const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
-        const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: overrideTmdbId });
+        const overrideTmdbId = hasNumericId
+          ? resolvedId
+          : directorOverrides.get(normalizeDirectorName(directorName));
+        const lookupName = directorName || decodedParam;
+        const result = await fetchDirectorFromTMDb({ name: lookupName, tmdbId: overrideTmdbId });
         if (!active) return;
 
         if (!result) {
@@ -51,7 +55,7 @@ export const DirectorPage: React.FC = () => {
           return;
         }
 
-        setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
+        setPersonName(result.person?.name ?? result.resolvedName ?? lookupName);
         setBiography(result.person?.biography ?? null);
         setProfileUrl(result.person?.profileUrl ?? undefined);
         setKnownFor(result.credits);
@@ -67,7 +71,7 @@ export const DirectorPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [directorName, directorOverrides]);
+  }, [decodedParam, directorName, directorOverrides, hasNumericId, resolvedId]);
 
   const curatedKnownFor = useMemo(() => {
     const seen = new Set<number>();
@@ -89,7 +93,7 @@ export const DirectorPage: React.FC = () => {
     return (
       <div className="known-for-grid">
         {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
+          const owned = ownedTmdbIds.has(movie.id);
           return (
             <div
               key={movie.id}
@@ -130,7 +134,7 @@ export const DirectorPage: React.FC = () => {
         />
         <div className="director-legend">
           <p className="eyebrow">Directores</p>
-          <h1>{personName || directorName}</h1>
+          <h1>{displayName}</h1>
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted">{biography}</p>}
           {!loading && !biography && <p className="text-muted">Biografía no disponible.</p>}
