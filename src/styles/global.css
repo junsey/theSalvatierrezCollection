@@ -2048,6 +2048,22 @@ small {
   gap: 4px;
 }
 
+.known-for-card__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.pill--type {
+  background: var(--surface-200);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
 .known-for-card__meta .pill {
   align-self: flex-start;
   margin-top: 4px;
