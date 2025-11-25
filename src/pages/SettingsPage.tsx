@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
-import { getSheetUrl } from '../services/googleSheets';
 import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
 import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
 
 export const SettingsPage: React.FC = () => {
-  const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
+  const { refreshAll, refreshCollection, refreshMissing, loading, collectionMeta, error, progress, movies } = useMovies();
   const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
@@ -34,14 +33,14 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleRefreshSheet = async () => {
+  const handleRefreshCollection = async () => {
     setStatus(null);
     try {
-      await refreshSheet();
-      setStatus('✅ Excel recargado correctamente.');
+      await refreshCollection();
+      setStatus('✅ Colección recargada correctamente.');
     } catch (err) {
       console.error(err);
-      setStatus('❌ No se pudo recargar el Excel.');
+      setStatus('❌ No se pudo recargar la colección.');
     }
   };
 
@@ -77,19 +76,20 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const lastUpdated = sheetMeta?.fetchedAt
-    ? new Date(sheetMeta.fetchedAt).toLocaleString()
+  const lastUpdated = collectionMeta?.fetchedAt
+    ? new Date(collectionMeta.fetchedAt).toLocaleString()
     : 'Sincronización pendiente';
 
-  const sheetSourceLabel: Record<string, string> = {
-    'network': 'En línea (último fetch)',
-    'cache-fresh': 'Copia local fresca',
-    'cache-stale': 'Copia local (stale, pero segura)',
-    'embedded': 'Copia embebida en la app',
-    'demo': 'Datos demo'
-  };
+  const processEnv =
+    typeof process !== 'undefined' && typeof (process as any).env !== 'undefined'
+      ? ((process as any).env as Record<string, string | undefined>)
+      : undefined;
 
-  const sourceLabel = sheetMeta ? sheetSourceLabel[sheetMeta.source] : 'N/D';
+  const supabaseUrl =
+    processEnv?.NEXT_PUBLIC_SUPABASE_URL ||
+    (typeof import.meta !== 'undefined' ? (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_URL : undefined);
+
+  const sourceLabel = collectionMeta ? 'Supabase' : 'N/D';
 
   // Identificar películas problemáticas
   const problematicMovies = movies.filter(
@@ -106,8 +106,8 @@ export const SettingsPage: React.FC = () => {
       <div className="panel" style={{ marginBottom: 16 }}>
         <h1>Configuración</h1>
         <p>
-          Guardamos una copia local del documento para que no se rompa si Google Sheets devuelve 404/403 y cacheamos los datos
-          enriquecidos de TMDb por 6 meses. Usa las opciones siguientes para gestionar la sincronización y el enriquecimiento de datos.
+          La colección se sincroniza directamente contra Supabase y cacheamos los datos enriquecidos de TMDb por 6 meses. Usa las
+          opciones siguientes para gestionar la sincronización y el enriquecimiento de datos.
         </p>
       </div>
       <div className="stat-grid" style={{ marginBottom: 16 }}>
@@ -120,8 +120,8 @@ export const SettingsPage: React.FC = () => {
           <div>{sourceLabel}</div>
         </div>
         <div className="stat-card">
-          <strong>Hoja remota</strong>
-          <div className="clamped" style={{ fontSize: 12 }}>{getSheetUrl()}</div>
+          <strong>Supabase URL</strong>
+          <div className="clamped" style={{ fontSize: 12 }}>{supabaseUrl ?? 'No configurada'}</div>
         </div>
       </div>
       <div className="panel" style={{ marginBottom: 16 }}>
@@ -130,27 +130,27 @@ export const SettingsPage: React.FC = () => {
           <div>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar todo</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Recarga el Excel desde Google Sheets y regenera todos los datos de TMDb (ignora caché existente).
+              Recarga la colección desde Supabase y regenera todos los datos de TMDb (ignora caché existente).
             </p>
             <button className="btn" onClick={handleRefreshAll} disabled={loading}>
               {loading ? 'Regenerando…' : 'Regenerar todo'}
             </button>
           </div>
-          
+
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Recargar Excel</h3>
+            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Recargar colección</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo recarga los datos desde Google Sheets. Solo enriquece las películas nuevas que no tienen caché.
+              Solo recarga los datos desde Supabase. Solo enriquece las películas nuevas que no tienen caché.
             </p>
-            <button className="btn" onClick={handleRefreshSheet} disabled={loading}>
-              {loading ? 'Recargando…' : 'Recargar Excel'}
+            <button className="btn" onClick={handleRefreshCollection} disabled={loading}>
+              {loading ? 'Recargando…' : 'Recargar colección'}
             </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar faltantes</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo enriquece las películas que no tienen caché o están en error. No recarga el Excel.
+              Solo enriquece las películas que no tienen caché o están en error. No recarga Supabase.
             </p>
             <button className="btn" onClick={handleRefreshMissing} disabled={loading}>
               {loading ? 'Regenerando…' : 'Regenerar faltantes'}
@@ -160,7 +160,7 @@ export const SettingsPage: React.FC = () => {
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar directores</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Limpia la caché de directores y vuelve a solicitar las biografías y retratos basados en los nombres del Excel.
+              Limpia la caché de directores y vuelve a solicitar las biografías y retratos basados en los nombres almacenados.
             </p>
             <button
               className="btn"
@@ -222,10 +222,10 @@ export const SettingsPage: React.FC = () => {
         </div>
       )}
       <div className="panel" style={{ marginTop: 16 }}>
-        <h3>Copia embebida</h3>
+        <h3>Fuentes heredadas</h3>
         <p>
-          La app incluye una copia de seguridad dentro del bundle (<code>src/data/sheet-backup.csv</code>). Si todo falla, los datos se
-          cargarán desde ahí para evitar el error 404.
+          Se mantiene el backup CSV antiguo (<code>src/data/sheet-backup.csv</code>) solo para scripts o importaciones manuales. La
+          aplicación en ejecución siempre consulta Supabase como única fuente de datos.
         </p>
       </div>
 

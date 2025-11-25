@@ -1,5 +1,5 @@
+import { CollectionMeta } from '../types/CollectionMeta';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
-import { SheetMeta } from './googleSheets';
 
 type StoredState = {
   seen: Record<string, boolean>;
@@ -16,7 +16,7 @@ const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 type CachedMoviesPayload = {
   fetchedAt: number;
   movies: MovieRecord[];
-  sheetMeta?: SheetMeta | null;
+  collectionMeta?: CollectionMeta | null;
 };
 
 export type CachedDirector = {
@@ -97,12 +97,12 @@ export function applyLocalOverrides(movies: MovieRecord[]): MovieRecord[] {
   }));
 }
 
-export function saveMovieCache(movies: MovieRecord[], sheetMeta?: SheetMeta | null) {
+export function saveMovieCache(movies: MovieRecord[], collectionMeta?: CollectionMeta | null) {
   if (typeof localStorage === 'undefined') return;
   const payload: CachedMoviesPayload = {
     fetchedAt: Date.now(),
     movies,
-    sheetMeta
+    collectionMeta
   };
   try {
     localStorage.setItem(MOVIE_CACHE_KEY, JSON.stringify(payload));

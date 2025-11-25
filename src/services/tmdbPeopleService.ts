@@ -7,6 +7,7 @@ const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
+const RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-runtime-cache-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
@@ -33,6 +34,8 @@ type DirectedMovie = {
   mediaType?: 'movie' | 'tv';
 };
 
+type RuntimeEntry = { runtime: number | null };
+
 export type DirectorProfile = {
   name: string;
   displayName: string;
@@ -52,6 +55,7 @@ const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = lo
   PERSON_SEARCH_CACHE_KEY
 );
 const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const runtimeCache: Record<string, PersonCacheEntry<RuntimeEntry>> = loadCache<RuntimeEntry>(RUNTIME_CACHE_KEY);
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -253,6 +257,26 @@ const isFeatureLengthProduction = (item: {
   return !isMarkedVideo && !looksLikeShort;
 };
 
+async function getMovieRuntime(movieId: number): Promise<number | null> {
+  const cacheKey = String(movieId);
+  const cached = runtimeCache[cacheKey];
+  if (isFresh(cached)) return cached.data.runtime ?? null;
+
+  if (!TMDB_API_KEY) return null;
+
+  try {
+    const url = `${API_BASE}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{ runtime?: number | null }>(url);
+    const runtime = Number.isFinite(data.runtime) ? Number(data.runtime) : null;
+    runtimeCache[cacheKey] = { fetchedAt: Date.now(), data: { runtime } };
+    saveCache(RUNTIME_CACHE_KEY, runtimeCache);
+    return runtime;
+  } catch (error) {
+    console.warn('No se pudo obtener la duración de la película', error);
+    return null;
+  }
+}
+
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY) return [];
   const cacheKey = String(personId);
@@ -279,27 +303,34 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
 
     const directedMovies = new Map<number, DirectedMovie>();
 
-    (data.crew ?? [])
-      .filter((item) => {
-        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
-        const job = item.job?.trim().toLowerCase();
-        const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
-      })
-      .forEach((item) => {
-        const title = item.title ?? item.name ?? 'Producción sin título';
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
-        const entry: DirectedMovie = {
-          id: item.id,
-          title,
-          year,
-          posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
-          popularity: item.popularity,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
-        };
+    const candidates = (data.crew ?? []).filter((item) => {
+      if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
+      const job = item.job?.trim().toLowerCase();
+      const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
+      return isPrimaryDirector && isFeatureLengthProduction(item);
+    });
 
-        directedMovies.set(item.id, entry);
-      });
+    for (const item of candidates) {
+      if (item.media_type === 'movie') {
+        const runtime = await getMovieRuntime(item.id);
+        if (runtime !== null && runtime < 60) {
+          continue;
+        }
+      }
+
+      const title = item.title ?? item.name ?? 'Producción sin título';
+      const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+      const entry: DirectedMovie = {
+        id: item.id,
+        title,
+        year,
+        posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
+        popularity: item.popularity,
+        mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+      };
+
+      directedMovies.set(item.id, entry);
+    }
 
     const sorted = Array.from(directedMovies.values()).sort((a, b) => {
       const yearA = a.year ?? Number.POSITIVE_INFINITY;
@@ -477,10 +508,12 @@ export function clearPeopleCaches() {
     localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
     localStorage.removeItem(CREDITS_CACHE_KEY);
     localStorage.removeItem(CONFIG_CACHE_KEY);
+    localStorage.removeItem(RUNTIME_CACHE_KEY);
   }
   Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
   Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
+  Object.keys(runtimeCache).forEach((key) => delete runtimeCache[key]);
 }
 
 export type { PersonDetails, DirectedMovie };

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMovies } from '../context/MovieContext';
+import { getOwnedTmdbIds } from '../lib/moviesRepository';
 import { DirectedMovie, getPersonDirectedMovies, getPersonDetails } from '../services/tmdbPeopleService';
 import { getWikipediaSummaryAndThumbnail, searchWikipediaArticle } from '../services/wikipediaService';
 
@@ -30,21 +30,21 @@ const formatDate = (date?: string | null) => {
 };
 
 export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) => {
-  const { movies } = useMovies();
   const [state, setState] = useState<DirectorProfileState>({ biography: null, filmography: [], loading: true });
-
-  const inCollection = useMemo(() => {
-    const map = new Map<number, string>();
-    movies.forEach((m) => {
-      if (m.tmdbId) {
-        map.set(m.tmdbId, m.id);
-      }
-    });
-    return map;
-  }, [movies]);
+  const [ownedTmdbIds, setOwnedTmdbIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     let active = true;
+    getOwnedTmdbIds()
+      .then((ids) => {
+        if (active) {
+          setOwnedTmdbIds(new Set(ids));
+        }
+      })
+      .catch((error) => {
+        console.error('No se pudieron cargar los IDs de TMDb de Supabase', error);
+      });
+
     async function loadProfile() {
       setState((prev) => ({ ...prev, loading: true }));
       try {
@@ -129,7 +129,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
           )}
         </div>
       </div>
-      <div className="director-card__films">
+          <div className="director-card__films">
         <h4>Filmografía seleccionada</h4>
         {state.loading && <p className="muted">Consultando obeliscos de celuloide...</p>}
         {!state.loading && state.filmography.length === 0 && <p className="muted">Sin registros de dirección.</p>}
@@ -138,7 +138,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
             .sort((a, b) => (b.year ?? 0) - (a.year ?? 0))
             .slice(0, 12)
             .map((film) => {
-              const ownedId = inCollection.get(film.id);
+              const ownedId = ownedTmdbIds.has(film.id);
               const label = film.year ? `${film.title} (${film.year})` : film.title;
               return (
                 <li key={`${film.id}-${film.title}`} className={ownedId ? 'owned' : 'pending'}>
