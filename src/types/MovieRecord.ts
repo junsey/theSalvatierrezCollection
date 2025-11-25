@@ -21,6 +21,7 @@ export type MovieRecord = {
   enDeposito?: boolean;
   funcionaStatus: 'working' | 'damaged' | 'untested';
   tmdbId?: number;
+  tmdbIdFromSheet?: number | null;
   tmdbRating?: number | null;
   tmdbYear?: number | null;
   tmdbTitle?: string;

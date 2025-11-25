@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { splitDirectors } from '../services/directors';
 import { MovieRecord } from '../types/MovieRecord';
-import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { PawRating } from './PawRating';
 
 interface Props {
@@ -9,15 +9,18 @@ interface Props {
   onClose: () => void;
 }
 export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
-  const [directors, setDirectors] = useState<string[]>([]);
-  const [loadingDirectors, setLoadingDirectors] = useState(false);
+  const directors = useMemo(() => {
+    const names = splitDirectors(movie.director ?? '');
+    const tmdbIds = (movie.directorTmdbIds ?? [])
+      .filter((id) => Number.isFinite(id))
+      .map((id) => Number(id));
 
-  const fallbackDirectors = movie.director
-    ? movie.director
-        .split(/[,;/&]/g)
-        .map((d) => d.trim())
-        .filter(Boolean)
-    : [];
+    if (tmdbIds.length === 0 && movie.directorTmdbId != null && Number.isFinite(movie.directorTmdbId)) {
+      tmdbIds.push(Number(movie.directorTmdbId));
+    }
+
+    return names.map((name, index) => ({ name, tmdbId: tmdbIds[index] ?? tmdbIds[0] ?? null }));
+  }, [movie.director, movie.directorTmdbId, movie.directorTmdbIds]);
 
   const funcionaLabel = (() => {
     switch (movie.funcionaStatus) {
@@ -29,26 +32,6 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
         return 'Sin probar';
     }
   })();
-
-  useEffect(() => {
-    let active = true;
-    async function fetchDirectors() {
-      if (!movie.tmdbId) {
-        setDirectors([]);
-        return;
-      }
-      setLoadingDirectors(true);
-      const found = await getDirectorFromMovie(movie.tmdbId);
-      if (!active) return;
-      const names = Array.from(new Set(found.map((entry) => entry.name)));
-      setDirectors(names);
-      setLoadingDirectors(false);
-    }
-    fetchDirectors();
-    return () => {
-      active = false;
-    };
-  }, [movie.tmdbId]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -121,14 +104,19 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
                   <strong>Director(es)</strong>
                   {movie.director && <small className="muted">Dato base: {movie.director}</small>}
                 </div>
-                {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
-                {!loadingDirectors && directors.length === 0 && fallbackDirectors.length === 0 && (
-                  <p className="muted">No hay directores registrados.</p>
-                )}
+                {directors.length === 0 && <p className="muted">No hay directores registrados.</p>}
                 <ul className="director-link-list">
-                  {(directors.length > 0 ? directors : fallbackDirectors).map((director) => (
-                    <li key={director}>
-                      <Link to={`/directors/${encodeURIComponent(director)}`}>{director}</Link>
+                  {directors.map((director) => (
+                    <li key={director.name}>
+                      <Link
+                        to={
+                          director.tmdbId
+                            ? `/directors/${director.tmdbId}`
+                            : `/directors/${encodeURIComponent(director.name)}`
+                        }
+                      >
+                        {director.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>

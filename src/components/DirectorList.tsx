@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  DirectorProfile,
-  buildDirectorProfiles,
-  getPersonDirectedMovies
-} from '../services/tmdbPeopleService';
+import { DirectorProfile, buildDirectorProfiles } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
+import { getDirectorWorks, setDirectorOwnedIdsFromMovies } from '../services/directorWorks';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -45,6 +42,9 @@ const getWorkKey = (movie: MovieRecord) => {
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  useEffect(() => {
+    setDirectorOwnedIdsFromMovies(movies);
+  }, [movies]);
   const directors = useMemo(() => {
     const map = new Map<
       string,
@@ -181,8 +181,8 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             if (tmdbTotals.has(profile.tmdbId)) {
               total = tmdbTotals.get(profile.tmdbId) ?? null;
             } else {
-              const filmography = await getPersonDirectedMovies(profile.tmdbId);
-              total = filmography.length;
+              const works = await getDirectorWorks(profile.tmdbId);
+              total = works.totalCount;
               tmdbTotals.set(profile.tmdbId, total);
             }
           }
@@ -321,7 +321,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       <div className="director-grid">
         {filteredProfiles.map((director) => (
           <Link
-            to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+            to={director.tmdbId ? `/directors/${director.tmdbId}` : `/directors/${encodeURIComponent(director.displayName || director.name)}`}
             className="director-card"
             key={buildDirectorKey(director.name, director.tmdbId)}
           >
