@@ -105,6 +105,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
   const [letterFilter, setLetterFilter] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
 
   useEffect(() => {
@@ -206,22 +207,15 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [profiles]);
 
-  useEffect(() => {
-    const matches = profiles.filter((director) =>
-      director.name.toLowerCase().includes('chris carter')
-    );
-    console.log('Chris Carter entries:', matches);
-  }, [profiles]);
-
   const filteredProfiles = useMemo(() => {
-    const filtered = letterFilter
-      ? profiles.filter((director) =>
-          (director.displayName || director.name)
-            .trim()
-            .toUpperCase()
-            .startsWith(letterFilter)
-        )
-      : profiles;
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    const filtered = profiles.filter((director) => {
+      const name = (director.displayName || director.name).trim();
+      const matchesLetter = letterFilter ? name.toUpperCase().startsWith(letterFilter) : true;
+      const matchesSearch = normalizedSearch ? name.toLowerCase().includes(normalizedSearch) : true;
+      return matchesLetter && matchesSearch;
+    });
 
     const enriched = filtered.map((profile) => {
       const owned = coverage[profile.key]?.owned ?? profile.worksCount;
@@ -240,7 +234,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return sorted.map((entry) => entry.profile);
-  }, [letterFilter, profiles, coverage, orderBy, collator]);
+  }, [letterFilter, searchTerm, profiles, coverage, orderBy, collator]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
@@ -291,6 +285,16 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               rowGap: 10
             }}
           >
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexGrow: 1, minWidth: 240 }}>
+              <strong style={{ whiteSpace: 'nowrap' }}>Buscar:</strong>
+              <input
+                type="search"
+                placeholder="Nombre del director"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </label>
             {availableLetters.length > 1 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <strong style={{ whiteSpace: 'nowrap' }}>Filtrar por letra:</strong>
@@ -363,7 +367,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           ))}
         {filteredProfiles.length === 0 && (
           <p className="muted" style={{ padding: '12px 0' }}>
-            No hay directores para la letra seleccionada.
+            No hay directores que coincidan con los filtros aplicados.
           </p>
         )}
       </div>

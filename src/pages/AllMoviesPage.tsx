@@ -38,8 +38,18 @@ export const AllMoviesPage: React.FC = () => {
   };
 
   const filtered = useMemo(() => {
+    const query = filters.query.trim().toLowerCase();
+
+    const matchesTitle = (movie: MovieRecord) => {
+      if (!query) return true;
+      const candidates = [movie.title, movie.originalTitle, movie.tmdbTitle, movie.tmdbOriginalTitle]
+        .filter((title): title is string => Boolean(title))
+        .map((title) => title.toLowerCase());
+      return candidates.some((title) => title.includes(query));
+    };
+
     return movies
-      .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
+      .filter((m) => matchesTitle(m))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
       .filter((m) => {
         if (filters.series === 'series') return Boolean(m.series);

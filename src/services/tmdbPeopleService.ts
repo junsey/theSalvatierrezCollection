@@ -8,6 +8,12 @@ const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
+const CACHE_LIMITS: Record<string, number> = {
+  [PERSON_CACHE_KEY]: 150,
+  [PERSON_SEARCH_CACHE_KEY]: 200,
+  [CREDITS_CACHE_KEY]: 150,
+  [CONFIG_CACHE_KEY]: 5
+};
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
 type SearchCacheEntry = { id: number; name: string } | null;
@@ -24,13 +30,16 @@ type PersonDetails = {
   alsoKnownAs?: string[];
 };
 
-type DirectedMovie = {
+export type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
   posterUrl?: string;
   popularity?: number;
   mediaType?: 'movie' | 'tv';
+  job?: string;
+  releaseDate?: string | null;
+  firstAirDate?: string | null;
 };
 
 export type DirectorProfile = {
@@ -65,12 +74,49 @@ function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   }
 }
 
+function pruneCacheEntries<T>(
+  payload: Record<string, PersonCacheEntry<T>>,
+  limit: number
+): Record<string, PersonCacheEntry<T>> {
+  const entries = Object.entries(payload);
+  if (entries.length <= limit) return payload;
+
+  const sorted = entries.sort(([, a], [, b]) => (b?.fetchedAt ?? 0) - (a?.fetchedAt ?? 0));
+  const trimmedEntries = sorted.slice(0, limit);
+  const keepKeys = new Set(trimmedEntries.map(([key]) => key));
+
+  Object.keys(payload).forEach((key) => {
+    if (!keepKeys.has(key)) delete payload[key];
+  });
+
+  return Object.fromEntries(trimmedEntries);
+}
+
 function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
   if (typeof localStorage === 'undefined') return;
+  const limit = CACHE_LIMITS[key];
+  const boundedPayload = limit ? pruneCacheEntries(payload, limit) : payload;
   try {
-    localStorage.setItem(key, JSON.stringify(payload));
+    localStorage.setItem(key, JSON.stringify(boundedPayload));
   } catch (error) {
     console.warn('No se pudo guardar la caché de personas TMDb', error);
+
+    if (limit && Object.keys(boundedPayload).length > 0) {
+      const tighterLimit = Math.max(10, Math.floor(limit * 0.7));
+      const pruned = pruneCacheEntries(payload, tighterLimit);
+      try {
+        localStorage.setItem(key, JSON.stringify(pruned));
+        return;
+      } catch (retryError) {
+        console.warn('No se pudo guardar la caché de personas TMDb tras recortar', retryError);
+      }
+    }
+
+    try {
+      localStorage.removeItem(key);
+    } catch (cleanupError) {
+      console.warn('No se pudo limpiar la caché de personas TMDb tras un error de cuota', cleanupError);
+    }
   }
 }
 
@@ -284,18 +330,26 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
         const job = item.job?.trim().toLowerCase();
         const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
+        const isSeriesCreator = job === 'creator' || job === 'series creator';
+        if (!isPrimaryDirector && !isSeriesCreator) return false;
+        if (item.media_type === 'movie' && !isFeatureLengthProduction(item)) return false;
+        return true;
       })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+        const releaseDate = item.release_date ?? null;
+        const firstAirDate = item.first_air_date ?? null;
+        const year = item.media_type === 'tv' ? parseYear(firstAirDate) : parseYear(releaseDate);
         const entry: DirectedMovie = {
           id: item.id,
           title,
           year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
           popularity: item.popularity,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+          job: item.job,
+          releaseDate,
+          firstAirDate
         };
 
         directedMovies.set(item.id, entry);
@@ -483,4 +537,4 @@ export function clearPeopleCaches() {
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
 }
 
-export type { PersonDetails, DirectedMovie };
+export type { PersonDetails };
