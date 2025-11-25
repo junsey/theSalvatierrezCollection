@@ -3,13 +3,42 @@ import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
-import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
+import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
-const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean => {
-  return collection.some((item) => item.tmdbId === tmdbId);
+const normalizeTitle = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const buildDirectorCollections = (directorName: string, collection: MovieRecord[]) => {
+  const normalizedDirector = normalizeDirectorName(directorName);
+  const ownedIds = new Set<number>();
+  const ownedTitles = new Set<string>();
+
+  collection.forEach((movie) => {
+    const matchesDirector = splitDirectors(movie.director)
+      .map(normalizeDirectorName)
+      .includes(normalizedDirector);
+
+    if (!matchesDirector) return;
+
+    if (Number.isFinite(movie.tmdbId) && movie.tmdbId != null) {
+      ownedIds.add(movie.tmdbId);
+    }
+
+    ownedTitles.add(normalizeTitle(movie.title));
+    if (movie.tmdbTitle) {
+      ownedTitles.add(normalizeTitle(movie.tmdbTitle));
+    }
+    if (movie.originalTitle) {
+      ownedTitles.add(normalizeTitle(movie.originalTitle));
+    }
+    if (movie.tmdbOriginalTitle) {
+      ownedTitles.add(normalizeTitle(movie.tmdbOriginalTitle));
+    }
+  });
+
+  return { ownedIds, ownedTitles };
 };
 
 export const DirectorPage: React.FC = () => {
@@ -17,6 +46,10 @@ export const DirectorPage: React.FC = () => {
   const directorName = decodeURIComponent(name ?? '').trim();
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const directorCollection = useMemo(
+    () => buildDirectorCollections(directorName, movies),
+    [directorName, movies]
+  );
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,48 +102,122 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorName, directorOverrides]);
 
-  const curatedKnownFor = useMemo(() => {
-    const seen = new Set<number>();
-    return knownFor
-      .filter((movie) => {
-        if (seen.has(movie.id)) return false;
-        seen.add(movie.id);
-        return true;
-      });
-  }, [knownFor]);
+  const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
+    const directorJobs = new Set(['director', 'series director', 'director de la serie']);
+    const creatorJobs = new Set(['creator', 'series creator']);
 
-  const renderKnownFor = () => {
-    if (loading) {
-      return <p className="muted">Cargando filmografía destacada...</p>;
+    const movieSeen = new Set<number>();
+    const seriesSeen = new Set<number>();
+
+    const isOwned = (title: string, id: number) =>
+      directorCollection.ownedIds.has(id) || directorCollection.ownedTitles.has(normalizeTitle(title));
+
+    const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
+      const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
+      const dateB = b.mediaType === 'tv' ? b.firstAirDate : b.releaseDate;
+
+      const tsA = dateA ? Date.parse(dateA) : Number.POSITIVE_INFINITY;
+      const tsB = dateB ? Date.parse(dateB) : Number.POSITIVE_INFINITY;
+
+      if (tsA !== tsB) return tsA - tsB;
+      return (a.title || '').localeCompare(b.title || '');
+    };
+
+    const directed = knownFor
+      .filter((credit) => credit.mediaType === 'movie' && directorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (movieSeen.has(credit.id)) return false;
+        movieSeen.add(credit.id);
+        return true;
+      })
+      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .sort(sortByDate);
+
+    const created = knownFor
+      .filter((credit) => credit.mediaType === 'tv' && creatorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (seriesSeen.has(credit.id)) return false;
+        seriesSeen.add(credit.id);
+        return true;
+      })
+      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .sort(sortByDate);
+
+    const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
+    const totalCount = directed.length + created.length;
+    const ratio = totalCount > 0 ? ownedCount / totalCount : 0;
+
+    return {
+      directedMovies: directed,
+      createdSeries: created,
+      ownedCount,
+      totalCount,
+      medalUnlocks: {
+        bronze: ratio > 0.5,
+        silver: ratio > 0.75,
+        gold: ratio >= 1
+      }
+    };
+  }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
+
+  const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="filmography-block">
+          <h2>{title}</h2>
+          <p className="muted">{emptyMessage}</p>
+        </div>
+      );
     }
-    if (curatedKnownFor.length === 0) {
-      return <p className="muted">No hay películas para mostrar.</p>;
-    }
+
+    type DisplayItem = (DirectedMovie & { owned?: boolean }) | { id: string; placeholder: true };
+    const placeholders = Array.from({ length: Math.max(0, 7 - items.length) }, (_, idx) => ({
+      id: `${title}-placeholder-${idx}`,
+      placeholder: true as const
+    }));
+    const displayItems: DisplayItem[] = [...items, ...placeholders];
+
     return (
-      <div className="known-for-grid">
-        {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
-          return (
-            <div
-              key={movie.id}
-              className={`known-for-card ${owned ? 'owned' : 'missing'}`}
-              aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
-            >
-              <div className="known-for-card__poster">
-                {movie.posterUrl ? (
-                  <img src={movie.posterUrl} alt={movie.title} className={!owned ? 'is-muted' : undefined} />
-                ) : (
-                  <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
-                )}
+      <div className="filmography-block">
+        <h2>{title}</h2>
+        <div className="known-for-grid">
+          {displayItems.map((item) => {
+            if ('placeholder' in item) {
+              return (
+                <div key={item.id} className="known-for-card known-for-card--placeholder" aria-hidden>
+                  <div className="known-for-card__poster" />
+                  <div className="known-for-card__meta" />
+                </div>
+              );
+            }
+
+            const owned = item.owned;
+            return (
+              <div
+                key={item.id}
+                className={`known-for-card ${owned ? 'owned' : 'missing'}`}
+                aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
+              >
+                <div className="known-for-card__poster">
+                  {item.posterUrl ? (
+                    <img src={item.posterUrl} alt={item.title} className={!owned ? 'is-muted' : undefined} />
+                  ) : (
+                    <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
+                  )}
+                </div>
+                <div className="known-for-card__meta">
+                  <div className="known-for-card__meta-row">
+                    <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                    <span className="media-tag" aria-label={title}>
+                      {item.mediaType === 'tv' ? 'Serie' : 'Película'}
+                    </span>
+                  </div>
+                  {item.year && <small>{item.year}</small>}
+                </div>
               </div>
-              <div className="known-for-card__meta">
-                <p className={!owned ? 'muted' : undefined}>{movie.title}</p>
-                {movie.year && <small>{movie.year}</small>}
-                <span className="pill">{owned ? 'En la colección' : 'Pendiente'}</span>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -134,14 +241,84 @@ export const DirectorPage: React.FC = () => {
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted">{biography}</p>}
           {!loading && !biography && <p className="text-muted">Biografía no disponible.</p>}
+          <div className="director-meta">
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>
+                En colección
+              </p>
+              <p className="director-meta__counts">
+                <span className="director-meta__value">{ownedCount}</span>
+                <span className="director-meta__divider">/</span>
+                <span className="director-meta__total">{totalCount || '—'}</span>
+              </p>
+            </div>
+            <div className="director-meta__medals" aria-label="Progreso de colección">
+              <span
+                className={`director-coverage__medal director-coverage__medal--bronze ${
+                  medalUnlocks.bronze ? 'is-active' : 'is-disabled'
+                }`}
+                title="Bronce"
+                aria-hidden
+              >
+                ★
+              </span>
+              <span
+                className={`director-coverage__medal director-coverage__medal--silver ${
+                  medalUnlocks.silver ? 'is-active' : 'is-disabled'
+                }`}
+                title="Plata"
+                aria-hidden
+              >
+                ★
+              </span>
+              <span
+                className={`director-coverage__medal director-coverage__medal--gold ${
+                  medalUnlocks.gold ? 'is-active' : 'is-disabled'
+                }`}
+                title="Oro"
+                aria-hidden
+              >
+                ★
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="filmography-block">
-        <h2>Filmografía</h2>
-        <p className="text-muted">Películas dirigidas según TMDb (combinado), resaltando las que ya están en la colección.</p>
-        {error ? <p className="muted">{error}</p> : renderKnownFor()}
-      </div>
+      {error && <p className="muted">{error}</p>}
+
+      {!error && (
+        <>
+          {loading ? (
+            <div className="filmography-block">
+              <h2>Filmografía</h2>
+              <p className="muted">Cargando filmografía...</p>
+            </div>
+          ) : (
+            <>
+              {directedMovies.length > 0
+                ? renderSection('Obras dirigidas (cine)', directedMovies, 'No hay películas dirigidas registradas.')
+                : renderSection('Obras dirigidas (cine)', directedMovies, 'No se encontraron películas dirigidas para esta persona.')}
+
+              {createdSeries.length > 0
+                ? renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series creadas registradas para esta persona.'
+                  )
+                : renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series en las que conste como creador/a.'
+                  )}
+
+              {directedMovies.length === 0 && createdSeries.length === 0 && (
+                <p className="muted">No se encontraron obras con los criterios actuales.</p>
+              )}
+            </>
+          )}
+        </>
+      )}
     </section>
   );
 };

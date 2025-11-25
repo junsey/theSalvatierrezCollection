@@ -8,6 +8,12 @@ const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
+const CACHE_LIMITS: Record<string, number> = {
+  [PERSON_CACHE_KEY]: 150,
+  [PERSON_SEARCH_CACHE_KEY]: 200,
+  [CREDITS_CACHE_KEY]: 150,
+  [CONFIG_CACHE_KEY]: 5
+};
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
 type SearchCacheEntry = { id: number; name: string } | null;
@@ -24,13 +30,16 @@ type PersonDetails = {
   alsoKnownAs?: string[];
 };
 
-type DirectedMovie = {
+export type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
   posterUrl?: string;
   popularity?: number;
   mediaType?: 'movie' | 'tv';
+  job?: string;
+  releaseDate?: string | null;
+  firstAirDate?: string | null;
 };
 
 export type DirectorProfile = {
@@ -51,7 +60,126 @@ const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = load
 const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
   PERSON_SEARCH_CACHE_KEY
 );
-const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = {};
+let legacyCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> | null = null;
+
+type CreditsPersistedEntry = PersonCacheEntry<DirectedMovie[]> & { id: string };
+const CACHE_DB_NAME = 'salvatierrez-cache';
+const CACHE_DB_VERSION = 1;
+const PERSON_CREDITS_STORE = 'personCredits';
+
+function openCacheDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const request = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
+
+    request.onerror = () => resolve(null);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(PERSON_CREDITS_STORE)) {
+        db.createObjectStore(PERSON_CREDITS_STORE, { keyPath: 'id' });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+  });
+}
+
+async function readPersistedCredits(cacheKey: string): Promise<PersonCacheEntry<DirectedMovie[]> | null> {
+  const db = await openCacheDb();
+  if (!db) return null;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(PERSON_CREDITS_STORE, 'readonly');
+      const store = tx.objectStore(PERSON_CREDITS_STORE);
+      const request = store.get(cacheKey);
+
+      request.onsuccess = () => {
+        resolve((request.result as CreditsPersistedEntry | undefined) ?? null);
+      };
+      request.onerror = () => resolve(null);
+    } catch (error) {
+      console.warn('No se pudo leer la caché persistida de créditos de persona', error);
+      resolve(null);
+    }
+  });
+}
+
+async function prunePersistedCredits(limit: number) {
+  const db = await openCacheDb();
+  if (!db || !limit) return;
+
+  const readAll = () =>
+    new Promise<CreditsPersistedEntry[]>((resolve) => {
+      try {
+        const tx = db.transaction(PERSON_CREDITS_STORE, 'readonly');
+        const store = tx.objectStore(PERSON_CREDITS_STORE);
+        const request = store.getAll();
+        request.onsuccess = () => resolve((request.result as CreditsPersistedEntry[]) ?? []);
+        request.onerror = () => resolve([]);
+      } catch (error) {
+        console.warn('No se pudo listar la caché de créditos persistida', error);
+        resolve([]);
+      }
+    });
+
+  const entries = await readAll();
+  if (entries.length <= limit) return;
+
+  const sorted = entries.sort((a, b) => (b?.fetchedAt ?? 0) - (a?.fetchedAt ?? 0));
+  const toDelete = sorted.slice(limit);
+
+  await Promise.all(
+    toDelete.map(
+      (entry) =>
+        new Promise<void>((resolve) => {
+          try {
+            const tx = db.transaction(PERSON_CREDITS_STORE, 'readwrite');
+            const store = tx.objectStore(PERSON_CREDITS_STORE);
+            const request = store.delete(entry.id);
+            request.onsuccess = () => resolve();
+            request.onerror = () => resolve();
+          } catch (error) {
+            console.warn('No se pudo limpiar la caché de créditos persistida', error);
+            resolve();
+          }
+        })
+    )
+  );
+}
+
+async function writePersistedCredits(
+  cacheKey: string,
+  entry: PersonCacheEntry<DirectedMovie[]>,
+  limit: number
+): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(PERSON_CREDITS_STORE, 'readwrite');
+      const store = tx.objectStore(PERSON_CREDITS_STORE);
+      const request = store.put({ id: cacheKey, ...entry });
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+    } catch (error) {
+      console.warn('No se pudo guardar la caché de créditos en IndexedDB', error);
+      resolve();
+    }
+  });
+
+  await prunePersistedCredits(limit);
+}
+
+function loadLegacyCredits(): Record<string, PersonCacheEntry<DirectedMovie[]>> {
+  if (legacyCreditsCache) return legacyCreditsCache;
+  legacyCreditsCache = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+  return legacyCreditsCache;
+}
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -65,12 +193,49 @@ function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   }
 }
 
+function pruneCacheEntries<T>(
+  payload: Record<string, PersonCacheEntry<T>>,
+  limit: number
+): Record<string, PersonCacheEntry<T>> {
+  const entries = Object.entries(payload);
+  if (entries.length <= limit) return payload;
+
+  const sorted = entries.sort(([, a], [, b]) => (b?.fetchedAt ?? 0) - (a?.fetchedAt ?? 0));
+  const trimmedEntries = sorted.slice(0, limit);
+  const keepKeys = new Set(trimmedEntries.map(([key]) => key));
+
+  Object.keys(payload).forEach((key) => {
+    if (!keepKeys.has(key)) delete payload[key];
+  });
+
+  return Object.fromEntries(trimmedEntries);
+}
+
 function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
   if (typeof localStorage === 'undefined') return;
+  const limit = CACHE_LIMITS[key];
+  const boundedPayload = limit ? pruneCacheEntries(payload, limit) : payload;
   try {
-    localStorage.setItem(key, JSON.stringify(payload));
+    localStorage.setItem(key, JSON.stringify(boundedPayload));
   } catch (error) {
     console.warn('No se pudo guardar la caché de personas TMDb', error);
+
+    if (limit && Object.keys(boundedPayload).length > 0) {
+      const tighterLimit = Math.max(10, Math.floor(limit * 0.7));
+      const pruned = pruneCacheEntries(payload, tighterLimit);
+      try {
+        localStorage.setItem(key, JSON.stringify(pruned));
+        return;
+      } catch (retryError) {
+        console.warn('No se pudo guardar la caché de personas TMDb tras recortar', retryError);
+      }
+    }
+
+    try {
+      localStorage.removeItem(key);
+    } catch (cleanupError) {
+      console.warn('No se pudo limpiar la caché de personas TMDb tras un error de cuota', cleanupError);
+    }
   }
 }
 
@@ -259,6 +424,19 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
   const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
+  const persisted = await readPersistedCredits(cacheKey);
+  if (persisted && isFresh(persisted)) {
+    personCreditsCache[cacheKey] = persisted;
+    return persisted.data;
+  }
+
+  const legacy = loadLegacyCredits()[cacheKey];
+  if (legacy && isFresh(legacy)) {
+    personCreditsCache[cacheKey] = legacy;
+    void writePersistedCredits(cacheKey, legacy, CACHE_LIMITS[CREDITS_CACHE_KEY]);
+    return legacy.data;
+  }
+
   try {
     const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
     const data = await tmdbFetchJson<{
@@ -284,18 +462,26 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
         const job = item.job?.trim().toLowerCase();
         const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
+        const isSeriesCreator = job === 'creator' || job === 'series creator';
+        if (!isPrimaryDirector && !isSeriesCreator) return false;
+        if (item.media_type === 'movie' && !isFeatureLengthProduction(item)) return false;
+        return true;
       })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+        const releaseDate = item.release_date ?? null;
+        const firstAirDate = item.first_air_date ?? null;
+        const year = item.media_type === 'tv' ? parseYear(firstAirDate) : parseYear(releaseDate);
         const entry: DirectedMovie = {
           id: item.id,
           title,
           year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
           popularity: item.popularity,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+          job: item.job,
+          releaseDate,
+          firstAirDate
         };
 
         directedMovies.set(item.id, entry);
@@ -309,8 +495,9 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
       return (b.popularity ?? 0) - (a.popularity ?? 0);
     });
 
-    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
-    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
+    const entry: PersonCacheEntry<DirectedMovie[]> = { fetchedAt: Date.now(), data: sorted };
+    personCreditsCache[cacheKey] = entry;
+    void writePersistedCredits(cacheKey, entry, CACHE_LIMITS[CREDITS_CACHE_KEY]);
     return sorted;
   } catch (error) {
     console.warn('No se pudo obtener la filmografía del director', error);
@@ -483,4 +670,4 @@ export function clearPeopleCaches() {
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
 }
 
-export type { PersonDetails, DirectedMovie };
+export type { PersonDetails };
