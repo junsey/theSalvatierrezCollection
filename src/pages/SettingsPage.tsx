@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
-import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
+import { buildDirectorProfiles, clearPeopleCaches, regeneratePeopleCaches } from '../services/tmdbPeopleService';
 import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
 
 export const SettingsPage: React.FC = () => {
@@ -12,6 +12,8 @@ export const SettingsPage: React.FC = () => {
   const [showProblematic, setShowProblematic] = useState(false);
   const [directorProgress, setDirectorProgress] = useState<{ current: number; total: number } | null>(null);
   const [regeneratingDirectors, setRegeneratingDirectors] = useState(false);
+  const [peopleProgress, setPeopleProgress] = useState<{ current: number; total: number } | null>(null);
+  const [regeneratingPeople, setRegeneratingPeople] = useState(false);
 
   const directorNames = useMemo(
     () => Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort(),
@@ -74,6 +76,25 @@ export const SettingsPage: React.FC = () => {
     } finally {
       setRegeneratingDirectors(false);
       setDirectorProgress(null);
+    }
+  };
+
+  const handleRefreshPeopleCache = async () => {
+    setStatus(null);
+    setPeopleProgress({ current: 0, total: directorNames.length });
+    setRegeneratingPeople(true);
+    try {
+      await regeneratePeopleCaches(directorNames, {
+        overrides: directorOverrides,
+        onProgress: (current, total) => setPeopleProgress({ current, total })
+      });
+      setStatus('✅ Caché de personas TMDb regenerada correctamente.');
+    } catch (err) {
+      console.error(err);
+      setStatus('❌ No se pudo regenerar la caché de personas.');
+    } finally {
+      setRegeneratingPeople(false);
+      setPeopleProgress(null);
     }
   };
 
@@ -170,6 +191,23 @@ export const SettingsPage: React.FC = () => {
               {regeneratingDirectors ? 'Regenerando…' : 'Regenerar directores'}
             </button>
           </div>
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar caché de personas TMDb</h3>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Borra la caché de sessionStorage/localStorage e IndexDB para los créditos de personas y la vuelve a generar con los
+              directores del Excel.
+            </p>
+            <button
+              className="btn"
+              onClick={handleRefreshPeopleCache}
+              disabled={
+                loading || regeneratingPeople || regeneratingDirectors || directorNames.length === 0 || peopleProgress !== null
+              }
+            >
+              {regeneratingPeople ? 'Regenerando…' : 'Regenerar caché TMDb de personas'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -206,6 +244,23 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div style={{ marginTop: 8, fontSize: '0.9em', color: 'var(--text-muted)' }}>
             {directorProgress.current} de {directorProgress.total} directores
+          </div>
+        </div>
+      )}
+
+      {peopleProgress && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8 }}>
+            <strong>Caché de personas TMDb</strong>
+          </div>
+          <div className="progress-bar">
+            <div
+              className="progress-bar-fill"
+              style={{ width: `${(peopleProgress.current / Math.max(peopleProgress.total, 1)) * 100}%` }}
+            />
+          </div>
+          <div style={{ marginTop: 8, fontSize: '0.9em', color: 'var(--text-muted)' }}>
+            {peopleProgress.current} de {peopleProgress.total} personas
           </div>
         </div>
       )}

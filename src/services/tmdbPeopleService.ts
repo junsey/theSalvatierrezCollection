@@ -70,6 +70,26 @@ const CACHE_DB_NAME = 'salvatierrez-cache';
 const CACHE_DB_VERSION = 1;
 const PERSON_CREDITS_STORE = 'personCredits';
 
+function getSessionStorage(): Storage | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    return sessionStorage;
+  } catch (error) {
+    console.warn('No se pudo acceder a sessionStorage', error);
+    return null;
+  }
+}
+
+function getLocalStorage(): Storage | null {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    return localStorage;
+  } catch (error) {
+    console.warn('No se pudo acceder a localStorage', error);
+    return null;
+  }
+}
+
 function openCacheDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null);
 
@@ -177,22 +197,56 @@ async function writePersistedCredits(
   await prunePersistedCredits(limit);
 }
 
+async function clearPersistedCredits(): Promise<void> {
+  const db = await openCacheDb();
+  if (!db) return;
+
+  await new Promise<void>((resolve) => {
+    try {
+      const tx = db.transaction(PERSON_CREDITS_STORE, 'readwrite');
+      const store = tx.objectStore(PERSON_CREDITS_STORE);
+      store.clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch (error) {
+      console.warn('No se pudo vaciar la caché persistida de créditos', error);
+      resolve();
+    }
+  });
+}
+
 function loadLegacyCredits(): Record<string, PersonCacheEntry<DirectedMovie[]>> {
   if (legacyCreditsCache) return legacyCreditsCache;
   legacyCreditsCache = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
   return legacyCreditsCache;
 }
 
-function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
-  if (typeof localStorage === 'undefined') return {};
+function readCacheFromStorage<T>(key: string, storage: Storage | null): Record<string, PersonCacheEntry<T>> | null {
+  if (!storage) return null;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return {};
+    const raw = storage.getItem(key);
+    if (!raw) return null;
     return JSON.parse(raw) as Record<string, PersonCacheEntry<T>>;
   } catch (error) {
     console.warn('No se pudo leer la caché de personas TMDb', error);
-    return {};
+    return null;
   }
+}
+
+function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
+  const sessionPayload = readCacheFromStorage<T>(key, getSessionStorage());
+  if (sessionPayload) return sessionPayload;
+
+  const localPayload = readCacheFromStorage<T>(key, getLocalStorage());
+  if (localPayload && getSessionStorage()) {
+    try {
+      getSessionStorage()?.setItem(key, JSON.stringify(localPayload));
+    } catch (error) {
+      console.warn('No se pudo hidratar la caché de sesión de personas', error);
+    }
+  }
+
+  return localPayload ?? {};
 }
 
 function pruneCacheEntries<T>(
@@ -213,12 +267,16 @@ function pruneCacheEntries<T>(
   return Object.fromEntries(trimmedEntries);
 }
 
-function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
-  if (typeof localStorage === 'undefined') return;
-  const limit = CACHE_LIMITS[key];
+function persistCacheToStorage<T>(
+  key: string,
+  payload: Record<string, PersonCacheEntry<T>>,
+  limit: number | undefined,
+  storage: Storage | null
+) {
+  if (!storage) return;
   const boundedPayload = limit ? pruneCacheEntries(payload, limit) : payload;
   try {
-    localStorage.setItem(key, JSON.stringify(boundedPayload));
+    storage.setItem(key, JSON.stringify(boundedPayload));
   } catch (error) {
     console.warn('No se pudo guardar la caché de personas TMDb', error);
 
@@ -226,7 +284,7 @@ function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>)
       const tighterLimit = Math.max(10, Math.floor(limit * 0.7));
       const pruned = pruneCacheEntries(payload, tighterLimit);
       try {
-        localStorage.setItem(key, JSON.stringify(pruned));
+        storage.setItem(key, JSON.stringify(pruned));
         return;
       } catch (retryError) {
         console.warn('No se pudo guardar la caché de personas TMDb tras recortar', retryError);
@@ -234,11 +292,17 @@ function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>)
     }
 
     try {
-      localStorage.removeItem(key);
+      storage.removeItem(key);
     } catch (cleanupError) {
       console.warn('No se pudo limpiar la caché de personas TMDb tras un error de cuota', cleanupError);
     }
   }
+}
+
+function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
+  const limit = CACHE_LIMITS[key];
+  persistCacheToStorage(key, payload, limit, getSessionStorage());
+  persistCacheToStorage(key, payload, limit, getLocalStorage());
 }
 
 function buildTmdbUrl(path: string, params?: Record<string, string | undefined | null>): string {
@@ -282,18 +346,33 @@ const buildOverrideMap = (
 };
 
 async function getProfileBase(): Promise<{ baseUrl: string; size: string }> {
-  if (typeof localStorage !== 'undefined') {
+  const readConfig = (storage: Storage | null) => {
+    if (!storage) return null;
     try {
-      const raw = localStorage.getItem(CONFIG_CACHE_KEY);
-      if (raw) {
-        const cached = JSON.parse(raw) as ConfigCache;
-        if (Date.now() - cached.fetchedAt < SIX_MONTHS_MS) {
-          return { baseUrl: cached.baseUrl, size: cached.size };
-        }
+      const raw = storage.getItem(CONFIG_CACHE_KEY);
+      if (!raw) return null;
+      const cached = JSON.parse(raw) as ConfigCache;
+      if (Date.now() - cached.fetchedAt < SIX_MONTHS_MS) {
+        return cached;
       }
+      return null;
     } catch (error) {
       console.warn('No se pudo leer la configuración de imágenes TMDb', error);
+      return null;
     }
+  };
+
+  const sessionConfig = readConfig(getSessionStorage());
+  if (sessionConfig) return { baseUrl: sessionConfig.baseUrl, size: sessionConfig.size };
+
+  const localConfig = readConfig(getLocalStorage());
+  if (localConfig) {
+    try {
+      getSessionStorage()?.setItem(CONFIG_CACHE_KEY, JSON.stringify(localConfig));
+    } catch (error) {
+      console.warn('No se pudo hidratar la configuración de imágenes en sesión', error);
+    }
+    return { baseUrl: localConfig.baseUrl, size: localConfig.size };
   }
 
   const url = `${API_BASE}/configuration?api_key=${TMDB_API_KEY}`;
@@ -301,10 +380,15 @@ async function getProfileBase(): Promise<{ baseUrl: string; size: string }> {
     const data = await tmdbFetchJson<{ images?: { secure_base_url?: string; profile_sizes?: string[] } }>(url);
     const baseUrl = data.images?.secure_base_url ?? 'https://image.tmdb.org/t/p/';
     const size = data.images?.profile_sizes?.[2] ?? 'w300';
-    if (typeof localStorage !== 'undefined') {
-      const payload: ConfigCache = { fetchedAt: Date.now(), baseUrl, size };
-      localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
-    }
+    const payload: ConfigCache = { fetchedAt: Date.now(), baseUrl, size };
+    [getSessionStorage(), getLocalStorage()].forEach((storage) => {
+      if (!storage) return;
+      try {
+        storage.setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('No se pudo guardar la configuración de imágenes TMDb', error);
+      }
+    });
     return { baseUrl, size };
   } catch (error) {
     console.warn('Fallo al obtener configuración TMDb, se usa fallback', error);
@@ -364,11 +448,11 @@ export async function searchPersonByName(name: string): Promise<{ id: number; na
   }
 }
 
-export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
+export async function getPersonDetails(personId: number, options?: { force?: boolean }): Promise<PersonDetails | null> {
   if (!TMDB_API_KEY && !TMDB_BEARER) return null;
   const cacheKey = String(personId);
   const cached = personDetailsCache[cacheKey];
-  if (isFresh(cached)) return cached.data;
+  if (!options?.force && isFresh(cached)) return cached.data;
 
   const requestDetails = async (language: string) => {
     const url = buildTmdbUrl(`/person/${personId}`, { language });
@@ -429,11 +513,11 @@ const isFeatureLengthProduction = (item: {
   return !isMarkedVideo && !looksLikeShort;
 };
 
-export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
+export async function getPersonDirectedMovies(personId: number, options?: { force?: boolean }): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY && !TMDB_BEARER) return [];
   const cacheKey = String(personId);
   const cached = personCreditsCache[cacheKey];
-  if (isFresh(cached)) return cached.data;
+  if (!options?.force && isFresh(cached)) return cached.data;
 
   const persisted = await readPersistedCredits(cacheKey);
   if (persisted && isFresh(persisted)) {
@@ -671,14 +755,42 @@ export async function buildDirectorProfiles(
   }));
 }
 
+export async function regeneratePeopleCaches(
+  names: string[],
+  options?: {
+    overrides?: Map<string, number | null> | Record<string, number | null | undefined>;
+    onProgress?: (current: number, total: number) => void;
+  }
+): Promise<void> {
+  clearPeopleCaches();
+  const profiles = await buildDirectorProfiles(names, {
+    forceRefresh: true,
+    overrides: options?.overrides
+  });
+
+  const tmdbIds = profiles
+    .map((profile) => profile.tmdbId)
+    .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+
+  const total = tmdbIds.length;
+  let current = 0;
+  for (const tmdbId of tmdbIds) {
+    await Promise.all([getPersonDetails(tmdbId, { force: true }), getPersonDirectedMovies(tmdbId, { force: true })]);
+    current += 1;
+    options?.onProgress?.(current, total);
+  }
+}
+
 export function clearPeopleCaches() {
   clearDirectorCache();
-  if (typeof localStorage !== 'undefined') {
-    localStorage.removeItem(PERSON_CACHE_KEY);
-    localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
-    localStorage.removeItem(CREDITS_CACHE_KEY);
-    localStorage.removeItem(CONFIG_CACHE_KEY);
-  }
+  [getSessionStorage(), getLocalStorage()].forEach((storage) => {
+    if (!storage) return;
+    storage.removeItem(PERSON_CACHE_KEY);
+    storage.removeItem(PERSON_SEARCH_CACHE_KEY);
+    storage.removeItem(CREDITS_CACHE_KEY);
+    storage.removeItem(CONFIG_CACHE_KEY);
+  });
+  void clearPersistedCredits();
   Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
   Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
