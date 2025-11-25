@@ -147,6 +147,9 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
   const directorIdField =
     record['Director TMDb Id'] ?? record['DirectorTMDbId'] ?? record['DirectorTMDbID'] ?? '';
   const directorTmdbIds = parseNumberList(directorIdField);
+  const tmdbIdFromSheet = safeNumber(
+    record['TMDbId'] ?? record['TMDb ID'] ?? record['tmdbId'] ?? record['tmdbid'] ?? ''
+  );
   const funcionaStatus = parseFunciona(record['Funciona'] ?? '');
   const enDeposito = parseEnDeposito(record['En depósito'] ?? record['En Deposito'] ?? '');
   return {
@@ -170,7 +173,8 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     dubbing: record['Doblaje'] ?? '',
     format: record['Formato'] ?? '',
     enDeposito,
-    funcionaStatus
+    funcionaStatus,
+    tmdbIdFromSheet: tmdbIdFromSheet ?? null
   };
 }
 
