@@ -1,4 +1,4 @@
-import { tmdbFetchJson, TMDB_API_KEY } from './tmdbApi';
+import { TMDB_BEARER, tmdbFetchJson, TMDB_API_KEY } from './tmdbApi';
 import { CachedDirector, clearDirectorCache, loadDirectorCache, saveDirectorCache } from './localStorage';
 
 const API_BASE = 'https://api.themoviedb.org/3';
@@ -60,7 +60,9 @@ const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = load
 const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
   PERSON_SEARCH_CACHE_KEY
 );
-const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = {};
+const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(
+  CREDITS_CACHE_KEY
+);
 let legacyCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> | null = null;
 
 type CreditsPersistedEntry = PersonCacheEntry<DirectedMovie[]> & { id: string };
@@ -239,6 +241,18 @@ function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>)
   }
 }
 
+function buildTmdbUrl(path: string, params?: Record<string, string | undefined | null>): string {
+  const url = new URL(`${API_BASE}${path}`);
+  if (TMDB_API_KEY) {
+    url.searchParams.set('api_key', TMDB_API_KEY);
+  }
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value == null || value === '') return;
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
 function isFresh(entry?: PersonCacheEntry<any>): boolean {
   if (!entry) return false;
   return Date.now() - entry.fetchedAt < SIX_MONTHS_MS;
@@ -311,9 +325,9 @@ function parseYear(date?: string | null): number | null {
 }
 
 export async function getDirectorFromMovie(movieId: number): Promise<{ id: number; name: string }[]> {
-  if (!TMDB_API_KEY) return [];
+  if (!TMDB_API_KEY && !TMDB_BEARER) return [];
   try {
-    const url = `${API_BASE}/movie/${movieId}/credits?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const url = buildTmdbUrl(`/movie/${movieId}/credits`, { language: 'es-ES' });
     const data = await tmdbFetchJson<{ crew?: { id: number; name: string; job: string }[] }>(url);
     const directors = (data.crew ?? []).filter((member) => member.job === 'Director');
     const seen = new Set<number>();
@@ -331,17 +345,14 @@ export async function getDirectorFromMovie(movieId: number): Promise<{ id: numbe
 }
 
 export async function searchPersonByName(name: string): Promise<{ id: number; name: string } | null> {
-  if (!TMDB_API_KEY) return null;
+  if (!TMDB_API_KEY && !TMDB_BEARER) return null;
   const normalized = normalizeName(name);
   const cached = personSearchCache[normalized];
   if (isFresh(cached)) return cached.data;
 
   try {
-    const url = new URL(`${API_BASE}/search/person`);
-    url.searchParams.set('api_key', TMDB_API_KEY);
-    url.searchParams.set('query', name.trim());
-    url.searchParams.set('language', 'es-ES');
-    const data = await tmdbFetchJson<{ results?: { id: number; name: string }[] }>(url.toString());
+    const url = buildTmdbUrl('/search/person', { query: name.trim(), language: 'es-ES' });
+    const data = await tmdbFetchJson<{ results?: { id: number; name: string }[] }>(url);
     const match = data.results?.[0];
     const payload = match ? { id: match.id, name: match.name } : null;
     personSearchCache[normalized] = { fetchedAt: Date.now(), data: payload };
@@ -354,13 +365,13 @@ export async function searchPersonByName(name: string): Promise<{ id: number; na
 }
 
 export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
-  if (!TMDB_API_KEY) return null;
+  if (!TMDB_API_KEY && !TMDB_BEARER) return null;
   const cacheKey = String(personId);
   const cached = personDetailsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
   const requestDetails = async (language: string) => {
-    const url = `${API_BASE}/person/${personId}?api_key=${TMDB_API_KEY}&language=${language}`;
+    const url = buildTmdbUrl(`/person/${personId}`, { language });
     return tmdbFetchJson<{
       id: number;
       name: string;
@@ -419,7 +430,7 @@ const isFeatureLengthProduction = (item: {
 };
 
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
-  if (!TMDB_API_KEY) return [];
+  if (!TMDB_API_KEY && !TMDB_BEARER) return [];
   const cacheKey = String(personId);
   const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
@@ -427,18 +438,20 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
   const persisted = await readPersistedCredits(cacheKey);
   if (persisted && isFresh(persisted)) {
     personCreditsCache[cacheKey] = persisted;
+    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     return persisted.data;
   }
 
   const legacy = loadLegacyCredits()[cacheKey];
   if (legacy && isFresh(legacy)) {
     personCreditsCache[cacheKey] = legacy;
+    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     void writePersistedCredits(cacheKey, legacy, CACHE_LIMITS[CREDITS_CACHE_KEY]);
     return legacy.data;
   }
 
   try {
-    const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const url = buildTmdbUrl(`/person/${personId}/combined_credits`, { language: 'es-ES' });
     const data = await tmdbFetchJson<{
       crew?: {
         id: number;
@@ -498,6 +511,7 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
     const entry: PersonCacheEntry<DirectedMovie[]> = { fetchedAt: Date.now(), data: sorted };
     personCreditsCache[cacheKey] = entry;
     void writePersistedCredits(cacheKey, entry, CACHE_LIMITS[CREDITS_CACHE_KEY]);
+    saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     return sorted;
   } catch (error) {
     console.warn('No se pudo obtener la filmografía del director', error);
