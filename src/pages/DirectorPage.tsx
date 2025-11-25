@@ -24,6 +24,7 @@ export const DirectorPage: React.FC = () => {
   const [biography, setBiography] = useState<string | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
   const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
+  const [createdWorks, setCreatedWorks] = useState<DirectedMovie[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -33,6 +34,7 @@ export const DirectorPage: React.FC = () => {
       setBiography(null);
       setProfileUrl(undefined);
       setKnownFor([]);
+      setCreatedWorks([]);
 
       if (!directorName) {
         setError('No se especificó director.');
@@ -55,6 +57,7 @@ export const DirectorPage: React.FC = () => {
         setBiography(result.person?.biography ?? null);
         setProfileUrl(result.person?.profileUrl ?? undefined);
         setKnownFor(result.credits);
+        setCreatedWorks(result.created);
       } catch (err) {
         console.warn('Error al cargar el director', err);
         if (active) setError('No se pudieron obtener los datos del director.');
@@ -79,34 +82,46 @@ export const DirectorPage: React.FC = () => {
       });
   }, [knownFor]);
 
-  const renderKnownFor = () => {
+  const curatedCreatedWorks = useMemo(() => {
+    const seen = new Set<number>();
+    return createdWorks.filter((project) => {
+      if (seen.has(project.id)) return false;
+      seen.add(project.id);
+      return true;
+    });
+  }, [createdWorks]);
+
+  const renderProjects = (projects: DirectedMovie[], options: { emptyLabel: string; loadingLabel: string }) => {
     if (loading) {
-      return <p className="muted">Cargando filmografía destacada...</p>;
+      return <p className="muted">{options.loadingLabel}</p>;
     }
-    if (curatedKnownFor.length === 0) {
-      return <p className="muted">No hay películas para mostrar.</p>;
+    if (projects.length === 0) {
+      return <p className="muted">{options.emptyLabel}</p>;
     }
     return (
       <div className="known-for-grid">
-        {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
+        {projects.map((project) => {
+          const owned = isMovieInCollection(project.id, movies);
           return (
             <div
-              key={movie.id}
+              key={project.id}
               className={`known-for-card ${owned ? 'owned' : 'missing'}`}
               aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
             >
               <div className="known-for-card__poster">
-                {movie.posterUrl ? (
-                  <img src={movie.posterUrl} alt={movie.title} className={!owned ? 'is-muted' : undefined} />
+                {project.posterUrl ? (
+                  <img src={project.posterUrl} alt={project.title} className={!owned ? 'is-muted' : undefined} />
                 ) : (
                   <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
                 )}
               </div>
               <div className="known-for-card__meta">
-                <p className={!owned ? 'muted' : undefined}>{movie.title}</p>
-                {movie.year && <small>{movie.year}</small>}
-                <span className="pill">{owned ? 'En la colección' : 'Pendiente'}</span>
+                <p className={!owned ? 'muted' : undefined}>{project.title}</p>
+                {project.year && <small>{project.year}</small>}
+                <div className="known-for-card__tags">
+                  <span className="pill pill--type">{project.mediaType === 'tv' ? 'TV' : 'Movie'}</span>
+                  <span className="pill">{owned ? 'En la colección' : 'Pendiente'}</span>
+                </div>
               </div>
             </div>
           );
@@ -139,8 +154,28 @@ export const DirectorPage: React.FC = () => {
 
       <div className="filmography-block">
         <h2>Filmografía</h2>
-        <p className="text-muted">Películas dirigidas según TMDb (combinado), resaltando las que ya están en la colección.</p>
-        {error ? <p className="muted">{error}</p> : renderKnownFor()}
+        <p className="text-muted">Películas y series dirigidas según TMDb (combinado), resaltando las que ya están en la colección.</p>
+        {error ? (
+          <p className="muted">{error}</p>
+        ) : (
+          renderProjects(curatedKnownFor, {
+            loadingLabel: 'Cargando filmografía destacada...',
+            emptyLabel: 'No hay producciones para mostrar.'
+          })
+        )}
+      </div>
+
+      <div className="filmography-block">
+        <h3>Como creador</h3>
+        <p className="text-muted">Series y películas en las que figura como creador, ordenadas por año.</p>
+        {error ? (
+          <p className="muted">{error}</p>
+        ) : (
+          renderProjects(curatedCreatedWorks, {
+            loadingLabel: 'Buscando proyectos creados...',
+            emptyLabel: 'No hay créditos como creador para mostrar.'
+          })
+        )}
       </div>
     </section>
   );

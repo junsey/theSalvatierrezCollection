@@ -33,6 +33,11 @@ type DirectedMovie = {
   mediaType?: 'movie' | 'tv';
 };
 
+type PersonCredits = {
+  directed: DirectedMovie[];
+  created: DirectedMovie[];
+};
+
 export type DirectorProfile = {
   name: string;
   displayName: string;
@@ -51,7 +56,7 @@ const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = load
 const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
   PERSON_SEARCH_CACHE_KEY
 );
-const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personCreditsCache: Record<string, PersonCacheEntry<PersonCredits>> = loadCache<PersonCredits>(CREDITS_CACHE_KEY);
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -253,81 +258,111 @@ const isFeatureLengthProduction = (item: {
   return !isMarkedVideo && !looksLikeShort;
 };
 
-export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
-  if (!TMDB_API_KEY) return [];
+async function getPersonCredits(personId: number): Promise<PersonCredits> {
+  if (!TMDB_API_KEY) return { directed: [], created: [] };
   const cacheKey = String(personId);
   const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
   try {
+    type CrewCredit = {
+      id: number;
+      media_type?: string;
+      title?: string;
+      name?: string;
+      job?: string;
+      release_date?: string | null;
+      first_air_date?: string | null;
+      poster_path?: string | null;
+      popularity?: number;
+      video?: boolean | null;
+      genre_ids?: number[];
+    };
+
     const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{
-      crew?: {
-        id: number;
-        media_type?: string;
-        title?: string;
-        name?: string;
-        job?: string;
-        release_date?: string | null;
-        first_air_date?: string | null;
-        poster_path?: string | null;
-        popularity?: number;
-        video?: boolean | null;
-        genre_ids?: number[];
-      }[];
-    }>(url);
+    const data = await tmdbFetchJson<{ crew?: CrewCredit[] }>(url);
 
     const directedMovies = new Map<number, DirectedMovie>();
+    const createdProjects = new Map<number, DirectedMovie>();
 
-    (data.crew ?? [])
-      .filter((item) => {
-        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
-        const job = item.job?.trim().toLowerCase();
-        const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
-      })
-      .forEach((item) => {
-        const title = item.title ?? item.name ?? 'Producción sin título';
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
-        const entry: DirectedMovie = {
-          id: item.id,
-          title,
-          year,
-          posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
-          popularity: item.popularity,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
-        };
+    const addEntry = (item: CrewCredit, bucket: Map<number, DirectedMovie>) => {
+      const title = item.title ?? item.name ?? 'Producción sin título';
+      const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+      const entry: DirectedMovie = {
+        id: item.id,
+        title,
+        year,
+        posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
+        popularity: item.popularity,
+        mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+      };
 
-        directedMovies.set(item.id, entry);
-      });
+      bucket.set(item.id, entry);
+    };
 
-    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
+    (data.crew ?? []).forEach((item) => {
+      if (item.media_type !== 'movie' && item.media_type !== 'tv') return;
+      const job = item.job?.trim().toLowerCase();
+      const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
+      const isCreator = job?.includes('creator') || job?.includes('creador') || job?.includes('creado por') || job === 'developed by';
+      const qualifies = (isPrimaryDirector || isCreator) && isFeatureLengthProduction(item);
+      if (!qualifies) return;
+      if (isPrimaryDirector) addEntry(item, directedMovies);
+      if (isCreator) addEntry(item, createdProjects);
+    });
+
+    const sorter = (a: DirectedMovie, b: DirectedMovie) => {
       const yearA = a.year ?? Number.POSITIVE_INFINITY;
       const yearB = b.year ?? Number.POSITIVE_INFINITY;
       const byYear = yearA - yearB;
       if (byYear !== 0) return byYear;
       return (b.popularity ?? 0) - (a.popularity ?? 0);
-    });
+    };
 
-    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
+    const credits: PersonCredits = {
+      directed: Array.from(directedMovies.values()).sort(sorter),
+      created: Array.from(createdProjects.values()).sort(sorter)
+    };
+
+    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: credits };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
-    return sorted;
+    return credits;
   } catch (error) {
     console.warn('No se pudo obtener la filmografía del director', error);
-    return [];
+    return { directed: [], created: [] };
   }
+}
+
+export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
+  const credits = await getPersonCredits(personId);
+  return credits.directed;
+}
+
+export async function getPersonCreatedProjects(personId: number): Promise<DirectedMovie[]> {
+  const credits = await getPersonCredits(personId);
+  return credits.created;
 }
 
 export async function fetchDirectorFromTMDb(
   director: DirectorLookup
-): Promise<{ person: PersonDetails | null; credits: DirectedMovie[]; resolvedName: string; tmdbId: number | null } | null> {
+): Promise<
+  | {
+      person: PersonDetails | null;
+      credits: DirectedMovie[];
+      created: DirectedMovie[];
+      resolvedName: string;
+      tmdbId: number | null;
+    }
+  | null
+> {
   if (!TMDB_API_KEY) return null;
 
   const loadById = async (id: number) => {
-    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonDirectedMovies(id)]);
+    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonCredits(id)]);
     return {
       person,
-      credits,
+      credits: credits.directed,
+      created: credits.created,
       resolvedName: person?.name ?? director.name,
       tmdbId: id
     };
@@ -341,10 +376,11 @@ export async function fetchDirectorFromTMDb(
     const match = await searchPersonByName(director.name);
     if (!match) return null;
 
-    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonDirectedMovies(match.id)]);
+    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonCredits(match.id)]);
     return {
       person,
-      credits,
+      credits: credits.directed,
+      created: credits.created,
       resolvedName: person?.name ?? match.name ?? director.name,
       tmdbId: match.id
     };
@@ -483,4 +519,4 @@ export function clearPeopleCaches() {
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
 }
 
-export type { PersonDetails, DirectedMovie };
+export type { PersonDetails, DirectedMovie, PersonCredits };
