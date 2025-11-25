@@ -2060,6 +2060,8 @@ small {
   color: var(--text-muted);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .known-for-card__meta .pill {

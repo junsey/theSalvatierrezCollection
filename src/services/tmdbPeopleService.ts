@@ -5,9 +5,9 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
-const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
+const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v2';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
-const TV_RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-tv-runtime-cache-v1';
+const TV_RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-tv-runtime-cache-v2';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
