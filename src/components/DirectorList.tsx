@@ -211,12 +211,9 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
     const filtered = profiles.filter((director) => {
-      const matchesLetter = letterFilter
-        ? (director.displayName || director.name).trim().toUpperCase().startsWith(letterFilter)
-        : true;
-      const matchesSearch = normalizedSearch
-        ? (director.displayName || director.name).toLowerCase().includes(normalizedSearch)
-        : true;
+      const name = (director.displayName || director.name).trim();
+      const matchesLetter = letterFilter ? name.toUpperCase().startsWith(letterFilter) : true;
+      const matchesSearch = normalizedSearch ? name.toLowerCase().includes(normalizedSearch) : true;
       return matchesLetter && matchesSearch;
     });
 
@@ -237,7 +234,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return sorted.map((entry) => entry.profile);
-  }, [letterFilter, profiles, coverage, orderBy, collator]);
+  }, [letterFilter, searchTerm, profiles, coverage, orderBy, collator]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
