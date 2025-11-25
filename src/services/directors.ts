@@ -11,7 +11,7 @@ export const normalizeDirectorName = (value: string) => value.trim().toLowerCase
 export const buildOwnedTmdbIdSet = (movies: MovieRecord[]): Set<number> =>
   new Set(
     movies
-      .map((movie) => Number(movie.tmdbIdFromSheet ?? movie.tmdbId))
+      .map((movie) => Number(movie.tmdbIdFromSheet))
       .filter((id) => Number.isFinite(id))
       .map((id) => Number(id))
   );

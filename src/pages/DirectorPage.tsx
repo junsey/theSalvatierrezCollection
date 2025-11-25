@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { buildOwnedTmdbIdSet } from '../services/directors';
@@ -22,6 +22,10 @@ type CombinedCrewCredit = {
   vote_count?: number | null;
   popularity?: number | null;
   video?: boolean | null;
+};
+
+type MovieDetailsResponse = {
+  runtime?: number | null;
 };
 
 type CombinedCreditsResponse = {
@@ -73,9 +77,9 @@ const mapCredit = (credit: CombinedCrewCredit): FilmographyEntry => {
   };
 };
 
-function splitOwned(list: FilmographyEntry[], ownedIds: Set<number>) {
-  const owned: FilmographyEntry[] = [];
-  const unowned: FilmographyEntry[] = [];
+function splitOwnedCredits(list: CombinedCrewCredit[], ownedIds: Set<number>) {
+  const owned: CombinedCrewCredit[] = [];
+  const unowned: CombinedCrewCredit[] = [];
   for (const entry of list) {
     if (ownedIds.has(entry.id)) owned.push(entry);
     else unowned.push(entry);
@@ -83,32 +87,10 @@ function splitOwned(list: FilmographyEntry[], ownedIds: Set<number>) {
   return { owned, unowned };
 }
 
-const curateCredits = (
-  credits: CombinedCrewCredit[] | undefined,
-  job: 'Director' | 'Creator',
-  ownedIds: Set<number>
-): FilmographyEntry[] => {
-  const filtered = (credits ?? []).filter(
-    (credit) =>
-      (credit.media_type === 'movie' || credit.media_type === 'tv') &&
-      credit.job === job &&
-      credit.video !== true
-  );
-
-  const mapped = filtered.map(mapCredit);
-  const seen = new Set<number>();
-  const deduped = mapped.filter((entry) => {
-    if (seen.has(entry.id)) return false;
-    seen.add(entry.id);
-    return true;
-  });
-
-  const split = splitOwned(deduped, ownedIds);
-  const filteredUnowned = split.unowned.filter((entry) => (entry.voteCount ?? 0) >= 30);
-
-  const merged = [...split.owned, ...filteredUnowned];
-  merged.sort((a, b) => a.sortDate - b.sortDate);
-  return merged;
+const byDate = (a: CombinedCrewCredit, b: CombinedCrewCredit) => {
+  const da = new Date(a.release_date ?? a.first_air_date ?? '1900-01-01').getTime();
+  const db = new Date(b.release_date ?? b.first_air_date ?? '1900-01-01').getTime();
+  return da - db;
 };
 
 export const DirectorPage: React.FC = () => {
@@ -116,6 +98,31 @@ export const DirectorPage: React.FC = () => {
   const decodedParam = decodeURIComponent(id ?? '').trim();
   const { movies } = useMovies();
   const ownedTmdbIds = useMemo(() => buildOwnedTmdbIdSet(movies), [movies]);
+
+  const runtimeCache = useRef<Map<number, boolean>>(new Map());
+
+  const isShortMovie = useCallback(
+    async (item: CombinedCrewCredit): Promise<boolean> => {
+      if (item.media_type !== 'movie') return false;
+      if (runtimeCache.current.has(item.id)) {
+        return runtimeCache.current.get(item.id) ?? false;
+      }
+
+      try {
+        const details = await tmdbFetchJson<MovieDetailsResponse>(
+          `${API_BASE}/movie/${item.id}?language=es-ES`
+        );
+        const runtime = details.runtime ?? 0;
+        const isShort = runtime > 0 && runtime < 60;
+        runtimeCache.current.set(item.id, isShort);
+        return isShort;
+      } catch {
+        runtimeCache.current.set(item.id, false);
+        return false;
+      }
+    },
+    []
+  );
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -159,8 +166,61 @@ export const DirectorPage: React.FC = () => {
         setPersonName(person.name ?? decodedParam);
         setBiography(person.biography?.trim() ? person.biography : null);
         setProfileUrl(person.profile_path ? `${PROFILE_BASE_URL}${person.profile_path}` : undefined);
-        const directed = curateCredits(credits?.crew, 'Director', ownedTmdbIds);
-        const created = curateCredits(credits?.crew, 'Creator', ownedTmdbIds);
+
+        const crewCredits = credits?.crew ?? [];
+
+        const rawDirectorCredits = crewCredits.filter(
+          (c) =>
+            c.job === 'Director' &&
+            (c.media_type === 'movie' || c.media_type === 'tv') &&
+            c.video !== true
+        );
+        const rawCreatorCredits = crewCredits.filter(
+          (c) =>
+            c.job === 'Creator' &&
+            (c.media_type === 'movie' || c.media_type === 'tv') &&
+            c.video !== true
+        );
+
+        const dirSplit = splitOwnedCredits(rawDirectorCredits, ownedTmdbIds);
+        const creSplit = splitOwnedCredits(rawCreatorCredits, ownedTmdbIds);
+
+        const filteredDirectorUnowned: CombinedCrewCredit[] = [];
+        for (const item of dirSplit.unowned) {
+          if (await isShortMovie(item)) continue;
+          if ((item.vote_count ?? 0) < 30) continue;
+          filteredDirectorUnowned.push(item);
+        }
+
+        const filteredCreatorUnowned: CombinedCrewCredit[] = [];
+        for (const item of creSplit.unowned) {
+          if (await isShortMovie(item)) continue;
+          if ((item.vote_count ?? 0) < 30) continue;
+          filteredCreatorUnowned.push(item);
+        }
+
+        const directorList = [...dirSplit.owned, ...filteredDirectorUnowned].sort(byDate);
+        const creatorList = [...creSplit.owned, ...filteredCreatorUnowned].sort(byDate);
+
+        const seenDirector = new Set<number>();
+        const seenCreator = new Set<number>();
+
+        const directed = directorList
+          .filter((entry) => {
+            if (seenDirector.has(entry.id)) return false;
+            seenDirector.add(entry.id);
+            return true;
+          })
+          .map(mapCredit);
+
+        const created = creatorList
+          .filter((entry) => {
+            if (seenCreator.has(entry.id)) return false;
+            seenCreator.add(entry.id);
+            return true;
+          })
+          .map(mapCredit);
+
         setBuckets({ directed, created });
       } catch (err) {
         console.warn('Error al cargar el director', err);
@@ -174,7 +234,7 @@ export const DirectorPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [decodedParam, ownedTmdbIds]);
+  }, [decodedParam, isShortMovie, ownedTmdbIds]);
 
   const renderList = (entries: FilmographyEntry[]) => {
     if (loading) return <p className="muted">Cargando filmografía...</p>;
