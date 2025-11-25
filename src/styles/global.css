@@ -2074,6 +2074,16 @@ small {
   padding: 10px;
 }
 
+.known-for-card--placeholder {
+  border-style: dashed;
+  opacity: 0.3;
+}
+
+.known-for-card--placeholder .known-for-card__poster,
+.known-for-card--placeholder .known-for-card__meta {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .known-for-card__poster {
   width: 100%;
   aspect-ratio: 2 / 3;

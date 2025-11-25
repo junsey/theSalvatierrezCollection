@@ -170,11 +170,27 @@ export const DirectorPage: React.FC = () => {
       );
     }
 
+    type DisplayItem = (DirectedMovie & { owned?: boolean }) | { id: string; placeholder: true };
+    const placeholders = Array.from({ length: Math.max(0, 7 - items.length) }, (_, idx) => ({
+      id: `${title}-placeholder-${idx}`,
+      placeholder: true as const
+    }));
+    const displayItems: DisplayItem[] = [...items, ...placeholders];
+
     return (
       <div className="filmography-block">
         <h2>{title}</h2>
         <div className="known-for-grid">
-          {items.map((item) => {
+          {displayItems.map((item) => {
+            if ('placeholder' in item) {
+              return (
+                <div key={item.id} className="known-for-card known-for-card--placeholder" aria-hidden>
+                  <div className="known-for-card__poster" />
+                  <div className="known-for-card__meta" />
+                </div>
+              );
+            }
+
             const owned = item.owned;
             return (
               <div
