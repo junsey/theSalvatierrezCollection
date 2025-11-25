@@ -5,9 +5,10 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const POSTER_BASE_URL = 'https://image.tmdb.org/t/p/w342';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
-const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v2';
+const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v3';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const TV_RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-tv-runtime-cache-v2';
+const MOVIE_RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-movie-runtime-cache-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
@@ -59,6 +60,7 @@ const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = lo
 );
 const personCreditsCache: Record<string, PersonCacheEntry<PersonCredits>> = loadCache<PersonCredits>(CREDITS_CACHE_KEY);
 const tvRuntimeCache: Record<string, PersonCacheEntry<number | null>> = loadCache<number | null>(TV_RUNTIME_CACHE_KEY);
+const movieRuntimeCache: Record<string, PersonCacheEntry<number | null>> = loadCache<number | null>(MOVIE_RUNTIME_CACHE_KEY);
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -150,6 +152,27 @@ function parseYear(date?: string | null): number | null {
   const [yearStr] = date.split('-');
   const year = Number(yearStr);
   return Number.isFinite(year) ? year : null;
+}
+
+async function getMovieRuntimeMinutes(movieId: number): Promise<number | null> {
+  if (!TMDB_API_KEY) return null;
+
+  const cacheKey = String(movieId);
+  const cached = movieRuntimeCache[cacheKey];
+  if (isFresh(cached)) return cached.data;
+
+  try {
+    const url = `${API_BASE}/movie/${movieId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{ runtime?: number | null }>(url);
+    const runtime = typeof data.runtime === 'number' && Number.isFinite(data.runtime) ? data.runtime : null;
+
+    movieRuntimeCache[cacheKey] = { fetchedAt: Date.now(), data: runtime };
+    saveCache(MOVIE_RUNTIME_CACHE_KEY, movieRuntimeCache);
+    return runtime;
+  } catch (error) {
+    console.warn('No se pudo obtener el runtime de la película', error);
+    return null;
+  }
 }
 
 async function getTvRuntimeMinutes(tvId: number): Promise<number | null> {
@@ -270,12 +293,12 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
-const isFeatureLengthProduction = (item: {
-  title?: string | null;
-  name?: string | null;
-  video?: boolean | null;
-  genre_ids?: number[];
-}) => {
+const hasRecognizableTitleAndYear = (item: { title?: string | null; name?: string | null }, year: number | null) => {
+  const title = (item.title ?? item.name ?? '').trim();
+  return title.length > 0 && year !== null;
+};
+
+const isFeatureLengthProduction = (item: { title?: string | null; name?: string | null; video?: boolean | null }) => {
   const title = (item.title ?? item.name ?? '').toLowerCase();
   const isMarkedVideo = item.video === true;
   const looksLikeShort = /\bshort\b|\bcorto\b/.test(title);
@@ -310,37 +333,45 @@ async function getPersonCredits(personId: number): Promise<PersonCredits> {
     const directedMovies = new Map<number, DirectedMovie>();
     const createdProjects = new Map<number, DirectedMovie>();
 
-    const addEntry = (item: CrewCredit, bucket: Map<number, DirectedMovie>) => {
-      const title = item.title ?? item.name ?? 'Producción sin título';
+    const creditPromises = (data.crew ?? []).map(async (item) => {
+      if (item.media_type !== 'movie' && item.media_type !== 'tv') return null;
+      const job = item.job?.trim().toLowerCase();
+      const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
+      const isCreator = job?.includes('creator') || job?.includes('creador') || job?.includes('creado por') || job === 'developed by';
+      if (!isPrimaryDirector && !isCreator) return null;
+      if (!isFeatureLengthProduction(item)) return null;
+
       const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+      if (!hasRecognizableTitleAndYear(item, year)) return null;
+
+      if (item.media_type === 'tv') {
+        const runtime = await getTvRuntimeMinutes(item.id);
+        if (runtime === null || runtime < 60) return null;
+      }
+
+      if (item.media_type === 'movie') {
+        const runtime = await getMovieRuntimeMinutes(item.id);
+        if (runtime === null || runtime < 60) return null;
+      }
+
       const entry: DirectedMovie = {
         id: item.id,
-        title,
+        title: item.title ?? item.name ?? 'Producción sin título',
         year,
         posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
         popularity: item.popularity,
         mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
       };
 
-      bucket.set(item.id, entry);
-    };
+      return { entry, isPrimaryDirector, isCreator };
+    });
 
-    for (const item of data.crew ?? []) {
-      if (item.media_type !== 'movie' && item.media_type !== 'tv') continue;
-      const job = item.job?.trim().toLowerCase();
-      const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-      const isCreator = job?.includes('creator') || job?.includes('creador') || job?.includes('creado por') || job === 'developed by';
-      const qualifies = (isPrimaryDirector || isCreator) && isFeatureLengthProduction(item);
-      if (!qualifies) continue;
-
-      if (item.media_type === 'tv') {
-        const runtime = await getTvRuntimeMinutes(item.id);
-        if (runtime != null && runtime < 60) continue;
-      }
-
-      if (isPrimaryDirector) addEntry(item, directedMovies);
-      if (isCreator) addEntry(item, createdProjects);
-    }
+    const creditResults = await Promise.all(creditPromises);
+    creditResults.forEach((result) => {
+      if (!result) return;
+      if (result.isPrimaryDirector) directedMovies.set(result.entry.id, result.entry);
+      if (result.isCreator) createdProjects.set(result.entry.id, result.entry);
+    });
 
     const sorter = (a: DirectedMovie, b: DirectedMovie) => {
       const yearA = a.year ?? Number.POSITIVE_INFINITY;
@@ -545,11 +576,13 @@ export function clearPeopleCaches() {
     localStorage.removeItem(CREDITS_CACHE_KEY);
     localStorage.removeItem(CONFIG_CACHE_KEY);
     localStorage.removeItem(TV_RUNTIME_CACHE_KEY);
+    localStorage.removeItem(MOVIE_RUNTIME_CACHE_KEY);
   }
   Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
   Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
   Object.keys(tvRuntimeCache).forEach((key) => delete tvRuntimeCache[key]);
+  Object.keys(movieRuntimeCache).forEach((key) => delete movieRuntimeCache[key]);
 }
 
 export type { PersonDetails, DirectedMovie, PersonCredits };
