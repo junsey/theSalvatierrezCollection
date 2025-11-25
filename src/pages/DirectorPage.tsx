@@ -102,7 +102,7 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorName, directorOverrides]);
 
-  const { directedMovies, createdSeries } = useMemo(() => {
+  const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
     const creatorJobs = new Set(['creator', 'series creator']);
 
@@ -143,7 +143,21 @@ export const DirectorPage: React.FC = () => {
       .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
       .sort(sortByDate);
 
-    return { directedMovies: directed, createdSeries: created };
+    const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
+    const totalCount = directed.length + created.length;
+    const ratio = totalCount > 0 ? ownedCount / totalCount : 0;
+
+    return {
+      directedMovies: directed,
+      createdSeries: created,
+      ownedCount,
+      totalCount,
+      medalUnlocks: {
+        bronze: ratio > 0.5,
+        silver: ratio > 0.75,
+        gold: ratio >= 1
+      }
+    };
   }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
 
   const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
@@ -211,6 +225,47 @@ export const DirectorPage: React.FC = () => {
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted">{biography}</p>}
           {!loading && !biography && <p className="text-muted">Biografía no disponible.</p>}
+          <div className="director-meta">
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>
+                En colección
+              </p>
+              <p className="director-meta__counts">
+                <span className="director-meta__value">{ownedCount}</span>
+                <span className="director-meta__divider">/</span>
+                <span className="director-meta__total">{totalCount || '—'}</span>
+              </p>
+            </div>
+            <div className="director-meta__medals" aria-label="Progreso de colección">
+              <span
+                className={`director-coverage__medal director-coverage__medal--bronze ${
+                  medalUnlocks.bronze ? 'is-active' : 'is-disabled'
+                }`}
+                title="Bronce"
+                aria-hidden
+              >
+                ★
+              </span>
+              <span
+                className={`director-coverage__medal director-coverage__medal--silver ${
+                  medalUnlocks.silver ? 'is-active' : 'is-disabled'
+                }`}
+                title="Plata"
+                aria-hidden
+              >
+                ★
+              </span>
+              <span
+                className={`director-coverage__medal director-coverage__medal--gold ${
+                  medalUnlocks.gold ? 'is-active' : 'is-disabled'
+                }`}
+                title="Oro"
+                aria-hidden
+              >
+                ★
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
