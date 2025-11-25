@@ -1711,19 +1711,20 @@ button.ghost {
 
 .director-hero {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(340px, 1fr);
-  gap: 14px 24px;
+  grid-template-columns: minmax(220px, 260px) minmax(520px, 1fr);
+  gap: 14px 28px;
   padding: 18px;
   margin-bottom: 18px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: linear-gradient(135deg, rgba(255, 54, 93, 0.06), rgba(10, 12, 18, 0.9));
   box-shadow: inset 0 0 32px rgba(255, 54, 93, 0.08), 0 16px 40px rgba(0, 0, 0, 0.4);
+  align-items: center;
 }
 
 .director-portrait {
   width: 100%;
-  max-width: 280px;
+  max-width: 260px;
   aspect-ratio: 4 / 5;
   border-radius: 14px;
   background-size: cover;
@@ -1752,25 +1753,29 @@ button.ghost {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   box-shadow: inset 0 0 12px rgba(255, 54, 93, 0.08);
+  align-self: flex-end;
+  margin-left: auto;
+  text-align: right;
 }
 
 .director-meta__counts {
   display: flex;
   align-items: baseline;
   gap: 6px;
-  font-size: 1.2em;
-  letter-spacing: 0.03em;
+  font-size: 1.35em;
+  letter-spacing: 0.04em;
 }
 
 .director-meta__value {
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 1.45em;
 }
 
 .director-meta__divider,
@@ -1782,7 +1787,7 @@ button.ghost {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 1.2em;
+  font-size: 1.55em;
   color: var(--text-muted);
 }
 
@@ -1798,6 +1803,45 @@ button.ghost {
 
 .director-meta__medals .director-coverage__medal.is-disabled {
   color: var(--text-muted);
+}
+
+@media (max-width: 1040px) {
+  .director-hero {
+    grid-template-columns: minmax(200px, 240px) 1fr;
+    gap: 12px 18px;
+  }
+
+  .director-portrait {
+    max-width: 240px;
+  }
+
+  .director-legend {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .director-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .director-portrait {
+    justify-self: center;
+    max-width: 220px;
+  }
+
+  .director-legend {
+    align-items: center;
+  }
+
+  .director-meta {
+    align-self: center;
+    justify-content: center;
+    text-align: center;
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 .stats-row {
