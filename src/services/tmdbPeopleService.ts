@@ -7,6 +7,7 @@ const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
+const TV_RUNTIME_CACHE_KEY = 'salvatierrez-tmdb-tv-runtime-cache-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
@@ -57,6 +58,7 @@ const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = lo
   PERSON_SEARCH_CACHE_KEY
 );
 const personCreditsCache: Record<string, PersonCacheEntry<PersonCredits>> = loadCache<PersonCredits>(CREDITS_CACHE_KEY);
+const tvRuntimeCache: Record<string, PersonCacheEntry<number | null>> = loadCache<number | null>(TV_RUNTIME_CACHE_KEY);
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -148,6 +150,29 @@ function parseYear(date?: string | null): number | null {
   const [yearStr] = date.split('-');
   const year = Number(yearStr);
   return Number.isFinite(year) ? year : null;
+}
+
+async function getTvRuntimeMinutes(tvId: number): Promise<number | null> {
+  if (!TMDB_API_KEY) return null;
+
+  const cacheKey = String(tvId);
+  const cached = tvRuntimeCache[cacheKey];
+  if (isFresh(cached)) return cached.data;
+
+  try {
+    const url = `${API_BASE}/tv/${tvId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{ episode_run_time?: number[]; runtime?: number | null }>(url);
+    const runTimes = (data.episode_run_time ?? []).filter((value) => Number.isFinite(value) && value > 0) as number[];
+    const candidate = runTimes.length > 0 ? Math.min(...runTimes) : data.runtime ?? null;
+    const runtime = typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : null;
+
+    tvRuntimeCache[cacheKey] = { fetchedAt: Date.now(), data: runtime };
+    saveCache(TV_RUNTIME_CACHE_KEY, tvRuntimeCache);
+    return runtime;
+  } catch (error) {
+    console.warn('No se pudo obtener el runtime de la serie', error);
+    return null;
+  }
 }
 
 export async function getDirectorFromMovie(movieId: number): Promise<{ id: number; name: string }[]> {
@@ -300,16 +325,22 @@ async function getPersonCredits(personId: number): Promise<PersonCredits> {
       bucket.set(item.id, entry);
     };
 
-    (data.crew ?? []).forEach((item) => {
-      if (item.media_type !== 'movie' && item.media_type !== 'tv') return;
+    for (const item of data.crew ?? []) {
+      if (item.media_type !== 'movie' && item.media_type !== 'tv') continue;
       const job = item.job?.trim().toLowerCase();
       const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
       const isCreator = job?.includes('creator') || job?.includes('creador') || job?.includes('creado por') || job === 'developed by';
       const qualifies = (isPrimaryDirector || isCreator) && isFeatureLengthProduction(item);
-      if (!qualifies) return;
+      if (!qualifies) continue;
+
+      if (item.media_type === 'tv') {
+        const runtime = await getTvRuntimeMinutes(item.id);
+        if (runtime != null && runtime < 60) continue;
+      }
+
       if (isPrimaryDirector) addEntry(item, directedMovies);
       if (isCreator) addEntry(item, createdProjects);
-    });
+    }
 
     const sorter = (a: DirectedMovie, b: DirectedMovie) => {
       const yearA = a.year ?? Number.POSITIVE_INFINITY;
@@ -513,10 +544,12 @@ export function clearPeopleCaches() {
     localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
     localStorage.removeItem(CREDITS_CACHE_KEY);
     localStorage.removeItem(CONFIG_CACHE_KEY);
+    localStorage.removeItem(TV_RUNTIME_CACHE_KEY);
   }
   Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
   Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
+  Object.keys(tvRuntimeCache).forEach((key) => delete tvRuntimeCache[key]);
 }
 
 export type { PersonDetails, DirectedMovie, PersonCredits };
