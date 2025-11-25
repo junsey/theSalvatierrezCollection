@@ -24,13 +24,16 @@ type PersonDetails = {
   alsoKnownAs?: string[];
 };
 
-type DirectedMovie = {
+export type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
   posterUrl?: string;
   popularity?: number;
   mediaType?: 'movie' | 'tv';
+  job?: string;
+  releaseDate?: string | null;
+  firstAirDate?: string | null;
 };
 
 export type DirectorProfile = {
@@ -284,18 +287,26 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
         if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
         const job = item.job?.trim().toLowerCase();
         const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
-        return isPrimaryDirector && isFeatureLengthProduction(item);
+        const isSeriesCreator = job === 'creator' || job === 'series creator';
+        if (!isPrimaryDirector && !isSeriesCreator) return false;
+        if (item.media_type === 'movie' && !isFeatureLengthProduction(item)) return false;
+        return true;
       })
       .forEach((item) => {
         const title = item.title ?? item.name ?? 'Producción sin título';
-        const year = item.media_type === 'tv' ? parseYear(item.first_air_date) : parseYear(item.release_date);
+        const releaseDate = item.release_date ?? null;
+        const firstAirDate = item.first_air_date ?? null;
+        const year = item.media_type === 'tv' ? parseYear(firstAirDate) : parseYear(releaseDate);
         const entry: DirectedMovie = {
           id: item.id,
           title,
           year,
           posterUrl: item.poster_path ? `${POSTER_BASE_URL}${item.poster_path}` : undefined,
           popularity: item.popularity,
-          mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+          job: item.job,
+          releaseDate,
+          firstAirDate
         };
 
         directedMovies.set(item.id, entry);
@@ -483,4 +494,4 @@ export function clearPeopleCaches() {
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
 }
 
-export type { PersonDetails, DirectedMovie };
+export type { PersonDetails };

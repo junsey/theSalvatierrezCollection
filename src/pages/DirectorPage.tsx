@@ -102,59 +102,92 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorName, directorOverrides]);
 
-  const curatedKnownFor = useMemo(() => {
-    const seen = new Set<number>();
-    return knownFor
-      .filter((movie) => {
-        if (seen.has(movie.id)) return false;
-        seen.add(movie.id);
+  const { directedMovies, createdSeries } = useMemo(() => {
+    const directorJobs = new Set(['director', 'series director', 'director de la serie']);
+    const creatorJobs = new Set(['creator', 'series creator']);
+
+    const movieSeen = new Set<number>();
+    const seriesSeen = new Set<number>();
+
+    const isOwned = (title: string, id: number) =>
+      directorCollection.ownedIds.has(id) || directorCollection.ownedTitles.has(normalizeTitle(title));
+
+    const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
+      const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
+      const dateB = b.mediaType === 'tv' ? b.firstAirDate : b.releaseDate;
+
+      const tsA = dateA ? Date.parse(dateA) : Number.POSITIVE_INFINITY;
+      const tsB = dateB ? Date.parse(dateB) : Number.POSITIVE_INFINITY;
+
+      if (tsA !== tsB) return tsA - tsB;
+      return (a.title || '').localeCompare(b.title || '');
+    };
+
+    const directed = knownFor
+      .filter((credit) => credit.mediaType === 'movie' && directorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (movieSeen.has(credit.id)) return false;
+        movieSeen.add(credit.id);
         return true;
       })
-      .map((movie) => ({
-        ...movie,
-        owned:
-          directorCollection.ownedIds.has(movie.id) ||
-          directorCollection.ownedTitles.has(normalizeTitle(movie.title))
-      }));
+      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .sort(sortByDate);
+
+    const created = knownFor
+      .filter((credit) => credit.mediaType === 'tv' && creatorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (seriesSeen.has(credit.id)) return false;
+        seriesSeen.add(credit.id);
+        return true;
+      })
+      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .sort(sortByDate);
+
+    return { directedMovies: directed, createdSeries: created };
   }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
 
-  const renderKnownFor = () => {
-    if (loading) {
-      return <p className="muted">Cargando filmografía destacada...</p>;
+  const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="filmography-block">
+          <h2>{title}</h2>
+          <p className="muted">{emptyMessage}</p>
+        </div>
+      );
     }
-    if (curatedKnownFor.length === 0) {
-      return <p className="muted">No hay películas para mostrar.</p>;
-    }
+
     return (
-      <div className="known-for-grid">
-        {curatedKnownFor.map((movie) => {
-          const owned = movie.owned;
-          const mediaLabel = movie.mediaType === 'tv' ? 'Serie' : 'Película';
-          return (
-            <div
-              key={movie.id}
-              className={`known-for-card ${owned ? 'owned' : 'missing'}`}
-              aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
-            >
-              <div className="known-for-card__poster">
-                {movie.posterUrl ? (
-                  <img src={movie.posterUrl} alt={movie.title} className={!owned ? 'is-muted' : undefined} />
-                ) : (
-                  <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
-                )}
-              </div>
-              <div className="known-for-card__meta">
-                <div className="known-for-card__meta-row">
-                  <p className={!owned ? 'muted' : undefined}>{movie.title}</p>
-                  <span className="media-tag" aria-label={mediaLabel}>
-                    {mediaLabel}
-                  </span>
+      <div className="filmography-block">
+        <h2>{title}</h2>
+        <div className="known-for-grid">
+          {items.map((item) => {
+            const owned = item.owned;
+            return (
+              <div
+                key={item.id}
+                className={`known-for-card ${owned ? 'owned' : 'missing'}`}
+                aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
+              >
+                <div className="known-for-card__poster">
+                  {item.posterUrl ? (
+                    <img src={item.posterUrl} alt={item.title} className={!owned ? 'is-muted' : undefined} />
+                  ) : (
+                    <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
+                  )}
                 </div>
-                {movie.year && <small>{movie.year}</small>}
+                <div className="known-for-card__meta">
+                  <div className="known-for-card__meta-row">
+                    <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                    <span className="media-tag" aria-label={title}>
+                      {item.mediaType === 'tv' ? 'Serie' : 'Película'}
+                    </span>
+                  </div>
+                  {item.year && <small>{item.year}</small>}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -181,10 +214,40 @@ export const DirectorPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="filmography-block">
-        <h2>Filmografía</h2>
-        {error ? <p className="muted">{error}</p> : renderKnownFor()}
-      </div>
+      {error && <p className="muted">{error}</p>}
+
+      {!error && (
+        <>
+          {loading ? (
+            <div className="filmography-block">
+              <h2>Filmografía</h2>
+              <p className="muted">Cargando filmografía...</p>
+            </div>
+          ) : (
+            <>
+              {directedMovies.length > 0
+                ? renderSection('Obras dirigidas (cine)', directedMovies, 'No hay películas dirigidas registradas.')
+                : renderSection('Obras dirigidas (cine)', directedMovies, 'No se encontraron películas dirigidas para esta persona.')}
+
+              {createdSeries.length > 0
+                ? renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series creadas registradas para esta persona.'
+                  )
+                : renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series en las que conste como creador/a.'
+                  )}
+
+              {directedMovies.length === 0 && createdSeries.length === 0 && (
+                <p className="muted">No se encontraron obras con los criterios actuales.</p>
+              )}
+            </>
+          )}
+        </>
+      )}
     </section>
   );
 };
