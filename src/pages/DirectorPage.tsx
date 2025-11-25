@@ -1,22 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
+import { getOwnedTmdbIds } from '../lib/moviesRepository';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
-import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
-
-const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean => {
-  return collection.some((item) => item.tmdbId === tmdbId);
-};
 
 export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const directorName = decodeURIComponent(name ?? '').trim();
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const [ownedTmdbIds, setOwnedTmdbIds] = useState<Set<number>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +38,11 @@ export const DirectorPage: React.FC = () => {
       }
 
       try {
+        const owned = await getOwnedTmdbIds();
+        if (active) {
+          setOwnedTmdbIds(new Set(owned));
+        }
+
         const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
         const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: overrideTmdbId });
         if (!active) return;
@@ -52,9 +54,9 @@ export const DirectorPage: React.FC = () => {
         }
 
         setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
-        setBiography(result.person?.biography ?? null);
-        setProfileUrl(result.person?.profileUrl ?? undefined);
-        setKnownFor(result.credits);
+          setBiography(result.person?.biography ?? null);
+          setProfileUrl(result.person?.profileUrl ?? undefined);
+          setKnownFor(result.credits);
       } catch (err) {
         console.warn('Error al cargar el director', err);
         if (active) setError('No se pudieron obtener los datos del director.');
@@ -89,7 +91,7 @@ export const DirectorPage: React.FC = () => {
     return (
       <div className="known-for-grid">
         {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
+          const owned = ownedTmdbIds.has(movie.id);
           return (
             <div
               key={movie.id}

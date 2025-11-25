@@ -12,10 +12,11 @@ import {
   setRating,
   setSeenOverride
 } from '../services/localStorage';
-import { FetchMoviesResult, SheetMeta, fetchMovies } from '../services/googleSheets';
+import { FetchMoviesResult, fetchMoviesFromSupabase } from '../services/supabaseMovies';
+import { CollectionMeta } from '../types/CollectionMeta';
 import { MovieRecord } from '../types/MovieRecord';
 
-type RefreshOptions = Parameters<typeof fetchMovies>[0] & { invalidateMovieCache?: boolean };
+type RefreshOptions = { invalidateMovieCache?: boolean; forceNetwork?: boolean };
 
 interface ProgressState {
   current: number;
@@ -30,11 +31,11 @@ interface MovieContextValue {
   seenOverrides: Record<string, boolean>;
   ratings: Record<string, number>;
   notes: Record<string, string>;
-  sheetMeta: SheetMeta | null;
+  collectionMeta: CollectionMeta | null;
   progress: ProgressState | null;
   refresh: (options?: RefreshOptions) => Promise<void>;
   refreshAll: () => Promise<void>;
-  refreshSheet: () => Promise<void>;
+  refreshCollection: () => Promise<void>;
   refreshMissing: () => Promise<void>;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
@@ -50,7 +51,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [seenOverrides, setSeenOverridesState] = useState(getSeenOverrides());
   const [ratingOverrides, setRatings] = useState(getRatingOverrides());
   const [notes, setNotes] = useState(getNotes());
-  const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
+  const [collectionMeta, setCollectionMeta] = useState<CollectionMeta | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
 
   const refresh = async (options?: RefreshOptions) => {
@@ -62,7 +63,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!options?.forceNetwork) {
       const cached = loadMovieCache();
       if (cached) {
-        setSheetMeta(cached.sheetMeta ?? null);
+        setCollectionMeta(cached.collectionMeta ?? null);
         const withLocal = applyLocalOverrides(cached.movies);
 
         const needsEnrichment = withLocal.some(
@@ -87,7 +88,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
           setProgress(null);
           setMovies(enriched);
-          saveMovieCache(enriched, cached.sheetMeta ?? null);
+          saveMovieCache(enriched, cached.collectionMeta ?? null);
           setLoading(false);
           return;
         } catch (err) {
@@ -100,8 +101,8 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     }
     try {
-      const result: FetchMoviesResult = await fetchMovies(options);
-      setSheetMeta(result.meta);
+      const result: FetchMoviesResult = await fetchMoviesFromSupabase();
+      setCollectionMeta(result.meta);
       const withLocal = applyLocalOverrides(result.movies);
       setMovies(withLocal);
       const enriched = await enrichMoviesBatch(withLocal, {
@@ -131,13 +132,13 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refresh({ forceNetwork: true, invalidateMovieCache: true });
   };
 
-  const refreshSheet = async () => {
+  const refreshCollection = async () => {
     setLoading(true);
     setError(null);
-    setProgress({ current: 0, total: 100, message: 'Recargando desde Google Sheets...' });
+    setProgress({ current: 0, total: 100, message: 'Recargando colección desde Supabase...' });
     try {
-      const result: FetchMoviesResult = await fetchMovies({ forceNetwork: true });
-      setSheetMeta(result.meta);
+      const result: FetchMoviesResult = await fetchMoviesFromSupabase();
+      setCollectionMeta(result.meta);
       const withLocal = applyLocalOverrides(result.movies);
       setMovies(withLocal);
       // Solo enriquece las que no tienen caché
@@ -167,7 +168,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (err) {
       setProgress(null);
       setLoading(false);
-      setError(err instanceof Error ? err.message : 'Unable to refresh sheet');
+      setError(err instanceof Error ? err.message : 'Unable to refresh collection');
     }
   };
 
@@ -188,7 +189,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (currentMovies.length === 0) {
         setProgress(null);
         setLoading(false);
-        setError('No hay películas cargadas. Usa "Recargar Excel" primero.');
+        setError('No hay películas cargadas. Usa "Recargar colección" primero.');
         return;
       }
 
@@ -225,7 +226,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       setMovies(updated);
       const cached = loadMovieCache();
-      saveMovieCache(updated, cached?.sheetMeta ?? null);
+      saveMovieCache(updated, cached?.collectionMeta ?? null);
       setProgress(null);
       setLoading(false);
     } catch (err) {
@@ -273,20 +274,20 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       movies, 
       loading, 
       error, 
-      refresh, 
-      refreshAll, 
-      refreshSheet, 
+      refresh,
+      refreshAll,
+      refreshCollection,
       refreshMissing,
-      updateSeen, 
-      updateRating, 
-      updateNote, 
-      seenOverrides, 
-      ratings: personalRatings, 
-      notes, 
-      sheetMeta,
+      updateSeen,
+      updateRating,
+      updateNote,
+      seenOverrides,
+      ratings: personalRatings,
+      notes,
+      collectionMeta,
       progress
     }),
-    [movies, loading, error, seenOverrides, personalRatings, notes, sheetMeta, progress]
+    [movies, loading, error, seenOverrides, personalRatings, notes, collectionMeta, progress]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;
