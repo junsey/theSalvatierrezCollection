@@ -3,13 +3,42 @@ import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
-import { buildDirectorOverrideMap, normalizeDirectorName } from '../services/directors';
+import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
-const isMovieInCollection = (tmdbId: number, collection: MovieRecord[]): boolean => {
-  return collection.some((item) => item.tmdbId === tmdbId);
+const normalizeTitle = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const buildDirectorCollections = (directorName: string, collection: MovieRecord[]) => {
+  const normalizedDirector = normalizeDirectorName(directorName);
+  const ownedIds = new Set<number>();
+  const ownedTitles = new Set<string>();
+
+  collection.forEach((movie) => {
+    const matchesDirector = splitDirectors(movie.director)
+      .map(normalizeDirectorName)
+      .includes(normalizedDirector);
+
+    if (!matchesDirector) return;
+
+    if (Number.isFinite(movie.tmdbId) && movie.tmdbId != null) {
+      ownedIds.add(movie.tmdbId);
+    }
+
+    ownedTitles.add(normalizeTitle(movie.title));
+    if (movie.tmdbTitle) {
+      ownedTitles.add(normalizeTitle(movie.tmdbTitle));
+    }
+    if (movie.originalTitle) {
+      ownedTitles.add(normalizeTitle(movie.originalTitle));
+    }
+    if (movie.tmdbOriginalTitle) {
+      ownedTitles.add(normalizeTitle(movie.tmdbOriginalTitle));
+    }
+  });
+
+  return { ownedIds, ownedTitles };
 };
 
 export const DirectorPage: React.FC = () => {
@@ -17,6 +46,10 @@ export const DirectorPage: React.FC = () => {
   const directorName = decodeURIComponent(name ?? '').trim();
   const { movies } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const directorCollection = useMemo(
+    () => buildDirectorCollections(directorName, movies),
+    [directorName, movies]
+  );
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,8 +109,14 @@ export const DirectorPage: React.FC = () => {
         if (seen.has(movie.id)) return false;
         seen.add(movie.id);
         return true;
-      });
-  }, [knownFor]);
+      })
+      .map((movie) => ({
+        ...movie,
+        owned:
+          directorCollection.ownedIds.has(movie.id) ||
+          directorCollection.ownedTitles.has(normalizeTitle(movie.title))
+      }));
+  }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
 
   const renderKnownFor = () => {
     if (loading) {
@@ -89,7 +128,8 @@ export const DirectorPage: React.FC = () => {
     return (
       <div className="known-for-grid">
         {curatedKnownFor.map((movie) => {
-          const owned = isMovieInCollection(movie.id, movies);
+          const owned = movie.owned;
+          const mediaLabel = movie.mediaType === 'tv' ? 'Serie' : 'Película';
           return (
             <div
               key={movie.id}
@@ -104,9 +144,13 @@ export const DirectorPage: React.FC = () => {
                 )}
               </div>
               <div className="known-for-card__meta">
-                <p className={!owned ? 'muted' : undefined}>{movie.title}</p>
+                <div className="known-for-card__meta-row">
+                  <p className={!owned ? 'muted' : undefined}>{movie.title}</p>
+                  <span className="media-tag" aria-label={mediaLabel}>
+                    {mediaLabel}
+                  </span>
+                </div>
                 {movie.year && <small>{movie.year}</small>}
-                <span className="pill">{owned ? 'En la colección' : 'Pendiente'}</span>
               </div>
             </div>
           );
@@ -139,7 +183,6 @@ export const DirectorPage: React.FC = () => {
 
       <div className="filmography-block">
         <h2>Filmografía</h2>
-        <p className="text-muted">Películas dirigidas según TMDb (combinado), resaltando las que ya están en la colección.</p>
         {error ? <p className="muted">{error}</p> : renderKnownFor()}
       </div>
     </section>
