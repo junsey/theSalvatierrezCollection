@@ -35,7 +35,7 @@ export async function getMoviesByDirector(directorName: string) {
   const { data, error } = await supabase
     .from('movies')
     .select('*')
-    .ilike('director', directorName);
+    .ilike('director', `%${directorName}%`);
 
   if (error) {
     console.error('Error fetching movies by director', error);
