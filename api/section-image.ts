@@ -13,6 +13,7 @@ const sectionQueries: Record<string, string> = {
 };
 
 const sectionImageCache: Record<string, string> = {};
+const DEFAULT_PEXELS_API_KEY = 'LWBTITAyhuA9AAKzlSyojkuer6ZfmqBOMmugcZzWAXQnsnK1Y3wvDOOa';
 
 const app = express();
 
@@ -24,10 +25,7 @@ app.get('/api/section-image', async (req, res) => {
     return res.status(400).json({ error: 'El parámetro "section" es obligatorio.' });
   }
 
-  const apiKey = process.env.PEXELS_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Falta la variable de entorno PEXELS_API_KEY.' });
-  }
+  const apiKey = process.env.PEXELS_API_KEY?.trim() || DEFAULT_PEXELS_API_KEY;
 
   if (sectionImageCache[section]) {
     return res.json({ imageUrl: sectionImageCache[section] });
