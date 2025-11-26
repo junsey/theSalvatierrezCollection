@@ -1144,6 +1144,22 @@ button.ghost {
   gap: 16px;
 }
 
+.movie-grid--seven {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.movie-grid--seven {
+  max-width: 1540px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1280px) {
+  .movie-grid--seven {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
 .movie-grid--six {
   max-width: 1400px;
   margin-left: auto;
