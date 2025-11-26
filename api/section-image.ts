@@ -24,6 +24,25 @@ const sectionQueries: Record<string, string> = Object.fromEntries(
   Object.entries(baseSectionQueries).map(([key, value]) => [normalizeSection(key), value])
 );
 
+const manualSectionImages: Record<string, string> = {
+  [normalizeSection('Stephen king')]:
+    'https://images.pexels.com/photos/12113860/pexels-photo-12113860.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('Accion - aventura')]:
+    'https://images.pexels.com/photos/3623114/pexels-photo-3623114.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('Basada en comics')]:
+    'https://images.pexels.com/photos/7809122/pexels-photo-7809122.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('Biopic')]:
+    'https://images.pexels.com/photos/3091193/pexels-photo-3091193.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('ciencia ficcion')]:
+    'https://images.pexels.com/photos/3389817/pexels-photo-3389817.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('clin eastwood')]:
+    'https://images.pexels.com/photos/6109216/pexels-photo-6109216.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('comedia')]:
+    'https://images.pexels.com/photos/33129/pexels-photo-33129.jpeg?auto=compress&cs=tinysrgb&w=1600',
+  [normalizeSection('Western')]:
+    'https://images.pexels.com/photos/162520/pexels-photo-162520.jpeg?auto=compress&cs=tinysrgb&w=1600',
+};
+
 const sectionImageCache: Record<string, string> = {};
 const DEFAULT_PEXELS_API_KEY = 'LWBTITAyhuA9AAKzlSyojkuer6ZfmqBOMmugcZzWAXQnsnK1Y3wvDOOa';
 
@@ -42,6 +61,11 @@ app.get('/api/section-image', async (req, res) => {
 
   if (sectionImageCache[normalizedSection]) {
     return res.json({ imageUrl: sectionImageCache[normalizedSection] });
+  }
+
+  if (manualSectionImages[normalizedSection]) {
+    sectionImageCache[normalizedSection] = manualSectionImages[normalizedSection];
+    return res.json({ imageUrl: manualSectionImages[normalizedSection] });
   }
 
   const query = sectionQueries[normalizedSection] || `${section} cinematic movie still`;
