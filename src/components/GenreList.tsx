@@ -24,7 +24,7 @@ export const GenreList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   return (
     <div className="section-grid">
       {genres.map((genre) => (
-        <Link key={genre} to={`/genres/${encodeURIComponent(genre)}`} className="section-card">
+        <Link key={genre} to={`/genres/${encodeURIComponent(genre)}`} className="genre-card">
           <div className="section-thumb" style={{ backgroundImage: 'linear-gradient(180deg, #0c0f18, #1b1f2a)' }} aria-hidden="true" />
           <div className="card-crest" aria-hidden="true">
             <img src={sectionSigil} alt="" />
