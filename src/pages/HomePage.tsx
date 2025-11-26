@@ -53,14 +53,12 @@ const MetricCard: React.FC<{
   href?: string;
   children?: React.ReactNode;
 }> = ({ title, caption, href, children }) => {
-  const headerClass = title !== undefined ? 'metric-card__header' : 'metric-card__header metric-card__header--single';
-
   const content = (
     <div className="metric-card">
       <div className="metric-card__glow" />
-      <div className={headerClass}>
+      <div className="metric-card__header">
         <small>{caption}</small>
-        {title !== undefined && <h3>{title}</h3>}
+        {title !== undefined && <div className="metric-card__value">{title}</div>}
       </div>
       {children && <div className="metric-card__body">{children}</div>}
     </div>
@@ -275,16 +273,16 @@ export const HomePage: React.FC = () => {
           />
           <MetricCard
             title={loading ? '…' : totalSeries.toLocaleString()}
-            caption="Crónicas Seriadas"
+            caption="Archivo de Series"
           />
           <MetricCard
             title={loading ? '…' : directors.toLocaleString()}
-            caption="Maestros del Arte"
+            caption="Archivo de Directores"
             href="/directors"
           />
           <MetricCard
             title={loading ? '…' : sections.toLocaleString()}
-            caption="Salas del Archivo"
+            caption="Secciones del archivo"
             href="/sections"
           />
           <MetricCard title={loading ? '…' : formatChartData.total.toLocaleString()} caption="Formatos">

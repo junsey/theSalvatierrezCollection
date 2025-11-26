@@ -7,6 +7,13 @@ import {
 } from '../services/tmdbPeopleService';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
+import {
+  CACHE_VERSION,
+  DirectorProfilesCache,
+  getCachedProfilesForKeys,
+  loadDirectorCache,
+  saveDirectorCache
+} from '../lib/directorCache';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -25,9 +32,6 @@ const normalizeTitle = (value: string) => {
 const buildDirectorKey = (name: string, tmdbId?: number | null) =>
   Number.isFinite(tmdbId) ? `tmdb-${tmdbId}` : `name-${normalizeDirectorName(name)}`;
 
-const getOverrideKey = (name: string, overrides: Map<string, number>) =>
-  buildDirectorKey(name, overrides.get(normalizeDirectorName(name)));
-
 const getWorkKey = (movie: MovieRecord) => {
   const mediaType = movie.tmdbType ?? (movie.series ? 'tv' : 'movie');
   const normalizedTitle = normalizeTitle(movie.title);
@@ -40,6 +44,13 @@ const getWorkKey = (movie: MovieRecord) => {
 
   const base = movie.tmdbId ? `tmdb-${movie.tmdbId}` : `title-${normalizedTitle}`;
   return `${base}:${mediaType}`;
+};
+
+type DirectorListProfile = DirectorProfile & {
+  key: string;
+  worksCount: number;
+  totalWorksDirected?: number | null;
+  totalWorksCreated?: number | null;
 };
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
@@ -65,8 +76,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           const normalizedName = normalizeDirectorName(name);
           const overrideId = directorOverrides.get(normalizedName);
           const key = buildDirectorKey(name, overrideId);
-          if (!map.has(key)) {
-            map.set(key, {
+          const mapKey = normalizedName;
+
+          if (!map.has(mapKey)) {
+            map.set(mapKey, {
               key,
               name: name.trim(),
               normalizedName,
@@ -74,11 +87,11 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               worksCount: 0
             });
           }
-          const entry = map.get(key)!;
+          const entry = map.get(mapKey)!;
           const workKey = getWorkKey(movie);
-          const workKeys = worksByDirector.get(key) ?? new Set<string>();
-          if (!worksByDirector.has(key)) {
-            worksByDirector.set(key, workKeys);
+          const workKeys = worksByDirector.get(mapKey) ?? new Set<string>();
+          if (!worksByDirector.has(mapKey)) {
+            worksByDirector.set(mapKey, workKeys);
           }
           if (!workKeys.has(workKey)) {
             entry.worksCount += 1;
@@ -98,7 +111,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return Array.from(letters).sort();
   }, [directors]);
 
-  const [profiles, setProfiles] = useState<(DirectorProfile & { key: string; worksCount: number })[]>([]);
+  const [profiles, setProfiles] = useState<DirectorListProfile[]>([]);
   const totalsCache = useRef<Map<number, number>>(new Map());
   const [coverage, setCoverage] = useState<Record<string, { owned: number; total: number | null }>>({});
   const [loading, setLoading] = useState(false);
@@ -108,53 +121,158 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
 
+  const getTotalFromEntry = (entry?: {
+    totalWorksDirected?: number | null;
+    totalWorksCreated?: number | null;
+  }) => {
+    if (!entry) return null;
+    const directed = entry.totalWorksDirected;
+    const created = entry.totalWorksCreated;
+    if (directed == null && created == null) return null;
+    return (directed ?? 0) + (created ?? 0);
+  };
+
   useEffect(() => {
     let active = true;
+
     async function hydrate() {
       if (directors.length === 0) {
         setProfiles([]);
         setProgress(null);
         return;
       }
+
       setLoading(true);
       setError(null);
-      setProgress({ current: 0, total: directors.length });
-      try {
-        const enriched = await buildDirectorProfiles(
-          directors.map((director) => director.name),
-          {
-            overrides: directorOverrides,
-            onProgress: (current, total) => {
-              if (!active) return;
-              setProgress({ current, total });
-            }
-          }
-        );
-        if (!active) return;
-        const enrichedMap = new Map<string, DirectorProfile>();
-        enriched.forEach((profile) => {
-          enrichedMap.set(normalizeDirectorName(profile.name), profile);
-        });
-        const merged = directors.map((director) => {
-          const profile = enrichedMap.get(director.normalizedName);
-          return {
+
+      const cache = loadDirectorCache();
+      const directorKeys = directors.map((director) => director.key);
+      const { found, missing } = getCachedProfilesForKeys(directorKeys, cache);
+
+      const initialProfiles: DirectorListProfile[] = [];
+      const cachedCoverage: Record<string, { owned: number; total: number | null }> = {};
+
+      directors.forEach((director) => {
+        const cached = found.get(director.key);
+        if (cached) {
+          const cachedTotal = getTotalFromEntry(cached);
+          const ownedCount = director.worksCount || cached.worksCountOwned || 0;
+
+          initialProfiles.push({
             key: director.key,
-            name: director.name,
-            displayName: profile?.displayName ?? director.name,
-            tmdbId: profile?.tmdbId ?? director.tmdbId ?? null,
-            profileUrl: profile?.profileUrl ?? null,
-            worksCount: director.worksCount
+            name: cached.name,
+            displayName: cached.displayName ?? cached.name,
+            tmdbId: cached.tmdbId ?? null,
+            profileUrl: cached.profileUrl ?? null,
+            worksCount: ownedCount,
+            totalWorksDirected: cached.totalWorksDirected ?? null,
+            totalWorksCreated: cached.totalWorksCreated ?? null
+          });
+
+          if (cachedTotal != null) {
+            cachedCoverage[director.key] = { owned: ownedCount, total: cachedTotal };
+          }
+        }
+      });
+
+      const sortedInitial = [...initialProfiles].sort((a, b) =>
+        collator.compare(a.displayName || a.name, b.displayName || b.name)
+      );
+      setProfiles(sortedInitial);
+      if (Object.keys(cachedCoverage).length > 0) {
+        setCoverage((prev) => ({ ...cachedCoverage, ...prev }));
+      }
+      setProgress({ current: initialProfiles.length, total: directors.length });
+
+      if (missing.length === 0) {
+        const nextCache: DirectorProfilesCache = {
+          version: CACHE_VERSION,
+          directors: { ...(cache?.directors || {}) }
+        };
+        const now = new Date().toISOString();
+
+        sortedInitial.forEach((profile) => {
+          nextCache.directors[profile.key] = {
+            key: profile.key,
+            name: profile.name,
+            displayName: profile.displayName,
+            tmdbId: profile.tmdbId ?? undefined,
+            profileUrl: profile.profileUrl ?? undefined,
+            worksCountOwned: profile.worksCount,
+            totalWorksDirected: profile.totalWorksDirected ?? null,
+            totalWorksCreated: profile.totalWorksCreated ?? null,
+            updatedAt: now
           };
         });
-        const sorted = [...merged].sort((a, b) =>
+
+        saveDirectorCache(nextCache);
+        setLoading(false);
+        setProgress(null);
+        return;
+      }
+
+      try {
+        const missingNames = directors
+          .filter((director) => missing.includes(director.key))
+          .map((director) => director.name);
+
+        const enrichedMissing = await buildDirectorProfiles(missingNames, {
+          overrides: directorOverrides,
+          onProgress: (current, total) => {
+            if (!active) return;
+            const base = initialProfiles.length;
+            setProgress({ current: base + current, total: directors.length });
+          }
+        });
+
+        if (!active) return;
+
+        const mergedProfiles: DirectorListProfile[] = [...initialProfiles];
+
+        enrichedMissing.forEach((profile) => {
+          const dir = directors.find((director) => director.name === profile.name);
+          if (!dir) return;
+
+          mergedProfiles.push({
+            ...profile,
+            key: dir.key,
+            worksCount: dir.worksCount,
+            totalWorksDirected: null,
+            totalWorksCreated: null
+          });
+        });
+
+        const sorted = [...mergedProfiles].sort((a, b) =>
           collator.compare(a.displayName || a.name, b.displayName || b.name)
         );
         setProfiles(sorted);
+        setLoading(false);
         setProgress(null);
+
+        const nextCache: DirectorProfilesCache = {
+          version: CACHE_VERSION,
+          directors: { ...(cache?.directors || {}) }
+        };
+        const now = new Date().toISOString();
+
+        sorted.forEach((profile) => {
+          nextCache.directors[profile.key] = {
+            key: profile.key,
+            name: profile.name,
+            displayName: profile.displayName,
+            tmdbId: profile.tmdbId ?? undefined,
+            profileUrl: profile.profileUrl ?? undefined,
+            worksCountOwned: profile.worksCount,
+            totalWorksDirected: profile.totalWorksDirected ?? null,
+            totalWorksCreated: profile.totalWorksCreated ?? null,
+            updatedAt: now
+          };
+        });
+
+        saveDirectorCache(nextCache);
       } catch (err) {
         console.warn('No se pudieron cargar los directores', err);
         if (active) setError('No se pudieron cargar los directores.');
-      } finally {
         if (active) setLoading(false);
       }
     }
@@ -173,32 +291,107 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       }
 
       const tmdbTotals = totalsCache.current;
+      const cache = loadDirectorCache();
+
+      const initialCoverage: Record<string, { owned: number; total: number | null }> = {};
+      const pending: DirectorListProfile[] = [];
+
+      profiles.forEach((profile) => {
+        const cached = cache?.directors?.[profile.key];
+        const ownedFromCache = cached?.worksCountOwned;
+        const owned = profile.worksCount || ownedFromCache || 0;
+        const totalFromCache = getTotalFromEntry(cached) ?? getTotalFromEntry(profile);
+        if (totalFromCache != null) {
+          initialCoverage[profile.key] = { owned, total: totalFromCache };
+        } else {
+          pending.push({ ...profile, worksCount: owned });
+        }
+      });
+
+      if (!cancelled) {
+        setCoverage(initialCoverage);
+      }
+
+      if (pending.length === 0) {
+        return;
+      }
+
       const rows = await Promise.all(
-        profiles.map(async (profile) => {
+        pending.map(async (profile) => {
           const owned = profile.worksCount;
 
           let total: number | null = null;
+          let directedCount: number | null = null;
+          let createdCount: number | null = null;
+
           if (profile.tmdbId) {
             if (tmdbTotals.has(profile.tmdbId)) {
               total = tmdbTotals.get(profile.tmdbId) ?? null;
             } else {
               const filmography = await getPersonDirectedMovies(profile.tmdbId);
+              directedCount = filmography.filter((item) =>
+                (item.job ?? '').toLowerCase().includes('director')
+              ).length;
+              createdCount = filmography.filter((item) =>
+                (item.job ?? '').toLowerCase().includes('creator')
+              ).length;
               total = filmography.length;
-              tmdbTotals.set(profile.tmdbId, total);
+              tmdbTotals.set(profile.tmdbId, total ?? 0);
             }
           }
 
-          return { key: profile.key, owned, total };
+          return { key: profile.key, owned, total, directedCount, createdCount, profile };
         })
       );
 
       if (cancelled) return;
 
-      const nextCoverage: Record<string, { owned: number; total: number | null }> = {};
-      rows.forEach(({ key, owned, total }) => {
-        nextCoverage[key] = { owned, total };
+      const rowsByKey = new Map(rows.map((row) => [row.key, row]));
+      const nextCoverage: Record<string, { owned: number; total: number | null }> = {
+        ...initialCoverage
+      };
+
+      const nextCache: DirectorProfilesCache = {
+        version: CACHE_VERSION,
+        directors: { ...(cache?.directors ?? {}) }
+      };
+      const now = new Date().toISOString();
+
+      profiles.forEach((profile) => {
+        const cached = cache?.directors?.[profile.key];
+        const row = rowsByKey.get(profile.key);
+
+        const directedCount =
+          row?.directedCount ?? cached?.totalWorksDirected ?? profile.totalWorksDirected ?? null;
+        const createdCount =
+          row?.createdCount ?? cached?.totalWorksCreated ?? profile.totalWorksCreated ?? null;
+
+        const total =
+          row?.total ??
+          initialCoverage[profile.key]?.total ??
+          getTotalFromEntry({ totalWorksDirected: directedCount, totalWorksCreated: createdCount });
+
+        const owned = profile.worksCount || cached?.worksCountOwned || 0;
+
+        if (total != null) {
+          nextCoverage[profile.key] = { owned, total };
+        }
+
+        nextCache.directors[profile.key] = {
+          key: profile.key,
+          name: profile.name,
+          displayName: profile.displayName,
+          tmdbId: profile.tmdbId ?? undefined,
+          profileUrl: profile.profileUrl ?? undefined,
+          worksCountOwned: owned,
+          totalWorksDirected: directedCount,
+          totalWorksCreated: createdCount,
+          updatedAt: now
+        };
       });
+
       setCoverage(nextCoverage);
+      saveDirectorCache(nextCache);
     }
 
     loadCoverage();
@@ -207,13 +400,27 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [profiles]);
 
+  const uniqueProfiles = useMemo(() => {
+    const map = new Map<string, DirectorListProfile>();
+    profiles.forEach((profile) => {
+      if (!map.has(profile.key)) {
+        map.set(profile.key, profile);
+      }
+    });
+    return Array.from(map.values());
+  }, [profiles]);
+
   const filteredProfiles = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    const filtered = profiles.filter((director) => {
-      const name = (director.displayName || director.name).trim();
-      const matchesLetter = letterFilter ? name.toUpperCase().startsWith(letterFilter) : true;
-      const matchesSearch = normalizedSearch ? name.toLowerCase().includes(normalizedSearch) : true;
+    const filtered = uniqueProfiles.filter((director) => {
+      const label = (director.displayName || director.name || '').trim();
+      const upper = label.toUpperCase();
+      const lower = label.toLowerCase();
+
+      const matchesLetter = letterFilter ? upper.startsWith(letterFilter) : true;
+      const matchesSearch = normalizedSearch ? lower.includes(normalizedSearch) : true;
+
       return matchesLetter && matchesSearch;
     });
 
@@ -234,7 +441,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return sorted.map((entry) => entry.profile);
-  }, [letterFilter, searchTerm, profiles, coverage, orderBy, collator]);
+  }, [letterFilter, searchTerm, uniqueProfiles, coverage, orderBy, collator]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
@@ -323,37 +530,37 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         </div>
       )}
       <div className="director-grid">
-        {filteredProfiles.map((director) => (
-          <Link
-            to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
-            className="director-card"
-            key={buildDirectorKey(director.name, director.tmdbId)}
-          >
-            {(() => {
-              const key = director.key;
-              const stats = coverage[key];
-              const owned = stats?.owned ?? director.worksCount;
-              const total = stats?.total ?? null;
-              const medal = getMedal(owned, total);
-              const label = total ? `${owned} de ${total}` : `${owned} en colección`;
-              return (
-                <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
-                  <span className="director-coverage__counts">
-                    {owned}
-                    <span className="director-coverage__divider">/</span>
-                    {total ?? '—'}
-                  </span>
-                  {medal && (
-                    <span
-                      className={`director-coverage__medal director-coverage__medal--${medal}`}
-                      aria-hidden
-                    >
-                      ★
-                    </span>
-                  )}
+        {filteredProfiles.map((director) => {
+          const key = director.key;
+          const stats = coverage[key];
+          const owned = stats?.owned ?? director.worksCount;
+          const total = stats?.total ?? null;
+          const medal = getMedal(owned, total);
+          const label = total ? `${owned} de ${total}` : `${owned} en colección`;
+
+          return (
+            <Link
+              to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+              className={['director-card', medal ? `director-card--${medal}` : '']
+                .filter(Boolean)
+                .join(' ')}
+              key={director.key}
+            >
+              <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
+                <span className="director-coverage__counts">
+                  {owned}
+                  <span className="director-coverage__divider">/</span>
+                  {total ?? '—'}
                 </span>
-              );
-            })()}
+                {medal && (
+                  <span
+                    className={`director-coverage__medal director-coverage__medal--${medal}`}
+                    aria-hidden
+                  >
+                    ★
+                  </span>
+                )}
+              </span>
               <div
                 className="director-thumb"
                 style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
@@ -364,7 +571,8 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                 <small className="section-count">Ver perfil</small>
               </div>
             </Link>
-          ))}
+          );
+        })}
         {filteredProfiles.length === 0 && (
           <p className="muted" style={{ padding: '12px 0' }}>
             No hay directores que coincidan con los filtros aplicados.
