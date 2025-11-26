@@ -160,6 +160,14 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
 
+  const detailMedal = useMemo(() => {
+    if (!totalCount || totalCount <= 0) return null;
+    if (medalUnlocks.gold) return 'gold';
+    if (medalUnlocks.silver) return 'silver';
+    if (medalUnlocks.bronze) return 'bronze';
+    return null;
+  }, [medalUnlocks, totalCount]);
+
   const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
     if (items.length === 0) {
       return (
@@ -236,52 +244,36 @@ export const DirectorPage: React.FC = () => {
           aria-hidden="true"
         />
         <div className="director-legend">
-          <p className="eyebrow">Directores</p>
-          <h1>{personName || directorName}</h1>
-          {loading && <p className="text-muted">Recopilando biografía...</p>}
-          {!loading && biography && <p className="text-muted">{biography}</p>}
-          {!loading && !biography && <p className="text-muted">Biografía no disponible.</p>}
-          <div className="director-meta">
-            <div>
-              <p className="eyebrow" style={{ marginBottom: 4 }}>
-                En colección
-              </p>
-              <p className="director-meta__counts">
-                <span className="director-meta__value">{ownedCount}</span>
-                <span className="director-meta__divider">/</span>
-                <span className="director-meta__total">{totalCount || '—'}</span>
-              </p>
+          <div className="director-legend__top">
+            <div className="director-legend__titles">
+              <p className="eyebrow">Directores</p>
+              <h1>{personName || directorName}</h1>
             </div>
-            <div className="director-meta__medals" aria-label="Progreso de colección">
-              <span
-                className={`director-coverage__medal director-coverage__medal--bronze ${
-                  medalUnlocks.bronze ? 'is-active' : 'is-disabled'
-                }`}
-                title="Bronce"
-                aria-hidden
-              >
-                ★
-              </span>
-              <span
-                className={`director-coverage__medal director-coverage__medal--silver ${
-                  medalUnlocks.silver ? 'is-active' : 'is-disabled'
-                }`}
-                title="Plata"
-                aria-hidden
-              >
-                ★
-              </span>
-              <span
-                className={`director-coverage__medal director-coverage__medal--gold ${
-                  medalUnlocks.gold ? 'is-active' : 'is-disabled'
-                }`}
-                title="Oro"
-                aria-hidden
-              >
-                ★
-              </span>
+            <div
+              className={['collection-badge', detailMedal ? `collection-badge--${detailMedal}` : '']
+                .filter(Boolean)
+                .join(' ')}
+              aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}
+            >
+              <span className="collection-badge__label">En colección</span>
+              <div className="collection-badge__stats">
+                <span className="collection-badge__value">{ownedCount}</span>
+                <span className="collection-badge__divider">/</span>
+                <span className="collection-badge__total">{totalCount || '—'}</span>
+                {detailMedal && (
+                  <span
+                    className={`collection-badge__medal director-coverage__medal director-coverage__medal--${detailMedal}`}
+                    aria-hidden
+                  >
+                    ★
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          {loading && <p className="text-muted">Recopilando biografía...</p>}
+          {!loading && biography && <p className="text-muted director-legend__bio">{biography}</p>}
+          {!loading && !biography && <p className="text-muted director-legend__bio">Biografía no disponible.</p>}
         </div>
       </div>
 

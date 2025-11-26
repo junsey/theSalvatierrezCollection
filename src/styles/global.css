@@ -1510,6 +1510,7 @@ button.ghost {
   min-height: 240px;
   justify-content: flex-end;
   background: rgba(255, 255, 255, 0.02);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .director-coverage {
@@ -1519,12 +1520,12 @@ button.ghost {
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   background: rgba(6, 6, 10, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.85em;
+  padding: 7px 12px;
+  font-size: 0.9em;
   color: var(--text-muted);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
@@ -1541,21 +1542,43 @@ button.ghost {
 }
 
 .director-coverage__medal {
-  font-size: 0.95em;
+  font-size: 1.15em;
   line-height: 1;
   text-shadow: 0 0 8px rgba(0, 0, 0, 0.45);
 }
 
 .director-coverage__medal--bronze {
-  color: #c58b4c;
+  color: #e0a45e;
 }
 
 .director-coverage__medal--silver {
-  color: #cbd5e1;
+  color: #d7dfe7;
 }
 
 .director-coverage__medal--gold {
-  color: #f7d251;
+  color: #ffd765;
+}
+
+.director-card--bronze {
+  border-color: #e0a45e;
+  box-shadow: 0 10px 24px rgba(224, 164, 94, 0.22);
+}
+
+.director-card--silver {
+  border-color: #d7dfe7;
+  box-shadow: 0 10px 24px rgba(215, 223, 231, 0.22);
+}
+
+.director-card--gold {
+  border-color: #ffd765;
+  box-shadow: 0 10px 24px rgba(255, 215, 101, 0.28);
+}
+
+.director-card--bronze:hover,
+.director-card--silver:hover,
+.director-card--gold:hover {
+  transform: scale(1.01);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
 .section-thumb {
@@ -1711,8 +1734,8 @@ button.ghost {
 
 .director-hero {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(340px, 1fr);
-  gap: 14px 24px;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
   padding: 18px;
   margin-bottom: 18px;
   border: 1px solid var(--border);
@@ -1744,38 +1767,107 @@ button.ghost {
 .director-legend {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   justify-content: center;
 }
 
-.director-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+.director-legend__top {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.director-legend__titles h1 {
+  margin-bottom: 6px;
+}
+
+.director-legend__bio {
+  max-width: 70ch;
+  line-height: 1.6;
+}
+
+.collection-badge {
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  gap: 6px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: inset 0 0 12px rgba(255, 54, 93, 0.08);
+  min-width: 160px;
+  box-shadow: inset 0 0 12px rgba(224, 160, 64, 0.12);
 }
 
-.director-meta__counts {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 1.2em;
-  letter-spacing: 0.03em;
+.collection-badge--bronze {
+  border-color: #e0a45e;
+  box-shadow: inset 0 0 12px rgba(224, 164, 94, 0.28);
 }
 
-.director-meta__value {
-  font-weight: 700;
+.collection-badge--silver {
+  border-color: #d7dfe7;
+  box-shadow: inset 0 0 12px rgba(215, 223, 231, 0.28);
 }
 
-.director-meta__divider,
-.director-meta__total {
+.collection-badge--gold {
+  border-color: #ffd765;
+  box-shadow: inset 0 0 14px rgba(255, 215, 101, 0.35);
+}
+
+.collection-badge__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
   color: var(--text-muted);
+}
+
+.collection-badge__stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.collection-badge__value {
+  font-size: 1.35em;
+  font-weight: 800;
+}
+
+.collection-badge__divider,
+.collection-badge__total {
+  color: var(--text-muted);
+}
+
+.collection-badge__medal {
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+@media (max-width: 900px) {
+  .director-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .director-portrait {
+    max-width: 100%;
+    justify-self: center;
+  }
+
+  .director-legend__top {
+    grid-template-columns: 1fr;
+  }
+
+  .collection-badge {
+    width: 100%;
+    justify-items: flex-start;
+  }
+
+  .collection-badge__stats {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 .director-meta__medals {

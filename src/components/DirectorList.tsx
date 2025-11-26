@@ -32,9 +32,6 @@ const normalizeTitle = (value: string) => {
 const buildDirectorKey = (name: string, tmdbId?: number | null) =>
   Number.isFinite(tmdbId) ? `tmdb-${tmdbId}` : `name-${normalizeDirectorName(name)}`;
 
-const getOverrideKey = (name: string, overrides: Map<string, number>) =>
-  buildDirectorKey(name, overrides.get(normalizeDirectorName(name)));
-
 const getWorkKey = (movie: MovieRecord) => {
   const mediaType = movie.tmdbType ?? (movie.series ? 'tv' : 'movie');
   const normalizedTitle = normalizeTitle(movie.title);
@@ -79,8 +76,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           const normalizedName = normalizeDirectorName(name);
           const overrideId = directorOverrides.get(normalizedName);
           const key = buildDirectorKey(name, overrideId);
-          if (!map.has(key)) {
-            map.set(key, {
+          const mapKey = normalizedName;
+
+          if (!map.has(mapKey)) {
+            map.set(mapKey, {
               key,
               name: name.trim(),
               normalizedName,
@@ -88,11 +87,11 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               worksCount: 0
             });
           }
-          const entry = map.get(key)!;
+          const entry = map.get(mapKey)!;
           const workKey = getWorkKey(movie);
-          const workKeys = worksByDirector.get(key) ?? new Set<string>();
-          if (!worksByDirector.has(key)) {
-            worksByDirector.set(key, workKeys);
+          const workKeys = worksByDirector.get(mapKey) ?? new Set<string>();
+          if (!worksByDirector.has(mapKey)) {
+            worksByDirector.set(mapKey, workKeys);
           }
           if (!workKeys.has(workKey)) {
             entry.worksCount += 1;
@@ -401,13 +400,27 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     };
   }, [profiles]);
 
+  const uniqueProfiles = useMemo(() => {
+    const map = new Map<string, DirectorListProfile>();
+    profiles.forEach((profile) => {
+      if (!map.has(profile.key)) {
+        map.set(profile.key, profile);
+      }
+    });
+    return Array.from(map.values());
+  }, [profiles]);
+
   const filteredProfiles = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    const filtered = profiles.filter((director) => {
-      const name = (director.displayName || director.name).trim();
-      const matchesLetter = letterFilter ? name.toUpperCase().startsWith(letterFilter) : true;
-      const matchesSearch = normalizedSearch ? name.toLowerCase().includes(normalizedSearch) : true;
+    const filtered = uniqueProfiles.filter((director) => {
+      const label = (director.displayName || director.name || '').trim();
+      const upper = label.toUpperCase();
+      const lower = label.toLowerCase();
+
+      const matchesLetter = letterFilter ? upper.startsWith(letterFilter) : true;
+      const matchesSearch = normalizedSearch ? lower.includes(normalizedSearch) : true;
+
       return matchesLetter && matchesSearch;
     });
 
@@ -428,7 +441,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return sorted.map((entry) => entry.profile);
-  }, [letterFilter, searchTerm, profiles, coverage, orderBy, collator]);
+  }, [letterFilter, searchTerm, uniqueProfiles, coverage, orderBy, collator]);
 
   const getMedal = (owned: number, total: number | null) => {
     if (!total || total <= 0) return null;
@@ -517,37 +530,37 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         </div>
       )}
       <div className="director-grid">
-        {filteredProfiles.map((director) => (
-          <Link
-            to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
-            className="director-card"
-            key={buildDirectorKey(director.name, director.tmdbId)}
-          >
-            {(() => {
-              const key = director.key;
-              const stats = coverage[key];
-              const owned = stats?.owned ?? director.worksCount;
-              const total = stats?.total ?? null;
-              const medal = getMedal(owned, total);
-              const label = total ? `${owned} de ${total}` : `${owned} en colección`;
-              return (
-                <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
-                  <span className="director-coverage__counts">
-                    {owned}
-                    <span className="director-coverage__divider">/</span>
-                    {total ?? '—'}
-                  </span>
-                  {medal && (
-                    <span
-                      className={`director-coverage__medal director-coverage__medal--${medal}`}
-                      aria-hidden
-                    >
-                      ★
-                    </span>
-                  )}
+        {filteredProfiles.map((director) => {
+          const key = director.key;
+          const stats = coverage[key];
+          const owned = stats?.owned ?? director.worksCount;
+          const total = stats?.total ?? null;
+          const medal = getMedal(owned, total);
+          const label = total ? `${owned} de ${total}` : `${owned} en colección`;
+
+          return (
+            <Link
+              to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+              className={['director-card', medal ? `director-card--${medal}` : '']
+                .filter(Boolean)
+                .join(' ')}
+              key={director.key}
+            >
+              <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
+                <span className="director-coverage__counts">
+                  {owned}
+                  <span className="director-coverage__divider">/</span>
+                  {total ?? '—'}
                 </span>
-              );
-            })()}
+                {medal && (
+                  <span
+                    className={`director-coverage__medal director-coverage__medal--${medal}`}
+                    aria-hidden
+                  >
+                    ★
+                  </span>
+                )}
+              </span>
               <div
                 className="director-thumb"
                 style={{ backgroundImage: `url(${director.profileUrl || FALLBACK_PORTRAIT})` }}
@@ -558,7 +571,8 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                 <small className="section-count">Ver perfil</small>
               </div>
             </Link>
-          ))}
+          );
+        })}
         {filteredProfiles.length === 0 && (
           <p className="muted" style={{ padding: '12px 0' }}>
             No hay directores que coincidan con los filtros aplicados.
