@@ -1559,6 +1559,13 @@ button.ghost {
   color: #ffd765;
 }
 
+.director-card--bronze,
+.director-card--silver,
+.director-card--gold {
+  border-color: #ffd765;
+  box-shadow: 0 10px 24px rgba(255, 215, 101, 0.28);
+}
+
 .director-card--bronze {
   border-color: #e0a45e;
   box-shadow: 0 10px 24px rgba(224, 164, 94, 0.22);
@@ -2101,6 +2108,35 @@ small {
   margin: 0 0 8px;
   font-family: 'Uncial Antiqua', 'EB Garamond', serif;
   letter-spacing: 0.5px;
+}
+
+/* Ensure medal borders override the base card styling declared above */
+.director-card.director-card--bronze,
+.director-card.director-card--silver,
+.director-card.director-card--gold {
+  border-width: 1px;
+}
+
+.director-card.director-card--bronze {
+  border-color: #e0a45e;
+  box-shadow: 0 10px 24px rgba(224, 164, 94, 0.22);
+}
+
+.director-card.director-card--silver {
+  border-color: #d7dfe7;
+  box-shadow: 0 10px 24px rgba(215, 223, 231, 0.22);
+}
+
+.director-card.director-card--gold {
+  border-color: #ffd765;
+  box-shadow: 0 10px 24px rgba(255, 215, 101, 0.28);
+}
+
+.director-card.director-card--bronze:hover,
+.director-card.director-card--silver:hover,
+.director-card.director-card--gold:hover {
+  transform: scale(1.01);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
 .film-link {
