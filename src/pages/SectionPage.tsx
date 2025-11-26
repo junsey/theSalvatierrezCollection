@@ -83,7 +83,7 @@ export const SectionPage: React.FC = () => {
         onReset={handleReset}
       />
       {filters.view === 'grid' ? (
-        <div className="movie-grid">
+        <div className="movie-grid movie-grid--seven">
           {filtered.map((movie) => (
             <MovieCard key={movie.id} movie={movie} onClick={() => setActiveMovie(movie)} />
           ))}
