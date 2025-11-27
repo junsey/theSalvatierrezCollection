@@ -5,7 +5,7 @@ import { useMovies } from '../context/MovieContext';
 import { MovieRecord } from '../types/MovieRecord';
 
 export const SurpriseMovieNightPage: React.FC = () => {
-  const { movies } = useMovies();
+  const { visibleMovies: movies } = useMovies();
   const [active, setActive] = useState<MovieRecord | null>(null);
   return (
     <section>

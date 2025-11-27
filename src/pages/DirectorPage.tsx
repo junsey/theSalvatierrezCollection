@@ -14,6 +14,8 @@ const buildDirectorCollections = (directorName: string, collection: MovieRecord[
   const normalizedDirector = normalizeDirectorName(directorName);
   const ownedIds = new Set<number>();
   const ownedTitles = new Set<string>();
+  const hiddenOwnedIds = new Set<number>();
+  const hiddenOwnedTitles = new Set<string>();
 
   collection.forEach((movie) => {
     const matchesDirector = splitDirectors(movie.director)
@@ -22,23 +24,44 @@ const buildDirectorCollections = (directorName: string, collection: MovieRecord[
 
     if (!matchesDirector) return;
 
+    const isHidden = movie.seccion.trim().toLowerCase() === 'z-inexistente';
+
     if (Number.isFinite(movie.tmdbId) && movie.tmdbId != null) {
       ownedIds.add(movie.tmdbId);
+      if (isHidden) {
+        hiddenOwnedIds.add(movie.tmdbId);
+      }
     }
 
-    ownedTitles.add(normalizeTitle(movie.title));
+    const normalizedTitle = normalizeTitle(movie.title);
+    ownedTitles.add(normalizedTitle);
+    if (isHidden) {
+      hiddenOwnedTitles.add(normalizedTitle);
+    }
     if (movie.tmdbTitle) {
-      ownedTitles.add(normalizeTitle(movie.tmdbTitle));
+      const normalizedTmdbTitle = normalizeTitle(movie.tmdbTitle);
+      ownedTitles.add(normalizedTmdbTitle);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedTmdbTitle);
+      }
     }
     if (movie.originalTitle) {
-      ownedTitles.add(normalizeTitle(movie.originalTitle));
+      const normalizedOriginal = normalizeTitle(movie.originalTitle);
+      ownedTitles.add(normalizedOriginal);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedOriginal);
+      }
     }
     if (movie.tmdbOriginalTitle) {
-      ownedTitles.add(normalizeTitle(movie.tmdbOriginalTitle));
+      const normalizedTmdbOriginal = normalizeTitle(movie.tmdbOriginalTitle);
+      ownedTitles.add(normalizedTmdbOriginal);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedTmdbOriginal);
+      }
     }
   });
 
-  return { ownedIds, ownedTitles };
+  return { ownedIds, ownedTitles, hiddenOwnedIds, hiddenOwnedTitles };
 };
 
 export const DirectorPage: React.FC = () => {
@@ -111,6 +134,9 @@ export const DirectorPage: React.FC = () => {
 
     const isOwned = (title: string, id: number) =>
       directorCollection.ownedIds.has(id) || directorCollection.ownedTitles.has(normalizeTitle(title));
+    const isHiddenOwned = (title: string, id: number) =>
+      directorCollection.hiddenOwnedIds.has(id) ||
+      directorCollection.hiddenOwnedTitles.has(normalizeTitle(title));
 
     const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
       const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
@@ -130,7 +156,11 @@ export const DirectorPage: React.FC = () => {
         movieSeen.add(credit.id);
         return true;
       })
-      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .map((credit) => ({
+        ...credit,
+        owned: isOwned(credit.title, credit.id),
+        hiddenOwned: isHiddenOwned(credit.title, credit.id)
+      }))
       .sort(sortByDate);
 
     const created = knownFor
@@ -140,7 +170,11 @@ export const DirectorPage: React.FC = () => {
         seriesSeen.add(credit.id);
         return true;
       })
-      .map((credit) => ({ ...credit, owned: isOwned(credit.title, credit.id) }))
+      .map((credit) => ({
+        ...credit,
+        owned: isOwned(credit.title, credit.id),
+        hiddenOwned: isHiddenOwned(credit.title, credit.id)
+      }))
       .sort(sortByDate);
 
     const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
@@ -178,7 +212,7 @@ export const DirectorPage: React.FC = () => {
       );
     }
 
-    type DisplayItem = (DirectedMovie & { owned?: boolean }) | { id: string; placeholder: true };
+    type DisplayItem = (DirectedMovie & { owned?: boolean; hiddenOwned?: boolean }) | { id: string; placeholder: true };
     const placeholders = Array.from({ length: Math.max(0, 7 - items.length) }, (_, idx) => ({
       id: `${title}-placeholder-${idx}`,
       placeholder: true as const
@@ -200,12 +234,15 @@ export const DirectorPage: React.FC = () => {
             }
 
             const owned = item.owned;
+            const hiddenOwned = owned && 'hiddenOwned' in item && Boolean(item.hiddenOwned);
+            const mediaLabel = item.mediaType === 'tv' ? 'Serie' : 'Película';
             return (
               <div
                 key={item.id}
                 className={`known-for-card ${owned ? 'owned' : 'missing'}`}
                 aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
               >
+                {hiddenOwned && <span className="known-for-card__badge">No Editado</span>}
                 <div className="known-for-card__poster">
                   {item.posterUrl ? (
                     <img src={item.posterUrl} alt={item.title} className={!owned ? 'is-muted' : undefined} />
@@ -216,11 +253,13 @@ export const DirectorPage: React.FC = () => {
                 <div className="known-for-card__meta">
                   <div className="known-for-card__meta-row">
                     <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                  </div>
+                  <div className="known-for-card__meta-row known-for-card__meta-row--footer">
+                    {item.year && <small>{item.year}</small>}
                     <span className="media-tag" aria-label={title}>
-                      {item.mediaType === 'tv' ? 'Serie' : 'Película'}
+                      {mediaLabel}
                     </span>
                   </div>
-                  {item.year && <small>{item.year}</small>}
                 </div>
               </div>
             );

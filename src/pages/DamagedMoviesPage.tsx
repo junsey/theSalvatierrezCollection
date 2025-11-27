@@ -5,12 +5,12 @@ import { useMovies } from '../context/MovieContext';
 import { MovieRecord } from '../types/MovieRecord';
 
 export const DamagedMoviesPage: React.FC = () => {
-  const { movies, loading, error } = useMovies();
+  const { visibleMovies, loading, error } = useMovies();
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
   const damagedMovies = useMemo(
-    () => movies.filter((movie) => movie.funcionaStatus === 'damaged'),
-    [movies]
+    () => visibleMovies.filter((movie) => movie.funcionaStatus === 'damaged'),
+    [visibleMovies]
   );
 
   return (

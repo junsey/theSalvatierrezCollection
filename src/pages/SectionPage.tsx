@@ -21,13 +21,16 @@ const baseFilters: MovieFilters = {
 export const SectionPage: React.FC = () => {
   const { name } = useParams();
   const sectionName = decodeURIComponent(name ?? '');
-  const { movies, ratings } = useMovies();
+  const { visibleMovies, ratings } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, seccion: sectionName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
   const handleReset = () => setFilters({ ...baseFilters, seccion: sectionName });
 
-  const sectionMovies = useMemo(() => movies.filter((m) => m.seccion === sectionName), [movies, sectionName]);
+  const sectionMovies = useMemo(
+    () => visibleMovies.filter((m) => m.seccion === sectionName),
+    [visibleMovies, sectionName]
+  );
 
   const filtered = useMemo(() => {
     return sectionMovies
