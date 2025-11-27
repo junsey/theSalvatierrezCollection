@@ -2331,6 +2331,14 @@ small {
   gap: 10px;
 }
 
+.known-for-card__meta-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .media-tag {
   padding: 4px 10px;
   border-radius: 999px;

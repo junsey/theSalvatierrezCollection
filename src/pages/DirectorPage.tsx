@@ -214,13 +214,13 @@ export const DirectorPage: React.FC = () => {
                   )}
                 </div>
                 <div className="known-for-card__meta">
-                  <div className="known-for-card__meta-row">
-                    <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                  <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                  <div className="known-for-card__meta-footer">
+                    {item.year && <small>{item.year}</small>}
                     <span className="media-tag" aria-label={title}>
                       {item.mediaType === 'tv' ? 'Serie' : 'Película'}
                     </span>
                   </div>
-                  {item.year && <small>{item.year}</small>}
                 </div>
               </div>
             );
