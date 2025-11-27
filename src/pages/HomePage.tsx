@@ -138,7 +138,7 @@ const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
 };
 
 export const HomePage: React.FC = () => {
-  const { movies, loading } = useMovies();
+  const { visibleMovies: movies, loading } = useMovies();
 
   const {
     totalMovies,

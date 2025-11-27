@@ -20,7 +20,7 @@ const defaultFilters: MovieFilters = {
 };
 
 export const AllMoviesPage: React.FC = () => {
-  const { movies, loading, error, ratings } = useMovies();
+  const { visibleMovies, loading, error, ratings } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
   const location = useLocation();
@@ -48,7 +48,7 @@ export const AllMoviesPage: React.FC = () => {
       return candidates.some((title) => title.includes(query));
     };
 
-    return movies
+    return visibleMovies
       .filter((m) => matchesTitle(m))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
       .filter((m) => {
@@ -89,15 +89,15 @@ export const AllMoviesPage: React.FC = () => {
             return a.title.localeCompare(b.title);
         }
       });
-  }, [movies, filters, ratings]);
+  }, [visibleMovies, filters, ratings]);
 
   useEffect(() => {
-    if (!movies.length) return;
+    if (!visibleMovies.length) return;
     const params = new URLSearchParams(location.search);
     const tmdbId = params.get('tmdbId');
     const saga = params.get('saga');
     if (tmdbId) {
-      const match = movies.find((m) => m.tmdbId === Number(tmdbId));
+      const match = visibleMovies.find((m) => m.tmdbId === Number(tmdbId));
       if (match) {
         setActiveMovie(match);
       }
@@ -111,14 +111,14 @@ export const AllMoviesPage: React.FC = () => {
         return next;
       });
     }
-  }, [location.search, movies]);
+  }, [location.search, visibleMovies]);
 
   return (
     <section>
       <h1>Archive of All Films</h1>
       {loading && <p>Summoning data from the crypt...</p>}
       {error && <p>Error: {error}</p>}
-      <FiltersBar filters={filters} onChange={handleChange} movies={movies} onReset={handleReset} />
+      <FiltersBar filters={filters} onChange={handleChange} movies={visibleMovies} onReset={handleReset} />
       {filters.view === 'grid' ? (
         <div className="movie-grid movie-grid--six">
           {filtered.map((movie) => (

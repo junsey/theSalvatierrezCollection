@@ -25,6 +25,7 @@ interface ProgressState {
 
 interface MovieContextValue {
   movies: MovieRecord[];
+  visibleMovies: MovieRecord[];
   loading: boolean;
   error: string | null;
   seenOverrides: Record<string, boolean>;
@@ -52,6 +53,11 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [notes, setNotes] = useState(getNotes());
   const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
+
+  const visibleMovies = useMemo(
+    () => movies.filter((movie) => movie.seccion.trim().toLowerCase() !== 'z-inexistente'),
+    [movies]
+  );
 
   const refresh = async (options?: RefreshOptions) => {
     setLoading(true);
@@ -222,7 +228,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Actualizar solo las películas enriquecidas
       const enrichedMap = new Map(enriched.map(m => [m.id, m]));
       const updated = currentMovies.map(m => enrichedMap.get(m.id) || m);
-      
+
       setMovies(updated);
       const cached = loadMovieCache();
       saveMovieCache(updated, cached?.sheetMeta ?? null);
@@ -269,10 +275,11 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [movies, ratingOverrides]);
 
   const value = useMemo(
-    () => ({ 
-      movies, 
-      loading, 
-      error, 
+    () => ({
+      movies,
+      visibleMovies,
+      loading,
+      error,
       refresh, 
       refreshAll, 
       refreshSheet, 
@@ -286,7 +293,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sheetMeta,
       progress
     }),
-    [movies, loading, error, seenOverrides, personalRatings, notes, sheetMeta, progress]
+    [movies, visibleMovies, loading, error, seenOverrides, personalRatings, notes, sheetMeta, progress]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;

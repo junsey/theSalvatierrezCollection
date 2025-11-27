@@ -3,7 +3,7 @@ import { DirectorList } from '../components/DirectorList';
 import { useMovies } from '../context/MovieContext';
 
 export const DirectorsHub: React.FC = () => {
-  const { movies } = useMovies();
+  const { visibleMovies: movies } = useMovies();
   return (
     <section>
       <h1>Directores</h1>

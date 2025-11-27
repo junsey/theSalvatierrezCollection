@@ -3,7 +3,7 @@ import { SectionList } from '../components/SectionList';
 import { useMovies } from '../context/MovieContext';
 
 export const SectionsHub: React.FC = () => {
-  const { movies } = useMovies();
+  const { visibleMovies: movies } = useMovies();
   return (
     <section>
       <h1>Sections</h1>
