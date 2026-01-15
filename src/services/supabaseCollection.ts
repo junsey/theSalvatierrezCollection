@@ -5,6 +5,7 @@ type CollectionRow = {
   id: string;
   Seccion?: string | null;
   'AAAño'?: number | null;
+  'Año'?: number | null;
   Saga?: string | null;
   Titulo?: string | null;
   'Titulo Original'?: string | null;
@@ -88,7 +89,7 @@ function mapRow(row: CollectionRow): MovieRecord {
   return {
     id: row.id,
     seccion: toText(row.Seccion, 'Desconocida'),
-    year: row['AAAño'] ?? null,
+    year: row['AAAño'] ?? row['Año'] ?? null,
     saga: toText(row.Saga),
     title: toText(row.Titulo, 'Sin tA-tulo'),
     originalTitle: toText(row['Titulo Original']),
@@ -117,6 +118,9 @@ export async function fetchCollectionFromSupabase(): Promise<FetchMoviesResult |
     if (record['AAAño'] !== undefined) return mapRow(record);
     if (record['AAño'] !== undefined) {
       return mapRow({ ...record, 'AAAño': record['AAño'] as number | null });
+    }
+    if (record['Año'] !== undefined) {
+      return mapRow({ ...record, 'AAAño': record['Año'] as number | null });
     }
     return mapRow(record);
   });
