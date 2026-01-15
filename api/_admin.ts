@@ -18,12 +18,24 @@ const getAdminToken = (req: any): string | null => {
   return typeof token === 'string' ? token : null;
 };
 
+const decodeBase64 = (value: string): string | null => {
+  if (typeof atob === 'function') {
+    return atob(value);
+  }
+  const bufferRef = (globalThis as any).Buffer;
+  if (bufferRef?.from) {
+    return bufferRef.from(value, 'base64').toString('utf-8');
+  }
+  return null;
+};
+
 export const isAdminAuthorized = (req: any): boolean => {
   if (!ADMIN_USER || !ADMIN_PASS) return false;
   const token = getAdminToken(req);
   if (!token) return false;
-  const expected = Buffer.from(`${ADMIN_USER}:${ADMIN_PASS}`, 'utf-8').toString('base64');
-  return token === expected;
+  const decoded = decodeBase64(token);
+  if (!decoded) return false;
+  return decoded === `${ADMIN_USER}:${ADMIN_PASS}`;
 };
 
 export const reject = (res: any, status: number, message: string) => {
