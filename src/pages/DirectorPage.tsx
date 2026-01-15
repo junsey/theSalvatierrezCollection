@@ -68,7 +68,7 @@ const buildDirectorCollections = (directorName: string, collection: MovieRecord[
 export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const directorName = decodeURIComponent(name ?? '').trim();
-  const { movies } = useMovies();
+  const { movies, tmdbEnrichmentEnabled } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const directorCollection = useMemo(
     () => buildDirectorCollections(directorName, movies),
@@ -124,6 +124,11 @@ export const DirectorPage: React.FC = () => {
           return;
         }
 
+        if (!tmdbEnrichmentEnabled) {
+          setLoading(false);
+          return;
+        }
+
         const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: supabaseTmdbId ?? overrideTmdbId });
         if (!active) return;
 
@@ -151,7 +156,7 @@ export const DirectorPage: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [directorName, directorOverrides]);
+  }, [directorName, directorOverrides, tmdbEnrichmentEnabled]);
 
   const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);

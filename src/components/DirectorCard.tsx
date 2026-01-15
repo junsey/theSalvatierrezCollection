@@ -31,7 +31,7 @@ const formatDate = (date?: string | null) => {
 };
 
 export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) => {
-  const { movies } = useMovies();
+  const { movies, tmdbEnrichmentEnabled } = useMovies();
   const [state, setState] = useState<DirectorProfileState>({ biography: null, filmography: [], loading: true });
 
   const inCollection = useMemo(() => {
@@ -52,12 +52,21 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
         const supabaseDirector = await fetchDirectorByPersonId(directorId);
         const supabaseFilmography = await fetchDirectorFilmographyByPersonId(directorId);
 
-        const details = supabaseDirector?.profile_path ? null : await getPersonDetails(directorId);
-        const directed = supabaseFilmography.length > 0 ? supabaseFilmography : await getPersonDirectedMovies(directorId);
+        const allowEnrichment = tmdbEnrichmentEnabled;
+        const details = allowEnrichment && !supabaseDirector?.profile_path ? await getPersonDetails(directorId) : null;
+        const directed =
+          supabaseFilmography.length > 0
+            ? supabaseFilmography
+            : allowEnrichment
+              ? await getPersonDirectedMovies(directorId)
+              : [];
 
         const resolvedName = details?.name ?? supabaseDirector?.name ?? name;
-        const wikiTitle = resolvedName ? await searchWikipediaArticle(resolvedName) : null;
-        const wiki = wikiTitle ? await getWikipediaSummaryAndThumbnail(wikiTitle) : { summary: null, thumbnailUrl: null };
+        const wikiTitle = allowEnrichment && resolvedName ? await searchWikipediaArticle(resolvedName) : null;
+        const wiki =
+          allowEnrichment && wikiTitle
+            ? await getWikipediaSummaryAndThumbnail(wikiTitle)
+            : { summary: null, thumbnailUrl: null };
         const supabasePhoto = await buildDirectorProfileUrl(supabaseDirector?.profile_path ?? null);
 
         if (!active) return;
@@ -81,7 +90,7 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
     return () => {
       active = false;
     };
-  }, [directorId, name]);
+  }, [directorId, name, tmdbEnrichmentEnabled]);
 
   const portrait =
     state.photoUrl ||

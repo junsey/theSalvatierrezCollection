@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMovies } from '../context/MovieContext';
 import {
   DirectorProfile,
   buildDirectorProfiles,
@@ -55,6 +56,7 @@ type DirectorListProfile = DirectorProfile & {
 };
 
 export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
+  const { tmdbEnrichmentEnabled } = useMovies();
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const [supabaseProfiles, setSupabaseProfiles] = useState<Record<string, string>>({});
@@ -232,6 +234,31 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         return;
       }
 
+      if (!tmdbEnrichmentEnabled) {
+        const mergedProfiles: DirectorListProfile[] = [...initialProfiles];
+        directors
+          .filter((director) => missing.includes(director.key))
+          .forEach((director) => {
+            mergedProfiles.push({
+              key: director.key,
+              name: director.name,
+              displayName: director.name,
+              tmdbId: director.tmdbId ?? null,
+              profileUrl: null,
+              worksCount: director.worksCount,
+              totalWorksDirected: null,
+              totalWorksCreated: null
+            });
+          });
+        const sorted = [...mergedProfiles].sort((a, b) =>
+          collator.compare(a.displayName || a.name, b.displayName || b.name)
+        );
+        setProfiles(sorted);
+        setLoading(false);
+        setProgress(null);
+        return;
+      }
+
       try {
         const missingNames = directors
           .filter((director) => missing.includes(director.key))
@@ -301,7 +328,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [collator, directors, directorOverrides]);
+  }, [collator, directors, directorOverrides, tmdbEnrichmentEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -334,6 +361,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       }
 
       if (pending.length === 0) {
+        return;
+      }
+
+      if (!tmdbEnrichmentEnabled) {
         return;
       }
 
@@ -419,7 +450,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles]);
+  }, [profiles, tmdbEnrichmentEnabled]);
 
   const uniqueProfiles = useMemo(() => {
     const map = new Map<string, DirectorListProfile>();
