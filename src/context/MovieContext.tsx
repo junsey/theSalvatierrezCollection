@@ -4,11 +4,13 @@ import { hydrateFromSupabase, persistSupabaseTmdb } from '../services/supabaseTm
 import {
   applyLocalOverrides,
   clearMovieCache,
+  getTmdbEnrichmentEnabled,
   getNotes,
   getRatingOverrides,
   getSeenOverrides,
   loadMovieCache,
   saveMovieCache,
+  setTmdbEnrichmentEnabled,
   setNote,
   setRating,
   setSeenOverride
@@ -35,11 +37,13 @@ interface MovieContextValue {
   notes: Record<string, string>;
   sheetMeta: SheetMeta | null;
   progress: ProgressState | null;
+  tmdbEnrichmentEnabled: boolean;
   refresh: (options?: RefreshOptions) => Promise<void>;
   refreshAll: () => Promise<void>;
   refreshSheet: () => Promise<void>;
   refreshMissing: () => Promise<void>;
   refreshSupabase: () => Promise<void>;
+  setTmdbEnrichmentEnabled: (value: boolean) => void;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
   updateNote: (id: string, text: string) => void;
@@ -56,6 +60,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [notes, setNotes] = useState(getNotes());
   const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
+  const [tmdbEnrichmentEnabledState, setTmdbEnrichmentEnabledState] = useState(getTmdbEnrichmentEnabled());
 
   const visibleMovies = useMemo(
     () => movies.filter((movie) => movie.seccion.trim().toLowerCase() !== 'z-inexistente'),
@@ -76,7 +81,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const supabaseHydrated = await hydrateFromSupabase(withLocal);
         const withSupabase = supabaseHydrated.movies;
 
-        const needsEnrichment = withSupabase.some(
+        const needsEnrichment = tmdbEnrichmentEnabledState && withSupabase.some(
           (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
         );
 
@@ -134,6 +139,10 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const supabaseHydrated = await hydrateFromSupabase(withLocal);
       const withSupabase = supabaseHydrated.movies;
       setMovies(withSupabase);
+      if (!tmdbEnrichmentEnabledState) {
+        saveMovieCache(withSupabase, result.meta);
+        return;
+      }
       const needs = withSupabase.filter(
         (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
       );
@@ -213,6 +222,12 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const withSupabase = supabaseHydrated.movies;
       setMovies(withSupabase);
       // Solo enriquece las que no tienen caché
+      if (!tmdbEnrichmentEnabledState) {
+        saveMovieCache(withSupabase, result.meta);
+        setProgress(null);
+        setLoading(false);
+        return;
+      }
       const needsEnrichment = withSupabase.filter(
         (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
       );
@@ -275,6 +290,11 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 
       // Filtrar películas que necesitan enriquecimiento
+      if (!tmdbEnrichmentEnabledState) {
+        setProgress(null);
+        setLoading(false);
+        return;
+      }
       const needsEnrichment = hydratedMovies.filter(
         (movie) => 
           !movie.tmdbStatus || 
@@ -342,6 +362,11 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setNotes((prev) => ({ ...prev, [id]: text }));
   };
 
+  const updateTmdbEnrichmentEnabled = (value: boolean) => {
+    setTmdbEnrichmentEnabled(value);
+    setTmdbEnrichmentEnabledState(value);
+  };
+
   const personalRatings = useMemo(() => {
     const map: Record<string, number> = {};
     movies.forEach((movie) => {
@@ -373,9 +398,22 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ratings: personalRatings, 
       notes, 
       sheetMeta,
-      progress
+      progress,
+      tmdbEnrichmentEnabled: tmdbEnrichmentEnabledState,
+      setTmdbEnrichmentEnabled: updateTmdbEnrichmentEnabled
     }),
-    [movies, visibleMovies, loading, error, seenOverrides, personalRatings, notes, sheetMeta, progress]
+    [
+      movies,
+      visibleMovies,
+      loading,
+      error,
+      seenOverrides,
+      personalRatings,
+      notes,
+      sheetMeta,
+      progress,
+      tmdbEnrichmentEnabledState
+    ]
   );
 
   return <MovieContext.Provider value={value}>{children}</MovieContext.Provider>;

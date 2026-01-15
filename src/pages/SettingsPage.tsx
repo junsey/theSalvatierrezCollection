@@ -6,7 +6,19 @@ import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeople
 import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
 
 export const SettingsPage: React.FC = () => {
-  const { refreshAll, refreshSheet, refreshMissing, refreshSupabase, loading, sheetMeta, error, progress, movies } = useMovies();
+  const {
+    refreshAll,
+    refreshSheet,
+    refreshMissing,
+    refreshSupabase,
+    loading,
+    sheetMeta,
+    error,
+    progress,
+    movies,
+    tmdbEnrichmentEnabled,
+    setTmdbEnrichmentEnabled
+  } = useMovies();
   const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
@@ -150,6 +162,21 @@ export const SettingsPage: React.FC = () => {
             </p>
             <button className="btn" onClick={handleRefreshSupabase} disabled={loading}>
               {loading ? 'Cargando...' : 'Usar Supabase'}
+            </button>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Enriquecimiento TMDb</h3>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              {tmdbEnrichmentEnabled
+                ? 'Activo: se consultara TMDb cuando falten datos.'
+                : 'Pausado: no se haran llamadas a TMDb.'}
+            </p>
+            <button
+              className="btn"
+              onClick={() => setTmdbEnrichmentEnabled(!tmdbEnrichmentEnabled)}
+              disabled={loading}
+            >
+              {tmdbEnrichmentEnabled ? 'Pausar TMDb' : 'Reactivar TMDb'}
             </button>
           </div>
           <div>

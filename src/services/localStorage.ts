@@ -6,6 +6,7 @@ type StoredState = {
   ratings: Record<string, number>;
   notes: Record<string, string>;
   filters: Partial<MovieFilters>;
+  tmdbEnrichmentEnabled?: boolean;
 };
 
 const STORAGE_KEY = 'salvatierrez-collection-state-v1';
@@ -84,6 +85,16 @@ export function getStoredFilters(): Partial<MovieFilters> {
 
 export function setStoredFilters(filters: Partial<MovieFilters>) {
   state.filters = { ...state.filters, ...filters };
+  saveState(state);
+}
+
+export function getTmdbEnrichmentEnabled(): boolean {
+  if (state.tmdbEnrichmentEnabled === undefined) return true;
+  return Boolean(state.tmdbEnrichmentEnabled);
+}
+
+export function setTmdbEnrichmentEnabled(value: boolean) {
+  state.tmdbEnrichmentEnabled = value;
   saveState(state);
 }
 
