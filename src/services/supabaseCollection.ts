@@ -64,8 +64,10 @@ async function supabaseRequest<T>(path: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-const parseFunciona = (value: string): 'working' | 'damaged' | 'untested' => {
-  const normalized = value.trim().toLowerCase();
+const parseFunciona = (value: unknown): 'working' | 'damaged' | 'untested' => {
+  const normalized = (typeof value === 'string' ? value : value == null ? '' : String(value))
+    .trim()
+    .toLowerCase();
   if (!normalized) return 'untested';
 
   const workingTokens = ['si', 'sA-', 'yes', 'y', 'true', 'ok', 'bueno', 'funciona', 'bien'];
@@ -76,22 +78,28 @@ const parseFunciona = (value: string): 'working' | 'damaged' | 'untested' => {
   return 'untested';
 };
 
+const toText = (value: unknown, fallback = ''): string => {
+  if (value == null) return fallback;
+  if (typeof value === 'string') return value;
+  return String(value);
+};
+
 function mapRow(row: CollectionRow): MovieRecord {
   return {
     id: row.id,
-    seccion: row.Seccion ?? 'Desconocida',
+    seccion: toText(row.Seccion, 'Desconocida'),
     year: row['AAAño'] ?? null,
-    saga: row.Saga ?? '',
-    title: row.Titulo ?? 'Sin tA-tulo',
-    originalTitle: row['Titulo Original'] ?? '',
-    genreRaw: row.Genero ?? '',
-    director: row.Director ?? '',
-    group: row.Grupo ?? '',
+    saga: toText(row.Saga),
+    title: toText(row.Titulo, 'Sin tA-tulo'),
+    originalTitle: toText(row['Titulo Original']),
+    genreRaw: toText(row.Genero),
+    director: toText(row.Director),
+    group: toText(row.Grupo),
     seen: row.Vista ?? false,
     ratingGloria: row['Puntuacion Gloria'] ?? null,
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
-    dubbing: row.Doblaje ?? '',
-    format: row.Formato ?? '',
+    dubbing: toText(row.Doblaje),
+    format: toText(row.Formato),
     funcionaStatus: parseFunciona(row.Funciona ?? '')
   };
 }
