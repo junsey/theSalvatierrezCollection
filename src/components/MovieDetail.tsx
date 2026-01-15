@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useMovies } from '../context/MovieContext';
+import { fixMovieTmdb, resolveMovieTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { PawRating } from './PawRating';
@@ -9,8 +11,12 @@ interface Props {
   onClose: () => void;
 }
 export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
+  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled } = useMovies();
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
+  const [adminTmdbId, setAdminTmdbId] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
 
   const fallbackDirectors = movie.director
     ? movie.director
@@ -31,9 +37,15 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   })();
 
   useEffect(() => {
+    setAdminMessage(null);
+    setAdminTmdbId('');
+    setAdminBusy(false);
+  }, [movie.id]);
+
+  useEffect(() => {
     let active = true;
     async function fetchDirectors() {
-      if (!movie.tmdbId) {
+      if (!movie.tmdbId || !tmdbEnrichmentEnabled) {
         setDirectors([]);
         return;
       }
@@ -48,7 +60,45 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       active = false;
     };
-  }, [movie.tmdbId]);
+  }, [movie.tmdbId, tmdbEnrichmentEnabled]);
+
+  const handleResolveTmdb = async () => {
+    if (!adminSession) return;
+    setAdminBusy(true);
+    setAdminMessage(null);
+    try {
+      await resolveMovieTmdb({ collectionId: movie.id });
+      await refreshSupabase();
+      setAdminMessage('TMDb actualizado desde bAosqueda.');
+    } catch (error) {
+      console.error(error);
+      setAdminMessage('No se pudo resolver TMDb.');
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const handleFixTmdb = async () => {
+    if (!adminSession) return;
+    const parsed = Number(adminTmdbId);
+    if (!Number.isFinite(parsed)) {
+      setAdminMessage('El ID TMDb debe ser numAcrico.');
+      return;
+    }
+    setAdminBusy(true);
+    setAdminMessage(null);
+    try {
+      await fixMovieTmdb({ collectionId: movie.id, tmdbId: parsed });
+      await refreshSupabase();
+      setAdminMessage('TMDb corregido.');
+      setAdminTmdbId('');
+    } catch (error) {
+      console.error(error);
+      setAdminMessage('No se pudo corregir TMDb.');
+    } finally {
+      setAdminBusy(false);
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -209,6 +259,29 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
                   )}
                 </div>
               </div>
+              {adminSession && (
+                <div className="movie-detail__ratings" style={{ marginTop: 16 }}>
+                  <h3>Admin</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+                    <button className="btn" onClick={handleResolveTmdb} disabled={adminBusy}>
+                      {adminBusy ? 'Buscando...' : 'Buscar en TMDb'}
+                    </button>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>ID TMDb correcto</span>
+                      <input
+                        type="number"
+                        value={adminTmdbId}
+                        onChange={(event) => setAdminTmdbId(event.target.value)}
+                        style={{ width: 140 }}
+                      />
+                    </label>
+                    <button className="btn" onClick={handleFixTmdb} disabled={adminBusy}>
+                      {adminBusy ? 'Actualizando...' : 'Corregir TMDb'}
+                    </button>
+                  </div>
+                  {adminMessage && <p className="muted" style={{ marginTop: 8 }}>{adminMessage}</p>}
+                </div>
+              )}
               <details className="status-accordion">
                 <summary>Status</summary>
                 <div className="status-accordion__body">

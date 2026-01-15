@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useMovies } from '../context/MovieContext';
+import { updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 
 interface Props {
@@ -10,10 +12,14 @@ interface Props {
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
 
 export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeSeenDefault = true }) => {
+  const { adminSession, applyMovieStatusUpdate } = useMovies();
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
   const [doubleFeature, setDoubleFeature] = useState<{ first: MovieRecord; second: MovieRecord; link: string } | null>(null);
+  const [statusInputs, setStatusInputs] = useState<
+    Record<string, { seen: boolean; ratingGloria: string; ratingRodrigo: string; busy?: boolean; error?: string }>
+  >({});
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
 
@@ -115,6 +121,63 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
   };
 
+  useEffect(() => {
+    const targets = [chosen, doubleFeature?.first, doubleFeature?.second].filter(Boolean) as MovieRecord[];
+    if (targets.length === 0) return;
+    setStatusInputs((prev) => {
+      const next = { ...prev };
+      targets.forEach((movie) => {
+        if (next[movie.id]) return;
+        next[movie.id] = {
+          seen: true,
+          ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
+          ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : ''
+        };
+      });
+      return next;
+    });
+  }, [chosen, doubleFeature]);
+
+  const updateStatusField = (movieId: string, field: 'seen' | 'ratingGloria' | 'ratingRodrigo', value: string | boolean) => {
+    setStatusInputs((prev) => ({
+      ...prev,
+      [movieId]: {
+        ...prev[movieId],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveStatus = async (movie: MovieRecord) => {
+    const input = statusInputs[movie.id];
+    if (!input) return;
+    setStatusInputs((prev) => ({
+      ...prev,
+      [movie.id]: { ...input, busy: true, error: undefined }
+    }));
+    try {
+      const ratingGloria = input.ratingGloria ? Number(input.ratingGloria) : null;
+      const ratingRodrigo = input.ratingRodrigo ? Number(input.ratingRodrigo) : null;
+      await updateMovieStatus({
+        collectionId: movie.id,
+        seen: input.seen,
+        ratingGloria,
+        ratingRodrigo
+      });
+      applyMovieStatusUpdate(movie.id, { seen: input.seen, ratingGloria, ratingRodrigo });
+      setStatusInputs((prev) => ({
+        ...prev,
+        [movie.id]: { ...input, busy: false, error: undefined }
+      }));
+    } catch (error) {
+      console.error(error);
+      setStatusInputs((prev) => ({
+        ...prev,
+        [movie.id]: { ...input, busy: false, error: 'No se pudo guardar.' }
+      }));
+    }
+  };
+
   const renderPoster = (movie: MovieRecord) => (
     <div className="feature-poster-frame" aria-hidden={!movie.posterUrl}>
       {movie.posterUrl ? (
@@ -124,6 +187,56 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       )}
     </div>
   );
+
+
+  const renderAdminControls = (movie: MovieRecord) => {
+    if (!adminSession) return null;
+    const input = statusInputs[movie.id];
+    return (
+      <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+        <strong>Marcar como vista</strong>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={input?.seen ?? true}
+              onChange={(event) => updateStatusField(movie.id, 'seen', event.target.checked)}
+            />
+            <span>Vista</span>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Gloria</span>
+            <input
+              type="number"
+              step="0.5"
+              value={input?.ratingGloria ?? ''}
+              onChange={(event) => updateStatusField(movie.id, 'ratingGloria', event.target.value)}
+              style={{ maxWidth: 90 }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span>Rodrigo</span>
+            <input
+              type="number"
+              step="0.5"
+              value={input?.ratingRodrigo ?? ''}
+              onChange={(event) => updateStatusField(movie.id, 'ratingRodrigo', event.target.value)}
+              style={{ maxWidth: 90 }}
+            />
+          </label>
+          <button
+            className="btn"
+            onClick={() => handleSaveStatus(movie)}
+            disabled={input?.busy}
+            style={{ alignSelf: 'flex-end' }}
+          >
+            {input?.busy ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+        {input?.error && <p style={{ marginTop: 8, color: 'var(--accent)' }}>{input.error}</p>}
+      </div>
+    );
+  };
 
   return (
     <div className="panel">
@@ -194,6 +307,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                   <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
                   <button onClick={summon}>Volver a invocar</button>
                 </div>
+                {renderAdminControls(chosen)}
               </div>
             )}
 
@@ -213,6 +327,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                       <div className="result-actions tight">
                         <button onClick={() => onSelect(item)}>Abrir detalles</button>
                       </div>
+                      {renderAdminControls(item)}
                     </div>
                   ))}
                 </div>

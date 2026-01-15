@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
 import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
+import { clearAdminSession, saveAdminSession } from '../services/adminSession';
+import { createMovie, verifyAdminCredentials } from '../services/adminApi';
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -17,13 +20,37 @@ export const SettingsPage: React.FC = () => {
     progress,
     movies,
     tmdbEnrichmentEnabled,
-    setTmdbEnrichmentEnabled
+    setTmdbEnrichmentEnabled,
+    adminSession,
+    setAdminSession
   } = useMovies();
   const navigate = useNavigate();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
   const [directorProgress, setDirectorProgress] = useState<{ current: number; total: number } | null>(null);
   const [regeneratingDirectors, setRegeneratingDirectors] = useState(false);
+  const [adminUser, setAdminUser] = useState('');
+  const [adminPass, setAdminPass] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [newMovie, setNewMovie] = useState({
+    seccion: '',
+    title: '',
+    year: '',
+    saga: '',
+    originalTitle: '',
+    genreRaw: '',
+    director: '',
+    group: '',
+    seen: false,
+    ratingGloria: '',
+    ratingRodrigo: '',
+    dubbing: '',
+    format: ''
+  });
+  const [newMovieBusy, setNewMovieBusy] = useState(false);
+  const [newMovieStatus, setNewMovieStatus] = useState<string | null>(null);
 
   const directorNames = useMemo(
     () => Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort(),
@@ -100,6 +127,82 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleAdminLogin = async () => {
+    setAdminBusy(true);
+    setAdminError(null);
+    setAdminMessage(null);
+    try {
+      const ok = await verifyAdminCredentials(adminUser.trim(), adminPass);
+      if (!ok) {
+        setAdminError('Credenciales incorrectas.');
+        return;
+      }
+      const session = saveAdminSession(adminUser.trim(), adminPass);
+      setAdminSession(session);
+      setAdminMessage('Sesión admin iniciada.');
+    } catch (error) {
+      console.error(error);
+      setAdminError('No se pudo validar la sesión admin.');
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    clearAdminSession();
+    setAdminSession(null);
+    setAdminMessage('Sesión admin cerrada.');
+  };
+
+  const handleCreateMovie = async () => {
+    setNewMovieBusy(true);
+    setNewMovieStatus(null);
+    try {
+      const payload = {
+        seccion: newMovie.seccion.trim(),
+        title: newMovie.title.trim(),
+        year: newMovie.year ? Number(newMovie.year) : null,
+        saga: newMovie.saga.trim(),
+        originalTitle: newMovie.originalTitle.trim(),
+        genreRaw: newMovie.genreRaw.trim(),
+        director: newMovie.director.trim(),
+        group: newMovie.group.trim(),
+        seen: newMovie.seen,
+        ratingGloria: newMovie.ratingGloria ? Number(newMovie.ratingGloria) : null,
+        ratingRodrigo: newMovie.ratingRodrigo ? Number(newMovie.ratingRodrigo) : null,
+        dubbing: newMovie.dubbing.trim(),
+        format: newMovie.format.trim()
+      };
+      if (!payload.seccion || !payload.title) {
+        setNewMovieStatus('Sección y título son obligatorios.');
+        return;
+      }
+      await createMovie(payload);
+      await refreshSupabase();
+      setNewMovieStatus('Película creada y sincronizada con Supabase.');
+      setNewMovie({
+        seccion: '',
+        title: '',
+        year: '',
+        saga: '',
+        originalTitle: '',
+        genreRaw: '',
+        director: '',
+        group: '',
+        seen: false,
+        ratingGloria: '',
+        ratingRodrigo: '',
+        dubbing: '',
+        format: ''
+      });
+    } catch (error) {
+      console.error(error);
+      setNewMovieStatus('No se pudo crear la película.');
+    } finally {
+      setNewMovieBusy(false);
+    }
+  };
+
   const lastUpdated = sheetMeta?.fetchedAt
     ? new Date(sheetMeta.fetchedAt).toLocaleString()
     : 'Sincronización pendiente';
@@ -152,6 +255,167 @@ export const SettingsPage: React.FC = () => {
           <div className="clamped" style={{ fontSize: 12 }}>{sheetMeta?.source === 'supabase' ? 'Supabase' : getSheetUrl()}</div>
         </div>
       </div>
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2>Admin</h2>
+        {!adminSession ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              Inicia sesiA3n para habilitar acciones de escritura en Supabase.
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Usuario</strong>
+              <input
+                type="text"
+                value={adminUser}
+                onChange={(event) => setAdminUser(event.target.value)}
+                autoComplete="username"
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>ContraseA?a</strong>
+              <input
+                type="password"
+                value={adminPass}
+                onChange={(event) => setAdminPass(event.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+            <button className="btn" onClick={handleAdminLogin} disabled={adminBusy}>
+              {adminBusy ? 'Validando...' : 'Iniciar sesiA3n'}
+            </button>
+            {adminMessage && <p className="muted">{adminMessage}</p>}
+            {adminError && <p style={{ color: 'var(--accent)' }}>{adminError}</p>}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              SesiA3n activa para <strong>{adminSession.user}</strong>.
+            </p>
+            <button className="btn" onClick={handleAdminLogout}>
+              Cerrar sesiA3n
+            </button>
+          </div>
+        )}
+      </div>
+      {adminSession && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <h2>Nueva pelA-cula</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>SecciA3n</strong>
+              <input
+                type="text"
+                value={newMovie.seccion}
+                onChange={(event) => setNewMovie({ ...newMovie, seccion: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>TAtulo</strong>
+              <input
+                type="text"
+                value={newMovie.title}
+                onChange={(event) => setNewMovie({ ...newMovie, title: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>AA?o</strong>
+              <input
+                type="number"
+                value={newMovie.year}
+                onChange={(event) => setNewMovie({ ...newMovie, year: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Director</strong>
+              <input
+                type="text"
+                value={newMovie.director}
+                onChange={(event) => setNewMovie({ ...newMovie, director: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>GAcnero</strong>
+              <input
+                type="text"
+                value={newMovie.genreRaw}
+                onChange={(event) => setNewMovie({ ...newMovie, genreRaw: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Saga</strong>
+              <input
+                type="text"
+                value={newMovie.saga}
+                onChange={(event) => setNewMovie({ ...newMovie, saga: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>TA-tulo original</strong>
+              <input
+                type="text"
+                value={newMovie.originalTitle}
+                onChange={(event) => setNewMovie({ ...newMovie, originalTitle: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Grupo</strong>
+              <input
+                type="text"
+                value={newMovie.group}
+                onChange={(event) => setNewMovie({ ...newMovie, group: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Doblaje</strong>
+              <input
+                type="text"
+                value={newMovie.dubbing}
+                onChange={(event) => setNewMovie({ ...newMovie, dubbing: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Formato</strong>
+              <input
+                type="text"
+                value={newMovie.format}
+                onChange={(event) => setNewMovie({ ...newMovie, format: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>PuntuaciA3n Gloria</strong>
+              <input
+                type="number"
+                step="0.5"
+                value={newMovie.ratingGloria}
+                onChange={(event) => setNewMovie({ ...newMovie, ratingGloria: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>PuntuaciA3n Rodrigo</strong>
+              <input
+                type="number"
+                step="0.5"
+                value={newMovie.ratingRodrigo}
+                onChange={(event) => setNewMovie({ ...newMovie, ratingRodrigo: event.target.value })}
+              />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={newMovie.seen}
+                onChange={(event) => setNewMovie({ ...newMovie, seen: event.target.checked })}
+              />
+              <span>Vista</span>
+            </label>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button className="btn" onClick={handleCreateMovie} disabled={newMovieBusy}>
+              {newMovieBusy ? 'Guardando...' : 'Crear pelA-cula'}
+            </button>
+            {newMovieStatus && <span className="muted">{newMovieStatus}</span>}
+          </div>
+        </div>
+      )}
       <div className="panel" style={{ marginBottom: 16 }}>
         <h2>Supabase</h2>
         <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 12 }}>

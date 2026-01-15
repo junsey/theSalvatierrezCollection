@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { enrichMoviesBatch } from '../services/tmdbApi';
 import { hydrateFromSupabase, persistSupabaseTmdb } from '../services/supabaseTmdb';
+import { AdminSession, loadAdminSession } from '../services/adminSession';
 import {
   applyLocalOverrides,
   clearMovieCache,
@@ -38,11 +39,14 @@ interface MovieContextValue {
   sheetMeta: SheetMeta | null;
   progress: ProgressState | null;
   tmdbEnrichmentEnabled: boolean;
+  adminSession: AdminSession | null;
   refresh: (options?: RefreshOptions) => Promise<void>;
   refreshAll: () => Promise<void>;
   refreshSheet: () => Promise<void>;
   refreshMissing: () => Promise<void>;
   refreshSupabase: () => Promise<void>;
+  setAdminSession: (session: AdminSession | null) => void;
+  applyMovieStatusUpdate: (id: string, updates: { seen?: boolean; ratingGloria?: number | null; ratingRodrigo?: number | null }) => void;
   setTmdbEnrichmentEnabled: (value: boolean) => void;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
@@ -61,6 +65,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [sheetMeta, setSheetMeta] = useState<SheetMeta | null>(null);
   const [progress, setProgress] = useState<ProgressState | null>(null);
   const [tmdbEnrichmentEnabledState, setTmdbEnrichmentEnabledState] = useState(getTmdbEnrichmentEnabled());
+  const [adminSession, setAdminSessionState] = useState<AdminSession | null>(loadAdminSession());
 
   const visibleMovies = useMemo(
     () => movies.filter((movie) => movie.seccion.trim().toLowerCase() !== 'z-inexistente'),
@@ -321,6 +326,30 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setNotes((prev) => ({ ...prev, [id]: text }));
   };
 
+  const applyMovieStatusUpdate = (
+    id: string,
+    updates: { seen?: boolean; ratingGloria?: number | null; ratingRodrigo?: number | null }
+  ) => {
+    setMovies((prev) => {
+      const next = prev.map((movie) => {
+        if (movie.id !== id) return movie;
+        return {
+          ...movie,
+          seen: updates.seen ?? movie.seen,
+          ratingGloria: updates.ratingGloria ?? movie.ratingGloria,
+          ratingRodrigo: updates.ratingRodrigo ?? movie.ratingRodrigo
+        };
+      });
+      const cached = loadMovieCache();
+      saveMovieCache(next, cached?.sheetMeta ?? sheetMeta ?? null);
+      return next;
+    });
+  };
+
+  const updateAdminSession = (session: AdminSession | null) => {
+    setAdminSessionState(session);
+  };
+
   const updateTmdbEnrichmentEnabled = (value: boolean) => {
     setTmdbEnrichmentEnabled(value);
     setTmdbEnrichmentEnabledState(value);
@@ -359,6 +388,9 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sheetMeta,
       progress,
       tmdbEnrichmentEnabled: tmdbEnrichmentEnabledState,
+      adminSession,
+      setAdminSession: updateAdminSession,
+      applyMovieStatusUpdate,
       setTmdbEnrichmentEnabled: updateTmdbEnrichmentEnabled
     }),
     [
@@ -371,7 +403,8 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       notes,
       sheetMeta,
       progress,
-      tmdbEnrichmentEnabledState
+      tmdbEnrichmentEnabledState,
+      adminSession
     ]
   );
 
