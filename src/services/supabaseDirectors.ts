@@ -80,7 +80,11 @@ export async function fetchDirectorFilmographyByPersonId(personId: number): Prom
       title: movie.title ?? 'Sin tA-tulo',
       year: movie.year ?? null,
       posterPath: movie.poster_path ?? null,
-      posterUrl: movie.poster_path ? `${base}w300${movie.poster_path}` : undefined
+      posterUrl: movie.poster_path ? `${base}w300${movie.poster_path}` : undefined,
+      mediaType: 'movie',
+      job: 'Director',
+      releaseDate: null,
+      firstAirDate: null
     }))
     .filter((movie) => movie.id);
 }
