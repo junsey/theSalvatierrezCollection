@@ -75,7 +75,7 @@ export async function fetchDirectorFilmographyByPersonId(personId: number): Prom
   const rows = await supabaseRequest<SupabaseFilmographyRow[]>(`tmdb_director_filmography?${params.toString()}`);
   const base = await getTmdbImageBaseUrl();
   return (rows ?? [])
-    .map((movie) => ({
+    .map((movie): DirectedMovie => ({
       id: Number(movie.tmdb_movie_id ?? 0),
       title: movie.title ?? 'Sin tA-tulo',
       year: movie.year ?? null,

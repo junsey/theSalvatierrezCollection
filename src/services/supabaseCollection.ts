@@ -4,7 +4,7 @@ import { MovieRecord } from '../types/MovieRecord';
 type CollectionRow = {
   id: string;
   Seccion?: string | null;
-  'AAño'?: number | null;
+  'AAAño'?: number | null;
   Saga?: string | null;
   Titulo?: string | null;
   'Titulo Original'?: string | null;
@@ -16,6 +16,7 @@ type CollectionRow = {
   Formato?: string | null;
   'Puntuacion Rodrigo'?: number | null;
   'Puntuacion Gloria'?: number | null;
+  Funciona?: string | null;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -63,11 +64,23 @@ async function supabaseRequest<T>(path: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+const parseFunciona = (value: string): 'working' | 'damaged' | 'untested' => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'untested';
+
+  const workingTokens = ['si', 'sA-', 'yes', 'y', 'true', 'ok', 'bueno', 'funciona', 'bien'];
+  const damagedTokens = ['no', 'daAñado', 'daniado', 'malo', 'broken', 'defectuoso'];
+
+  if (workingTokens.includes(normalized)) return 'working';
+  if (damagedTokens.includes(normalized)) return 'damaged';
+  return 'untested';
+};
+
 function mapRow(row: CollectionRow): MovieRecord {
   return {
     id: row.id,
     seccion: row.Seccion ?? 'Desconocida',
-    year: row['AAño'] ?? null,
+    year: row['AAAño'] ?? null,
     saga: row.Saga ?? '',
     title: row.Titulo ?? 'Sin tA-tulo',
     originalTitle: row['Titulo Original'] ?? '',
@@ -78,7 +91,8 @@ function mapRow(row: CollectionRow): MovieRecord {
     ratingGloria: row['Puntuacion Gloria'] ?? null,
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
     dubbing: row.Doblaje ?? '',
-    format: row.Formato ?? ''
+    format: row.Formato ?? '',
+    funcionaStatus: parseFunciona(row.Funciona ?? '')
   };
 }
 
@@ -92,9 +106,9 @@ export async function fetchCollectionFromSupabase(): Promise<FetchMoviesResult |
   const rows = await supabaseRequest<Record<string, unknown>[]>(`Coleccion_Salvatierrez?${params.toString()}`);
   const mapped = (rows ?? []).map((row) => {
     const record = row as CollectionRow & { [key: string]: unknown };
-    if (record['AAño'] !== undefined) return mapRow(record);
-    if (record['Año'] !== undefined) {
-      return mapRow({ ...record, 'AAño': record['Año'] as number | null });
+    if (record['AAAño'] !== undefined) return mapRow(record);
+    if (record['AAño'] !== undefined) {
+      return mapRow({ ...record, 'AAAño': record['AAño'] as number | null });
     }
     return mapRow(record);
   });
