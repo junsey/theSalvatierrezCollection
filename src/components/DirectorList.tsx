@@ -15,7 +15,7 @@ import {
   loadDirectorCache,
   saveDirectorCache
 } from '../lib/directorCache';
-import { fetchAllDirectorProfiles } from '../services/supabaseDirectors';
+import { fetchAllDirectorProfiles, fetchDirectorFilmographyCountByPersonId } from '../services/supabaseDirectors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -59,7 +59,9 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const { tmdbEnrichmentEnabled } = useMovies();
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
-  const [supabaseProfiles, setSupabaseProfiles] = useState<Record<string, string>>({});
+  const [supabaseProfiles, setSupabaseProfiles] = useState<
+    Record<string, { profileUrl?: string; tmdbId?: number | null }>
+  >({});
   const directors = useMemo(() => {
     const map = new Map<
       string,
@@ -79,7 +81,9 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         .forEach((name) => {
           const normalizedName = normalizeDirectorName(name);
           const overrideId = directorOverrides.get(normalizedName);
-          const key = buildDirectorKey(name, overrideId);
+          const supabaseId = supabaseProfiles[normalizedName]?.tmdbId ?? null;
+          const tmdbId = overrideId ?? supabaseId ?? undefined;
+          const key = buildDirectorKey(name, tmdbId);
           const mapKey = normalizedName;
 
           if (!map.has(mapKey)) {
@@ -87,7 +91,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               key,
               name: name.trim(),
               normalizedName,
-              tmdbId: overrideId,
+              tmdbId: tmdbId ?? undefined,
               worksCount: 0
             });
           }
@@ -105,7 +109,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     });
 
     return Array.from(map.values()).sort((a, b) => collator.compare(a.name, b.name));
-  }, [collator, directorOverrides, movies]);
+  }, [collator, directorOverrides, movies, supabaseProfiles]);
   const availableLetters = useMemo(() => {
     const letters = new Set<string>();
     directors.forEach((director) => {
@@ -364,10 +368,6 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
         return;
       }
 
-      if (!tmdbEnrichmentEnabled) {
-        return;
-      }
-
       const rows = await Promise.all(
         pending.map(async (profile) => {
           const owned = profile.worksCount;
@@ -380,15 +380,23 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
             if (tmdbTotals.has(profile.tmdbId)) {
               total = tmdbTotals.get(profile.tmdbId) ?? null;
             } else {
-              const filmography = await getPersonDirectedMovies(profile.tmdbId);
-              directedCount = filmography.filter((item) =>
-                (item.job ?? '').toLowerCase().includes('director')
-              ).length;
-              createdCount = filmography.filter((item) =>
-                (item.job ?? '').toLowerCase().includes('creator')
-              ).length;
-              total = filmography.length;
-              tmdbTotals.set(profile.tmdbId, total ?? 0);
+              const supabaseTotal = await fetchDirectorFilmographyCountByPersonId(profile.tmdbId);
+              if (supabaseTotal != null) {
+                total = supabaseTotal;
+                directedCount = supabaseTotal;
+                createdCount = 0;
+                tmdbTotals.set(profile.tmdbId, supabaseTotal);
+              } else if (tmdbEnrichmentEnabled) {
+                const filmography = await getPersonDirectedMovies(profile.tmdbId);
+                directedCount = filmography.filter((item) =>
+                  (item.job ?? '').toLowerCase().includes('director')
+                ).length;
+                createdCount = filmography.filter((item) =>
+                  (item.job ?? '').toLowerCase().includes('creator')
+                ).length;
+                total = filmography.length;
+                tmdbTotals.set(profile.tmdbId, total ?? 0);
+              }
             }
           }
 
@@ -589,7 +597,8 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           const total = stats?.total ?? null;
           const medal = getMedal(owned, total);
           const label = total ? `${owned} de ${total}` : `${owned} en colección`;
-          const supabasePortrait = supabaseProfiles[(director.displayName || director.name).toLowerCase()];
+          const supabasePortrait =
+            supabaseProfiles[(director.displayName || director.name).toLowerCase()]?.profileUrl;
 
           return (
             <Link

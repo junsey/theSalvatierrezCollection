@@ -130,8 +130,8 @@ export const SettingsPage: React.FC = () => {
       <div className="panel" style={{ marginBottom: 16 }}>
         <h1>Configuración</h1>
         <p>
-          Guardamos una copia local del documento para que no se rompa si Google Sheets devuelve 404/403 y cacheamos los datos
-          enriquecidos de TMDb por 6 meses. Usa las opciones siguientes para gestionar la sincronización y el enriquecimiento de datos.
+          Supabase es la fuente principal y guardamos una copia local para evitar cortes. Las herramientas legacy (Excel/TMDb) quedan
+          abajo para uso manual.
         </p>
       </div>
       <div className="stat-grid" style={{ marginBottom: 16 }}>
@@ -153,22 +153,25 @@ export const SettingsPage: React.FC = () => {
         </div>
       </div>
       <div className="panel" style={{ marginBottom: 16 }}>
-        <h2>Opciones de sincronización</h2>
+        <h2>Supabase</h2>
+        <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 12 }}>
+          Supabase es la fuente principal. Las acciones legacy quedan separadas para uso manual.
+        </p>
+        <button className="btn" onClick={handleRefreshSupabase} disabled={loading}>
+          {loading ? 'Cargando...' : 'Usar Supabase'}
+        </button>
+      </div>
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2>Legacy (Excel + TMDb)</h2>
+        <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 12 }}>
+          Acciones manuales para emergencias. No se ejecutan de forma automatica.
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Cargar desde Supabase</h3>
-            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Usa la base de datos como fuente principal sin llamar TMDb.
-            </p>
-            <button className="btn" onClick={handleRefreshSupabase} disabled={loading}>
-              {loading ? 'Cargando...' : 'Usar Supabase'}
-            </button>
-          </div>
-          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Enriquecimiento TMDb</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
               {tmdbEnrichmentEnabled
-                ? 'Activo: se consultara TMDb cuando falten datos.'
+                ? 'Activo: se consultara TMDb cuando se use legacy.'
                 : 'Pausado: no se haran llamadas a TMDb.'}
             </p>
             <button
@@ -179,47 +182,46 @@ export const SettingsPage: React.FC = () => {
               {tmdbEnrichmentEnabled ? 'Pausar TMDb' : 'Reactivar TMDb'}
             </button>
           </div>
-          <div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar todo</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Recarga el Excel desde Google Sheets y regenera todos los datos de TMDb (ignora caché existente).
+              Recarga el Excel desde Google Sheets y regenera todos los datos de TMDb (ignora cachAc existente).
             </p>
             <button className="btn" onClick={handleRefreshAll} disabled={loading}>
-              {loading ? 'Regenerando…' : 'Regenerar todo'}
+              {loading ? 'Regenerando???' : 'Regenerar todo'}
             </button>
           </div>
-          
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Recargar Excel</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo recarga los datos desde Google Sheets. Solo enriquece las películas nuevas que no tienen caché.
+              Solo recarga los datos desde Google Sheets. Solo enriquece las pelA-culas nuevas que no tienen cachAc.
             </p>
             <button className="btn" onClick={handleRefreshSheet} disabled={loading}>
-              {loading ? 'Recargando…' : 'Recargar Excel'}
+              {loading ? 'Recargando???' : 'Recargar Excel'}
             </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar faltantes</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo enriquece las películas que no tienen caché o están en error. No recarga el Excel.
+              Solo enriquece las pelA-culas que no tienen cachAc o estA-n en error. No recarga el Excel.
             </p>
             <button className="btn" onClick={handleRefreshMissing} disabled={loading}>
-              {loading ? 'Regenerando…' : 'Regenerar faltantes'}
-      </button>
+              {loading ? 'Regenerando???' : 'Regenerar faltantes'}
+            </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar directores</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Limpia la caché de directores y vuelve a solicitar las biografías y retratos basados en los nombres del Excel.
+              Limpia la cachAc de directores y vuelve a solicitar las biografA-as y retratos basados en los nombres del Excel.
             </p>
             <button
               className="btn"
               onClick={handleRefreshDirectors}
               disabled={loading || regeneratingDirectors || directorNames.length === 0}
             >
-              {regeneratingDirectors ? 'Regenerando…' : 'Regenerar directores'}
+              {regeneratingDirectors ? 'Regenerando???' : 'Regenerar directores'}
             </button>
           </div>
         </div>

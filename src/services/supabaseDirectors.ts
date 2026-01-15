@@ -43,6 +43,29 @@ async function supabaseRequest<T>(path: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+async function supabaseRequestCount(path: string): Promise<number | null> {
+  const url = `${SUPABASE_URL?.replace(/\/$/, '')}/rest/v1/${path}`;
+  const response = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY ?? '',
+      Authorization: `Bearer ${SUPABASE_ANON_KEY ?? ''}`,
+      Prefer: 'count=exact',
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase error ${response.status}: ${text}`);
+  }
+
+  const contentRange = response.headers.get('Content-Range');
+  if (!contentRange) return null;
+  const parts = contentRange.split('/');
+  const count = parts[1] ? Number(parts[1]) : NaN;
+  return Number.isFinite(count) ? count : null;
+}
+
 export async function fetchDirectorByName(name: string) {
   if (!isConfigured() || !name) return null;
   const params = new URLSearchParams({
@@ -95,18 +118,32 @@ export async function buildDirectorProfileUrl(profilePath?: string | null): Prom
   return `${base}w300${profilePath}`;
 }
 
-export async function fetchAllDirectorProfiles(): Promise<Record<string, string>> {
+export async function fetchDirectorFilmographyCountByPersonId(personId: number): Promise<number | null> {
+  if (!isConfigured()) return null;
+  const params = new URLSearchParams({
+    select: 'tmdb_movie_id',
+    limit: '1'
+  });
+  params.set('tmdb_person_id', `eq.${personId}`);
+  params.set('is_visible', 'eq.true');
+  return supabaseRequestCount(`tmdb_director_filmography?${params.toString()}`);
+}
+
+export async function fetchAllDirectorProfiles(): Promise<Record<string, { profileUrl?: string; tmdbId?: number | null }>> {
   if (!isConfigured()) return {};
   const params = new URLSearchParams({
-    select: 'name,profile_path',
+    select: 'name,profile_path,tmdb_person_id',
     limit: '2000'
   });
   const rows = await supabaseRequest<SupabaseDirectorRow[]>(`tmdb_directors?${params.toString()}`);
   const base = await getTmdbImageBaseUrl();
-  const map: Record<string, string> = {};
+  const map: Record<string, { profileUrl?: string; tmdbId?: number | null }> = {};
   for (const row of rows ?? []) {
-    if (!row.name || !row.profile_path) continue;
-    map[row.name.toLowerCase()] = `${base}w300${row.profile_path}`;
+    if (!row.name) continue;
+    map[row.name.toLowerCase()] = {
+      profileUrl: row.profile_path ? `${base}w300${row.profile_path}` : undefined,
+      tmdbId: row.tmdb_person_id ?? null
+    };
   }
   return map;
 }

@@ -89,7 +89,7 @@ export function setStoredFilters(filters: Partial<MovieFilters>) {
 }
 
 export function getTmdbEnrichmentEnabled(): boolean {
-  if (state.tmdbEnrichmentEnabled === undefined) return true;
+  if (state.tmdbEnrichmentEnabled === undefined) return false;
   return Boolean(state.tmdbEnrichmentEnabled);
 }
 
