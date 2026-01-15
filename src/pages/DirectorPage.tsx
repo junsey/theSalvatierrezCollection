@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
+import { refreshDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
@@ -68,7 +69,7 @@ const buildDirectorCollections = (directorName: string, collection: MovieRecord[
 export const DirectorPage: React.FC = () => {
   const { name } = useParams();
   const directorName = decodeURIComponent(name ?? '').trim();
-  const { movies, tmdbEnrichmentEnabled } = useMovies();
+  const { movies, tmdbEnrichmentEnabled, adminSession } = useMovies();
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const directorCollection = useMemo(
     () => buildDirectorCollections(directorName, movies),
@@ -81,6 +82,9 @@ export const DirectorPage: React.FC = () => {
   const [biography, setBiography] = useState<string | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
   const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
+  const [tmdbPersonId, setTmdbPersonId] = useState<number | null>(null);
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -90,6 +94,7 @@ export const DirectorPage: React.FC = () => {
       setBiography(null);
       setProfileUrl(undefined);
       setKnownFor([]);
+      setRefreshMessage(null);
 
       if (!directorName) {
         setError('No se especificó director.');
@@ -111,6 +116,7 @@ export const DirectorPage: React.FC = () => {
         if (supabaseDirector?.name) {
           setPersonName(supabaseDirector.name);
         }
+        setTmdbPersonId(supabaseTmdbId);
         if (supabaseProfile) {
           setProfileUrl(supabaseProfile);
         }
@@ -157,6 +163,34 @@ export const DirectorPage: React.FC = () => {
       active = false;
     };
   }, [directorName, directorOverrides, tmdbEnrichmentEnabled]);
+
+  const handleRefreshDirector = async () => {
+    if (!adminSession) return;
+    setRefreshBusy(true);
+    setRefreshMessage(null);
+    try {
+      const response = await refreshDirectorTmdb({ name: directorName, tmdbId: tmdbPersonId });
+      if (response?.name) {
+        setPersonName(response.name);
+      }
+      if (response?.profilePath) {
+        const url = await buildDirectorProfileUrl(response.profilePath);
+        setProfileUrl(url);
+      }
+      setBiography(response?.biography ?? null);
+      if (response?.tmdbId) {
+        const filmography = await fetchDirectorFilmographyByPersonId(response.tmdbId);
+        setKnownFor(filmography);
+        setTmdbPersonId(response.tmdbId);
+      }
+      setRefreshMessage('TMDb actualizado para este director.');
+    } catch (err) {
+      console.error('No se pudo actualizar el director', err);
+      setRefreshMessage('No se pudo actualizar TMDb.');
+    } finally {
+      setRefreshBusy(false);
+    }
+  };
 
   const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
@@ -346,6 +380,14 @@ export const DirectorPage: React.FC = () => {
           {loading && <p className="text-muted">Recopilando biografía...</p>}
           {!loading && biography && <p className="text-muted director-legend__bio">{biography}</p>}
           {!loading && !biography && <p className="text-muted director-legend__bio">Biografía no disponible.</p>}
+          {adminSession && (
+            <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button className="btn" onClick={handleRefreshDirector} disabled={refreshBusy}>
+                {refreshBusy ? 'Actualizando...' : 'Actualizar TMDb'}
+              </button>
+              {refreshMessage && <span className="text-muted">{refreshMessage}</span>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -360,6 +402,9 @@ export const DirectorPage: React.FC = () => {
             </div>
           ) : (
             <>
+              {adminSession && knownFor.length === 0 && (
+                <p className="muted">No hay filmografía en Supabase. Usa "Actualizar TMDb" para generarla.</p>
+              )}
               {directedMovies.length > 0
                 ? renderSection('Obras dirigidas (cine)', directedMovies, 'No hay películas dirigidas registradas.')
                 : renderSection('Obras dirigidas (cine)', directedMovies, 'No se encontraron películas dirigidas para esta persona.')}

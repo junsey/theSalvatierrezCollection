@@ -79,3 +79,10 @@ export async function fixMovieTmdb(payload: { collectionId: string; tmdbId: numb
     body: JSON.stringify(payload)
   });
 }
+
+export async function refreshDirectorTmdb(payload: { name: string; tmdbId?: number | null }) {
+  return adminFetch('/api/directors/refresh', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}

@@ -45,6 +45,8 @@ export type TmdbEnrichment = {
     name?: string | null;
     episodeCount?: number | null;
     airDate?: string | null;
+    posterPath?: string | null;
+    posterUrl?: string;
   }[];
 };
 
@@ -245,7 +247,7 @@ type TvSearchResult = {
 type TvDetailResult = TvSearchResult & {
   overview?: string | null;
   genres?: { id: number; name: string }[];
-  seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null }[];
+  seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null; poster_path?: string | null }[];
 };
 
 function isTvResult(result: SearchResult | TvSearchResult | null): result is TvSearchResult {
@@ -352,13 +354,33 @@ async function fetchTvDetails(id: number, maxRps?: number): Promise<TvDetailResu
   }
 }
 
+export async function fetchTvSeasons(tmdbId: number): Promise<TmdbEnrichment['tmdbSeasons']> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    return [];
+  }
+  const url = `${API_BASE}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`;
+  const details = await tmdbFetchJson<TvDetailResult>(url);
+  const baseUrl = await getImageBaseUrl();
+  return (details.seasons ?? []).map((season) => ({
+    seasonNumber: season.season_number,
+    name: season.name ?? null,
+    episodeCount: season.episode_count ?? null,
+    airDate: season.air_date ?? null,
+    posterPath: season.poster_path ?? null,
+    posterUrl: season.poster_path ? buildPosterUrl(baseUrl, season.poster_path) : undefined
+  }));
+}
+
 async function fetchTvSeasonDetails(id: number, season: number, maxRps?: number) {
   if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
     return null;
   }
   const url = `${API_BASE}/tv/${id}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
-    return await tmdbFetchJson<{ air_date?: string | null; episode_count?: number | null; name?: string | null }>(url, maxRps);
+    return await tmdbFetchJson<{ air_date?: string | null; episode_count?: number | null; name?: string | null; poster_path?: string | null }>(
+      url,
+      maxRps
+    );
   } catch (error) {
     console.warn('TMDb season fetch failed', error);
     return null;
@@ -459,6 +481,7 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
     }
 
     let enrichment: TmdbEnrichment | null = null;
+    const imageBaseUrl = await getImageBaseUrl();
     if (mediaType === 'tv' && isTvResult(found)) {
       const tvFound = found;
       const details = await fetchTvDetails(tvFound.id, options?.maxRequestsPerSecond);
@@ -469,7 +492,9 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
         seasonNumber: season.season_number,
         name: season.name,
         episodeCount: season.episode_count ?? null,
-        airDate: season.air_date ?? null
+        airDate: season.air_date ?? null,
+        posterPath: season.poster_path ?? null,
+        posterUrl: season.poster_path ? buildPosterUrl(imageBaseUrl, season.poster_path) : undefined
       })) ?? [];
 
       const enrichedSeasons = baseSeasons.map((season) => {
@@ -478,7 +503,9 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
             ...season,
             name: seasonDetails.name ?? season.name,
             episodeCount: seasonDetails.episode_count ?? season.episodeCount,
-            airDate: seasonDetails.air_date ?? season.airDate
+            airDate: seasonDetails.air_date ?? season.airDate,
+            posterPath: seasonDetails.poster_path ?? season.posterPath,
+            posterUrl: seasonDetails.poster_path ? buildPosterUrl(imageBaseUrl, seasonDetails.poster_path) : season.posterUrl
           };
         }
         return season;
@@ -552,7 +579,7 @@ export async function enrichWithTmdb(movie: MovieRecord, options?: EnrichOptions
       fetchedAt: Date.now(),
       message: 'Respuesta TMDb correcta'
     };
-    return applyEnrichment(movie, enrichment, await getImageBaseUrl(), status);
+    return applyEnrichment(movie, enrichment, imageBaseUrl, status);
   } catch (error) {
     console.error('TMDb lookup failed for', movie.originalTitle || movie.title, error);
     const stale = getCached(titles, movie.year ?? null, mediaType, true);

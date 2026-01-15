@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { fixMovieTmdb, resolveMovieTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
+import { fetchTvSeasons } from '../services/tmdbApi';
 import { PawRating } from './PawRating';
 
 interface Props {
@@ -20,6 +21,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   );
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
 
   const fallbackDirectors = movie.director
     ? movie.director
@@ -44,6 +46,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     setAdminTmdbId('');
     setAdminTmdbType(movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie');
     setAdminBusy(false);
+    setSeasonOverrides(null);
   }, [movie.id]);
 
   useEffect(() => {
@@ -65,6 +68,33 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
       active = false;
     };
   }, [movie.tmdbId, tmdbEnrichmentEnabled]);
+
+  useEffect(() => {
+    let active = true;
+    async function fetchSeasons() {
+      if (!tmdbEnrichmentEnabled || movie.tmdbType !== 'tv' || !movie.tmdbId) {
+        setSeasonOverrides(null);
+        return;
+      }
+      const hasPoster = movie.tmdbSeasons?.some((season) => season.posterUrl || season.posterPath);
+      if (hasPoster) {
+        setSeasonOverrides(null);
+        return;
+      }
+      try {
+        const seasons = await fetchTvSeasons(movie.tmdbId);
+        if (active) {
+          setSeasonOverrides(seasons);
+        }
+      } catch (error) {
+        console.warn('No se pudieron cargar las temporadas', error);
+      }
+    }
+    fetchSeasons();
+    return () => {
+      active = false;
+    };
+  }, [movie.tmdbId, movie.tmdbType, movie.tmdbSeasons, tmdbEnrichmentEnabled]);
 
   const parseTmdbInput = (value: string, fallbackType: 'movie' | 'tv') => {
     const trimmed = value.trim();
@@ -128,6 +158,16 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
       setAdminBusy(false);
     }
   };
+
+  const displaySeasons = useMemo(() => {
+    const base = movie.tmdbSeasons ?? [];
+    const overrides = seasonOverrides ?? [];
+    if (overrides.length === 0) return base;
+    const map = new Map(overrides.map((season) => [season.seasonNumber, season]));
+    return base.length > 0
+      ? base.map((season) => ({ ...season, ...map.get(season.seasonNumber) }))
+      : overrides;
+  }, [movie.tmdbSeasons, seasonOverrides]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -234,19 +274,29 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
                       <small className="muted"> Temporada solicitada: {movie.season}</small>
                     )}
                   </div>
-                  {movie.tmdbSeasons && movie.tmdbSeasons.length > 0 ? (
+                  {displaySeasons && displaySeasons.length > 0 ? (
                     <ul className="director-link-list">
-                      {movie.tmdbSeasons.map((season) => (
+                      {displaySeasons.map((season) => (
                         <li key={season.seasonNumber}>
                           <span>
                             T{season.seasonNumber}{' '}
                             {season.name && <em style={{ color: 'var(--text-muted)' }}>({season.name})</em>}
-                            {movie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+                            {movie.season === season.seasonNumber && <strong> ??" Seleccionada</strong>}
                           </span>
                           <div className="muted" style={{ fontSize: '0.9em' }}>
-                            Episodios: {season.episodeCount ?? '¿?'}{' '}
-                            {season.airDate && <span>• Estreno: {season.airDate}</span>}
+                            Episodios: {season.episodeCount ?? 'A??'}{' '}
+                            {season.airDate && <span>??? Estreno: {season.airDate}</span>}
                           </div>
+                          {season.posterUrl && (
+                            <div style={{ marginTop: 8 }}>
+                              <img
+                                src={season.posterUrl}
+                                alt={season.name ?? `Temporada ${season.seasonNumber}`}
+                                style={{ width: 120, borderRadius: 8 }}
+                                loading="lazy"
+                              />
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>

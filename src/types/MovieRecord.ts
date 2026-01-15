@@ -35,6 +35,8 @@ export type MovieRecord = {
     name?: string | null;
     episodeCount?: number | null;
     airDate?: string | null;
+    posterPath?: string | null;
+    posterUrl?: string;
   }[];
   tmdbStatus?: TmdbStatus;
 };
