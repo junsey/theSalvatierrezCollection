@@ -47,6 +47,14 @@ export const readJsonBody = async (req: any) => {
   return raw ? JSON.parse(raw) : {};
 };
 
+const stripTrailingSlash = (value: string) => {
+  let result = value;
+  while (result.endsWith('/')) {
+    result = result.slice(0, -1);
+  }
+  return result;
+};
+
 export const supabaseRequest = async <T>(path: string, options: RequestInit = {}): Promise<T> => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error('Supabase server credentials missing.');
@@ -55,7 +63,7 @@ export const supabaseRequest = async <T>(path: string, options: RequestInit = {}
   headers.set('apikey', SUPABASE_SERVICE_ROLE_KEY);
   headers.set('Authorization', `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`);
   headers.set('Content-Type', 'application/json');
-  const response = await fetch(`${SUPABASE_URL.replace(/\\/$/, '')}/rest/v1/${path}`, {
+  const response = await fetch(`${stripTrailingSlash(SUPABASE_URL)}/rest/v1/${path}`, {
     ...options,
     headers
   });
