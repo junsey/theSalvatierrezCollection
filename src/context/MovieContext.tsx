@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { enrichMoviesBatch } from '../services/tmdbApi';
+import { hydrateFromSupabase, persistSupabaseTmdb } from '../services/supabaseTmdb';
 import {
   applyLocalOverrides,
   clearMovieCache,
@@ -13,6 +14,7 @@ import {
   setSeenOverride
 } from '../services/localStorage';
 import { FetchMoviesResult, SheetMeta, fetchMovies } from '../services/googleSheets';
+import { fetchCollectionFromSupabase } from '../services/supabaseCollection';
 import { MovieRecord } from '../types/MovieRecord';
 
 type RefreshOptions = Parameters<typeof fetchMovies>[0] & { invalidateMovieCache?: boolean };
@@ -36,6 +38,7 @@ interface MovieContextValue {
   refreshAll: () => Promise<void>;
   refreshSheet: () => Promise<void>;
   refreshMissing: () => Promise<void>;
+  refreshSupabase: () => Promise<void>;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
   updateNote: (id: string, text: string) => void;
@@ -64,20 +67,25 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (cached) {
         setSheetMeta(cached.sheetMeta ?? null);
         const withLocal = applyLocalOverrides(cached.movies);
+        const supabaseHydrated = await hydrateFromSupabase(withLocal);
+        const withSupabase = supabaseHydrated.movies;
 
-        const needsEnrichment = withLocal.some(
+        const needsEnrichment = withSupabase.some(
           (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
         );
 
         if (!needsEnrichment) {
-          setMovies(withLocal);
+          setMovies(withSupabase);
           setLoading(false);
           return;
         }
 
         try {
-          setMovies(withLocal);
-          const enriched = await enrichMoviesBatch(withLocal, {
+          setMovies(withSupabase);
+          const needs = withSupabase.filter(
+            (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
+          );
+          const enriched = await enrichMoviesBatch(needs, {
             allowStaleCache: true,
             maxRequestsPerSecond: 40,
             onProgress: (current, total, movieTitle) => {
@@ -86,25 +94,44 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           });
           setProgress(null);
-          setMovies(enriched);
-          saveMovieCache(enriched, cached.sheetMeta ?? null);
+          const enrichedMap = new Map(enriched.map((movie) => [movie.id, movie]));
+          const updated = withSupabase.map((movie) => enrichedMap.get(movie.id) || movie);
+          setMovies(updated);
+          saveMovieCache(updated, cached.sheetMeta ?? null);
+          const toPersist = updated.filter(
+            (movie) =>
+              movie.tmdbId &&
+              !supabaseHydrated.hydratedIds.has(movie.id)
+          );
+          await persistSupabaseTmdb(toPersist);
           setLoading(false);
           return;
         } catch (err) {
           console.warn('Failed to re-enrich cached movies, falling back to cached payload', err);
           setProgress(null);
-          setMovies(withLocal);
+          setMovies(withSupabase);
           setLoading(false);
           return;
         }
       }
     }
     try {
-      const result: FetchMoviesResult = await fetchMovies(options);
+      let result: FetchMoviesResult;
+      try {
+        result = (await fetchCollectionFromSupabase()) ?? await fetchMovies(options);
+      } catch (err) {
+        console.warn('Supabase fetch failed; falling back to Sheets', err);
+        result = await fetchMovies(options);
+      }
       setSheetMeta(result.meta);
       const withLocal = applyLocalOverrides(result.movies);
-      setMovies(withLocal);
-      const enriched = await enrichMoviesBatch(withLocal, {
+      const supabaseHydrated = await hydrateFromSupabase(withLocal);
+      const withSupabase = supabaseHydrated.movies;
+      setMovies(withSupabase);
+      const needs = withSupabase.filter(
+        (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
+      );
+      const enriched = await enrichMoviesBatch(needs, {
         allowStaleCache: !options?.forceNetwork,
         forceNetwork: options?.invalidateMovieCache,
         maxRequestsPerSecond: 40,
@@ -114,8 +141,16 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       });
       setProgress(null);
-      setMovies(enriched);
-      saveMovieCache(enriched, result.meta);
+      const enrichedMap = new Map(enriched.map((movie) => [movie.id, movie]));
+      const updated = withSupabase.map((movie) => enrichedMap.get(movie.id) || movie);
+      setMovies(updated);
+      saveMovieCache(updated, result.meta);
+      const toPersist = updated.filter(
+        (movie) =>
+          movie.tmdbId &&
+          !supabaseHydrated.hydratedIds.has(movie.id)
+      );
+      await persistSupabaseTmdb(toPersist);
     } catch (err) {
       setProgress(null);
       setError(err instanceof Error ? err.message : 'Unable to load movies');
@@ -131,17 +166,48 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     await refresh({ forceNetwork: true, invalidateMovieCache: true });
   };
 
+  const refreshSupabase = async () => {
+    setLoading(true);
+    setError(null);
+    setProgress(null);
+    clearMovieCache();
+    try {
+      const result = await fetchCollectionFromSupabase();
+      if (!result) {
+        throw new Error('Supabase no estA1 disponible o no estA1 configurado.');
+      }
+      setSheetMeta(result.meta);
+      const withLocal = applyLocalOverrides(result.movies);
+      const supabaseHydrated = await hydrateFromSupabase(withLocal);
+      setMovies(supabaseHydrated.movies);
+      saveMovieCache(supabaseHydrated.movies, result.meta);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load Supabase data');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const refreshSheet = async () => {
     setLoading(true);
     setError(null);
     setProgress({ current: 0, total: 100, message: 'Recargando desde Google Sheets...' });
     try {
-      const result: FetchMoviesResult = await fetchMovies({ forceNetwork: true });
+      let result: FetchMoviesResult;
+      try {
+        result = (await fetchCollectionFromSupabase()) ?? await fetchMovies({ forceNetwork: true });
+      } catch (err) {
+        console.warn('Supabase fetch failed; falling back to Sheets', err);
+        result = await fetchMovies({ forceNetwork: true });
+      }
       setSheetMeta(result.meta);
       const withLocal = applyLocalOverrides(result.movies);
-      setMovies(withLocal);
+      const supabaseHydrated = await hydrateFromSupabase(withLocal);
+      const withSupabase = supabaseHydrated.movies;
+      setMovies(withSupabase);
       // Solo enriquece las que no tienen caché
-      const needsEnrichment = withLocal.filter(
+      const needsEnrichment = withSupabase.filter(
         (movie) => !movie.tmdbStatus || movie.tmdbStatus.source === 'none'
       );
       if (needsEnrichment.length > 0) {
@@ -156,11 +222,17 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
         // Actualizar solo las películas enriquecidas
         const enrichedMap = new Map(enriched.map(m => [m.id, m]));
-        const updated = withLocal.map(m => enrichedMap.get(m.id) || m);
+        const updated = withSupabase.map(m => enrichedMap.get(m.id) || m);
         setMovies(updated);
         saveMovieCache(updated, result.meta);
+        const toPersist = updated.filter(
+          (movie) =>
+            movie.tmdbId &&
+            !supabaseHydrated.hydratedIds.has(movie.id)
+        );
+        await persistSupabaseTmdb(toPersist);
       } else {
-        saveMovieCache(withLocal, result.meta);
+        saveMovieCache(withSupabase, result.meta);
       }
       setProgress(null);
       setLoading(false);
@@ -191,9 +263,13 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setError('No hay películas cargadas. Usa "Recargar Excel" primero.');
         return;
       }
+      const supabaseHydrated = await hydrateFromSupabase(currentMovies);
+      const hydratedMovies = supabaseHydrated.movies;
+      setMovies(hydratedMovies);
+
 
       // Filtrar películas que necesitan enriquecimiento
-      const needsEnrichment = currentMovies.filter(
+      const needsEnrichment = hydratedMovies.filter(
         (movie) => 
           !movie.tmdbStatus || 
           movie.tmdbStatus.source === 'none' || 
@@ -221,11 +297,17 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // Actualizar solo las películas enriquecidas
       const enrichedMap = new Map(enriched.map(m => [m.id, m]));
-      const updated = currentMovies.map(m => enrichedMap.get(m.id) || m);
+      const updated = hydratedMovies.map(m => enrichedMap.get(m.id) || m);
       
       setMovies(updated);
       const cached = loadMovieCache();
       saveMovieCache(updated, cached?.sheetMeta ?? null);
+      const toPersist = updated.filter(
+        (movie) =>
+          movie.tmdbId &&
+          !supabaseHydrated.hydratedIds.has(movie.id)
+      );
+      await persistSupabaseTmdb(toPersist);
       setProgress(null);
       setLoading(false);
     } catch (err) {
@@ -275,6 +357,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       error, 
       refresh, 
       refreshAll, 
+      refreshSupabase,
       refreshSheet, 
       refreshMissing,
       updateSeen, 

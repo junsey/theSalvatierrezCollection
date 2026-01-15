@@ -19,6 +19,7 @@ export type MovieRecord = {
   tmdbYear?: number | null;
   tmdbTitle?: string;
   tmdbOriginalTitle?: string;
+  posterPath?: string | null;
   posterUrl?: string;
   plot?: string;
   tmdbGenres?: string[];

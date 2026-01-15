@@ -4,7 +4,7 @@ import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 
 export const HomePage: React.FC = () => {
-  const { movies, loading } = useMovies();
+  const { movies, loading, sheetMeta } = useMovies();
   const stats = useMemo(() => {
     const seen = movies.filter((m) => m.seen).length;
     const unseen = movies.length - seen;
@@ -18,12 +18,12 @@ export const HomePage: React.FC = () => {
         <div>
           <h1>The Salvatierrez Collection</h1>
           <p>
-            Un catálogo oscuro con estética dungeon synth para tu videoteca. Las películas descienden en vivo desde Google
-            Sheets, se visten con datos de TMDb (portadas, rating, sinopsis) y guardan tus marcas locales de "vista" y
-            "puntuación" (columna Puntuacion) junto a tus notas personales en este navegador.
+            Un catA?logo oscuro con estActica dungeon synth para tu videoteca. Las pelA-culas se cargan desde tu fuente activa,
+            se visten con datos de TMDb (portadas, rating, sinopsis) y guardan tus marcas locales de "vista" y "puntuaciA3n"
+            junto a tus notas personales en este navegador.
           </p>
           <p>
-            Fuente del Excel: <code>{getSheetUrl()}</code>
+            Fuente: <code>{sheetMeta?.source === 'supabase' ? 'Supabase' : getSheetUrl()}</code>
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Link className="nav-link" to="/movies">Enter the Archive</Link>

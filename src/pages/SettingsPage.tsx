@@ -3,7 +3,7 @@ import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 
 export const SettingsPage: React.FC = () => {
-  const { refreshAll, refreshSheet, refreshMissing, loading, sheetMeta, error, progress, movies } = useMovies();
+  const { refreshAll, refreshSheet, refreshMissing, refreshSupabase, loading, sheetMeta, error, progress, movies } = useMovies();
   const [status, setStatus] = useState<string | null>(null);
   const [showProblematic, setShowProblematic] = useState(false);
 
@@ -15,6 +15,17 @@ export const SettingsPage: React.FC = () => {
     } catch (err) {
       console.error(err);
       setStatus('❌ No se pudo regenerar completamente.');
+    }
+  };
+
+  const handleRefreshSupabase = async () => {
+    setStatus(null);
+    try {
+      await refreshSupabase();
+      setStatus('OK. Datos cargados desde Supabase.');
+    } catch (err) {
+      console.error(err);
+      setStatus('ERROR. No se pudo cargar Supabase.');
     }
   };
 
@@ -49,7 +60,8 @@ export const SettingsPage: React.FC = () => {
     'cache-fresh': 'Copia local fresca',
     'cache-stale': 'Copia local (stale, pero segura)',
     'embedded': 'Copia embebida en la app',
-    'demo': 'Datos demo'
+    'demo': 'Datos demo',
+    'supabase': 'Supabase (BD)'
   };
 
   const sourceLabel = sheetMeta ? sheetSourceLabel[sheetMeta.source] : 'N/D';
@@ -83,13 +95,26 @@ export const SettingsPage: React.FC = () => {
           <div>{sourceLabel}</div>
         </div>
         <div className="stat-card">
+          <strong>Estado Supabase</strong>
+          <div>{sheetMeta?.source === 'supabase' ? 'Conectado' : 'No conectado'}</div>
+        </div>
+        <div className="stat-card">
           <strong>Hoja remota</strong>
-          <div className="clamped" style={{ fontSize: 12 }}>{getSheetUrl()}</div>
+          <div className="clamped" style={{ fontSize: 12 }}>{sheetMeta?.source === 'supabase' ? 'Supabase' : getSheetUrl()}</div>
         </div>
       </div>
       <div className="panel" style={{ marginBottom: 16 }}>
         <h2>Opciones de sincronización</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Cargar desde Supabase</h3>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
+              Usa la base de datos como fuente principal sin llamar TMDb.
+            </p>
+            <button className="btn" onClick={handleRefreshSupabase} disabled={loading}>
+              {loading ? 'Cargando...' : 'Usar Supabase'}
+            </button>
+          </div>
           <div>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar todo</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>

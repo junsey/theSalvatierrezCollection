@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { FiltersBar } from '../components/FiltersBar';
 import { MovieCard } from '../components/MovieCard';
@@ -6,6 +6,8 @@ import { MovieDetail } from '../components/MovieDetail';
 import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
 import { getDirectorProfile } from '../data/directorProfiles';
+import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
+import { DirectedMovie } from '../services/tmdbPeopleService';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const baseFilters: MovieFilters = {
@@ -36,6 +38,7 @@ export const DirectorPage: React.FC = () => {
   const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
   const directorName = decodeURIComponent(name ?? '');
   const profile = getDirectorProfile(directorName);
+  const [supabaseProfile, setSupabaseProfile] = useState<{ image?: string; filmography: DirectedMovie[] } | null>(null);
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
 
@@ -47,18 +50,62 @@ export const DirectorPage: React.FC = () => {
     return { total, seen };
   }, [directorMovies]);
 
+  useEffect(() => {
+    let active = true;
+    async function loadSupabaseProfile() {
+      try {
+        const director = await fetchDirectorByName(directorName);
+        if (!director || !director.tmdb_person_id) {
+          if (active) setSupabaseProfile(null);
+          return;
+        }
+        const [filmography, image] = await Promise.all([
+          fetchDirectorFilmographyByPersonId(director.tmdb_person_id),
+          buildDirectorProfileUrl(director.profile_path ?? null)
+        ]);
+        if (!active) return;
+        setSupabaseProfile({ image, filmography });
+      } catch (error) {
+        console.warn('No se pudo cargar el director desde Supabase', error);
+        if (active) setSupabaseProfile(null);
+      }
+    }
+    if (directorName) {
+      loadSupabaseProfile();
+    }
+    return () => {
+      active = false;
+    };
+  }, [directorName]);
+
   const collectionTitles = useMemo(
     () => directorMovies.map((m) => m.title.toLowerCase()),
     [directorMovies]
   );
 
-  const suggestedFilmography = useMemo(() => {
+  const collectionTmdbIds = useMemo(() => {
+    return new Set(directorMovies.map((m) => m.tmdbId).filter(Boolean) as number[]);
+  }, [directorMovies]);
+
+  const hasSupabaseFilmography = (supabaseProfile?.filmography?.length ?? 0) > 0;
+
+  const filmographyEntries = useMemo(() => {
+    const supabaseFilms = supabaseProfile?.filmography ?? [];
+    if (supabaseFilms.length > 0) {
+      return supabaseFilms.map((film) => ({
+        id: film.id,
+        title: film.title,
+        year: film.year,
+        posterUrl: film.posterUrl,
+        inCollection: collectionTmdbIds.has(film.id)
+      }));
+    }
     const planned = profile.filmography ?? [];
     return planned.map((title) => ({
       title,
-      inCollection: collectionTitles.includes(title.toLowerCase()),
+      inCollection: collectionTitles.includes(title.toLowerCase())
     }));
-  }, [profile.filmography, collectionTitles]);
+  }, [profile.filmography, collectionTitles, supabaseProfile, collectionTmdbIds]);
 
   const filtered = useMemo(() => {
     return directorMovies
@@ -109,7 +156,7 @@ export const DirectorPage: React.FC = () => {
       <div className="director-hero">
         <div
           className="director-portrait"
-          style={{ backgroundImage: `url(${profile.image})` }}
+          style={{ backgroundImage: `url(${supabaseProfile?.image ?? profile.image})` }}
           aria-hidden="true"
         />
         <div className="director-legend">
@@ -149,19 +196,29 @@ export const DirectorPage: React.FC = () => {
           onNoteChange={(note) => updateNote(activeMovie.id, note)}
         />
       )}
-      {suggestedFilmography.length > 0 && (
+      {filmographyEntries.length > 0 && (
         <div className="filmography-block">
-          <h2>Filmografía sugerida</h2>
+          <h2>{hasSupabaseFilmography ? 'Filmografia' : 'Filmografia sugerida'}</h2>
           <p className="text-muted">
-            Títulos clave del director para completar la colección. Los que ya tienes aparecen como marcados.
+            {hasSupabaseFilmography
+              ? 'Filmografia completa del director. Las peliculas de tu coleccion aparecen marcadas.'
+              : 'Titulos clave del director para completar la coleccion. Los que ya tienes aparecen como marcados.'}
           </p>
           <ul className="filmography-list">
-            {suggestedFilmography.map((entry) => (
-              <li key={entry.title} className={entry.inCollection ? 'owned' : 'pending'}>
-                <span>{entry.title}</span>
-                <span className="pill">{entry.inCollection ? 'En la colección' : 'Pendiente'}</span>
-              </li>
-            ))}
+            {filmographyEntries.map((entry) => {
+              const label = entry.year ? `${entry.title} (${entry.year})` : entry.title;
+              return (
+                <li key={`${entry.title}-${entry.year ?? 'na'}`} className={entry.inCollection ? 'owned' : 'pending'}>
+                  <div className="filmography-item">
+                    {entry.posterUrl && (
+                      <img className="filmography-poster" src={entry.posterUrl} alt="" loading="lazy" />
+                    )}
+                    <span>{label}</span>
+                  </div>
+                  <span className="pill">{entry.inCollection ? 'En la coleccion' : 'Pendiente'}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

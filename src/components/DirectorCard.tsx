@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, getPersonDirectedMovies, getPersonDetails } from '../services/tmdbPeopleService';
+import { buildDirectorProfileUrl, fetchDirectorByPersonId, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
 import { getWikipediaSummaryAndThumbnail, searchWikipediaArticle } from '../services/wikipediaService';
 
 type DirectorCardProps = {
@@ -48,19 +49,21 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
     async function loadProfile() {
       setState((prev) => ({ ...prev, loading: true }));
       try {
-        const [details, directed] = await Promise.all([
-          getPersonDetails(directorId),
-          getPersonDirectedMovies(directorId)
-        ]);
+        const supabaseDirector = await fetchDirectorByPersonId(directorId);
+        const supabaseFilmography = await fetchDirectorFilmographyByPersonId(directorId);
 
-        const resolvedName = details?.name ?? name;
+        const details = supabaseDirector?.profile_path ? null : await getPersonDetails(directorId);
+        const directed = supabaseFilmography.length > 0 ? supabaseFilmography : await getPersonDirectedMovies(directorId);
+
+        const resolvedName = details?.name ?? supabaseDirector?.name ?? name;
         const wikiTitle = resolvedName ? await searchWikipediaArticle(resolvedName) : null;
         const wiki = wikiTitle ? await getWikipediaSummaryAndThumbnail(wikiTitle) : { summary: null, thumbnailUrl: null };
+        const supabasePhoto = await buildDirectorProfileUrl(supabaseDirector?.profile_path ?? null);
 
         if (!active) return;
         setState({
           biography: wiki.summary || details?.biography || null,
-          photoUrl: wiki.thumbnailUrl || details?.profileUrl,
+          photoUrl: supabasePhoto || wiki.thumbnailUrl || details?.profileUrl,
           placeOfBirth: details?.placeOfBirth,
           birthday: details?.birthday,
           deathday: details?.deathday,
@@ -142,14 +145,19 @@ export const DirectorCard: React.FC<DirectorCardProps> = ({ directorId, name }) 
               const label = film.year ? `${film.title} (${film.year})` : film.title;
               return (
                 <li key={`${film.id}-${film.title}`} className={ownedId ? 'owned' : 'pending'}>
-                  {ownedId ? (
-                    <Link to={`/movies?tmdbId=${film.id}`} className="film-link">
-                      {label}
-                    </Link>
-                  ) : (
-                    <span className="film-link muted">{label}</span>
-                  )}
-                  <span className="pill">{ownedId ? 'En colección' : 'Pendiente'}</span>
+                  <div className="filmography-item">
+                    {film.posterUrl && (
+                      <img className="filmography-poster" src={film.posterUrl} alt="" loading="lazy" />
+                    )}
+                    {ownedId ? (
+                      <Link to={`/movies?tmdbId=${film.id}`} className="film-link">
+                        {label}
+                      </Link>
+                    ) : (
+                      <span className="film-link muted">{label}</span>
+                    )}
+                  </div>
+                  <span className="pill">{ownedId ? 'En colecciA3n' : 'Pendiente'}</span>
                 </li>
               );
             })}

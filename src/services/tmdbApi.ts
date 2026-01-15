@@ -196,6 +196,16 @@ async function getImageBaseUrl(): Promise<string> {
   }
 }
 
+export async function getTmdbImageBaseUrl(): Promise<string> {
+  return getImageBaseUrl();
+}
+
+export async function getTmdbPosterUrl(path?: string | null): Promise<string | undefined> {
+  if (!path) return undefined;
+  const base = await getImageBaseUrl();
+  return buildPosterUrl(base, path);
+}
+
 type SearchResult = {
   id: number;
   title: string;
@@ -417,6 +427,7 @@ function applyEnrichment(
     tmdbOriginalTitle: enrichment.tmdbOriginalTitle,
     tmdbYear: enrichment.tmdbYear ?? movie.year,
     tmdbRating: enrichment.tmdbRating,
+    posterPath: enrichment.posterPath ?? movie.posterPath,
     posterUrl: enrichment.posterPath ? buildPosterUrl(baseUrl, enrichment.posterPath) : movie.posterUrl,
     plot: enrichment.overview ?? movie.plot,
     tmdbGenres: enrichment.tmdbGenres ?? movie.tmdbGenres,

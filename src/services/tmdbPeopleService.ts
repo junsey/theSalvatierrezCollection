@@ -1,4 +1,4 @@
-import { tmdbFetchJson, TMDB_API_KEY } from './tmdbApi';
+import { tmdbFetchJson, TMDB_API_KEY, getTmdbImageBaseUrl } from './tmdbApi';
 
 const API_BASE = 'https://api.themoviedb.org/3';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
@@ -24,6 +24,8 @@ type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
+  posterPath?: string | null;
+  posterUrl?: string;
 };
 
 type ConfigCache = { fetchedAt: number; baseUrl: string; size: string };
@@ -165,10 +167,17 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
 
   try {
     const url = `${API_BASE}/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null }[] }>(url);
+    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null; poster_path?: string | null }[] }>(url);
+    const base = await getTmdbImageBaseUrl();
     const directed = (data.crew ?? [])
       .filter((item) => item.job === 'Director')
-      .map((item) => ({ id: item.id, title: item.title, year: parseYear(item.release_date) }));
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        year: parseYear(item.release_date),
+        posterPath: item.poster_path ?? null,
+        posterUrl: item.poster_path ? `${base}w300${item.poster_path}` : undefined
+      }));
     personCreditsCache[personId] = { fetchedAt: Date.now(), data: directed };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
     return directed;

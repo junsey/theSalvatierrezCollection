@@ -11,7 +11,7 @@ type SheetCachePayload = {
   sourceUrl?: string;
 };
 
-export type SheetSource = 'network' | 'cache-fresh' | 'cache-stale' | 'embedded' | 'demo';
+export type SheetSource = 'network' | 'cache-fresh' | 'cache-stale' | 'embedded' | 'demo' | 'supabase';
 
 export type SheetMeta = {
   source: SheetSource;
