@@ -6,6 +6,7 @@ import { refreshDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
+import { clearDirectorCache } from '../lib/directorCache';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -187,6 +188,7 @@ export const DirectorPage: React.FC = () => {
         setTmdbPersonId(response.tmdbId);
         setAdminTmdbId(String(response.tmdbId));
       }
+      clearDirectorCache();
       setRefreshMessage('TMDb actualizado para este director.');
     } catch (err) {
       console.error('No se pudo actualizar el director', err);

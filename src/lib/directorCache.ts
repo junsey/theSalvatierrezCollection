@@ -63,6 +63,16 @@ export function saveDirectorCache(cache: DirectorProfilesCache): void {
   }
 }
 
+
+export function clearDirectorCache(): void {
+  if (!isBrowser()) return;
+  try {
+    window.localStorage.removeItem(CACHE_KEY);
+  } catch (error) {
+    console.warn('No se pudo limpiar la cachAc de directores', error);
+  }
+}
+
 export function getCachedProfilesForKeys(
   keys: string[],
   cache: DirectorProfilesCache | null
