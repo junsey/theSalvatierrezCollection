@@ -9,8 +9,8 @@ const ADMIN_SESSION_KEY = 'salvatierrez-admin-session-v1';
 const isBrowser = typeof window !== 'undefined';
 
 const encodeBase64 = (value: string) => {
-  if (typeof btoa !== 'undefined') return btoa(value);
-  return Buffer.from(value, 'utf-8').toString('base64');
+  if (typeof btoa === 'function') return btoa(value);
+  throw new Error('Base64 encoder unavailable.');
 };
 
 export function buildAdminToken(user: string, pass: string): string {
