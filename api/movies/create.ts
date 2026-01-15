@@ -9,21 +9,37 @@ export default async function handler(req: any, res: any) {
   }
   try {
     const body = await readJsonBody(req);
+    const toText = (value: any, fallback = '') => {
+      if (value == null) return fallback;
+      if (typeof value === 'string') return value;
+      return String(value);
+    };
+    const toNullIfEmpty = (value: any) => {
+      const text = toText(value, '').trim();
+      return text ? text : null;
+    };
+    const toBoolOrNull = (value: any) => {
+      if (typeof value === 'boolean') return value;
+      if (value == null || value === '') return null;
+      if (value === 1 || value === '1') return true;
+      if (value === 0 || value === '0') return false;
+      return null;
+    };
     const payload = {
-      Seccion: body.seccion ?? null,
+      Seccion: toNullIfEmpty(body.seccion),
       'Año': body.year ?? null,
-      Saga: body.saga ?? '',
-      Titulo: body.title ?? null,
-      'Titulo Original': body.originalTitle ?? '',
-      Genero: body.genreRaw ?? '',
-      Director: body.director ?? '',
-      Grupo: body.group ?? '',
-      Vista: body.seen ?? false,
-      Doblaje: body.dubbing ?? '',
-      Formato: body.format ?? '',
+      Saga: toText(body.saga),
+      Titulo: toNullIfEmpty(body.title),
+      'Titulo Original': toText(body.originalTitle),
+      Genero: toText(body.genreRaw),
+      Director: toText(body.director),
+      Grupo: toText(body.group),
+      Vista: toBoolOrNull(body.seen),
+      Doblaje: toText(body.dubbing),
+      Formato: toText(body.format),
       'Puntuacion Rodrigo': body.ratingRodrigo ?? null,
       'Puntuacion Gloria': body.ratingGloria ?? null,
-      Funciona: body.funciona ?? null
+      Funciona: toNullIfEmpty(body.funciona)
     };
     if (!payload.Seccion || !payload.Titulo) {
       return reject(res, 400, 'Seccion y titulo son obligatorios.');
