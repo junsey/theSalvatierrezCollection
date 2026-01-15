@@ -8,9 +8,14 @@ const buildDirectorPayload = (details: { id: number; name: string; profilePath: 
   last_synced_at: new Date().toISOString()
 });
 
-const buildFilmographyPayload = (tmdbPersonId: number, items: Array<{ id: number; title: string; year: number | null; posterPath: string | null; mediaType: 'movie' | 'tv' }>) =>
+const buildFilmographyPayload = (
+  tmdbPersonId: number,
+  items: Array<{ id: number; title: string; year: number | null; posterPath: string | null; mediaType: 'movie' | 'tv' }>,
+  existingIds: Set<number>
+) =>
   items
     .filter((item) => item.mediaType === 'movie')
+    .filter((item) => !existingIds.has(item.id))
     .map((item) => ({
       tmdb_person_id: tmdbPersonId,
       tmdb_movie_id: item.id,
@@ -54,11 +59,15 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify(buildDirectorPayload(details))
     });
 
-    const filmographyPayload = buildFilmographyPayload(tmdbId, credits);
+    const existingRows = await supabaseRequest<Array<{ tmdb_movie_id: number }>>(
+      `tmdb_director_filmography?select=tmdb_movie_id&tmdb_person_id=eq.${tmdbId}`
+    );
+    const existingIds = new Set((existingRows ?? []).map((row) => Number(row.tmdb_movie_id)).filter(Number.isFinite));
+    const filmographyPayload = buildFilmographyPayload(tmdbId, credits, existingIds);
     if (filmographyPayload.length > 0) {
-      await supabaseRequest('tmdb_director_filmography?on_conflict=tmdb_person_id,tmdb_movie_id', {
+      await supabaseRequest('tmdb_director_filmography', {
         method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        headers: { Prefer: 'return=minimal' },
         body: JSON.stringify(filmographyPayload)
       });
     }

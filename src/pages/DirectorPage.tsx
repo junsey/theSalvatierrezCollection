@@ -83,6 +83,7 @@ export const DirectorPage: React.FC = () => {
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
   const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
   const [tmdbPersonId, setTmdbPersonId] = useState<number | null>(null);
+  const [adminTmdbId, setAdminTmdbId] = useState('');
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
 
@@ -117,6 +118,7 @@ export const DirectorPage: React.FC = () => {
           setPersonName(supabaseDirector.name);
         }
         setTmdbPersonId(supabaseTmdbId);
+        setAdminTmdbId(supabaseTmdbId ? String(supabaseTmdbId) : '');
         if (supabaseProfile) {
           setProfileUrl(supabaseProfile);
         }
@@ -124,13 +126,8 @@ export const DirectorPage: React.FC = () => {
           setKnownFor(supabaseFilmography);
         }
 
-        const needsFallback = !supabaseFilmography.length || !supabaseProfile;
-        if (!needsFallback) {
-          setLoading(false);
-          return;
-        }
-
-        if (!tmdbEnrichmentEnabled) {
+        const shouldFetchTmdb = true;
+        if (!shouldFetchTmdb) {
           setLoading(false);
           return;
         }
@@ -147,6 +144,7 @@ export const DirectorPage: React.FC = () => {
         setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
         setBiography(result.person?.biography ?? null);
         setProfileUrl((supabaseProfile ?? result.person?.profileUrl) ?? undefined);
+        setAdminTmdbId(result.tmdbId ? String(result.tmdbId) : '');
         if (!supabaseFilmography.length) {
           setKnownFor(result.credits);
         }
@@ -166,10 +164,15 @@ export const DirectorPage: React.FC = () => {
 
   const handleRefreshDirector = async () => {
     if (!adminSession) return;
+    const parsedId = adminTmdbId.trim() ? Number(adminTmdbId.trim()) : null;
+    if (adminTmdbId.trim() && !Number.isFinite(parsedId)) {
+      setRefreshMessage('El TMDb ID debe ser numérico.');
+      return;
+    }
     setRefreshBusy(true);
     setRefreshMessage(null);
     try {
-      const response = await refreshDirectorTmdb({ name: directorName, tmdbId: tmdbPersonId });
+      const response = await refreshDirectorTmdb({ name: directorName, tmdbId: parsedId ?? tmdbPersonId ?? null });
       if (response?.name) {
         setPersonName(response.name);
       }
@@ -182,6 +185,7 @@ export const DirectorPage: React.FC = () => {
         const filmography = await fetchDirectorFilmographyByPersonId(response.tmdbId);
         setKnownFor(filmography);
         setTmdbPersonId(response.tmdbId);
+        setAdminTmdbId(String(response.tmdbId));
       }
       setRefreshMessage('TMDb actualizado para este director.');
     } catch (err) {
@@ -382,6 +386,15 @@ export const DirectorPage: React.FC = () => {
           {!loading && !biography && <p className="text-muted director-legend__bio">Biografía no disponible.</p>}
           {adminSession && (
             <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>TMDb ID</span>
+                <input
+                  type="number"
+                  value={adminTmdbId}
+                  onChange={(event) => setAdminTmdbId(event.target.value)}
+                  style={{ width: 120 }}
+                />
+              </label>
               <button className="btn" onClick={handleRefreshDirector} disabled={refreshBusy}>
                 {refreshBusy ? 'Actualizando...' : 'Actualizar TMDb'}
               </button>

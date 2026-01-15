@@ -361,14 +361,24 @@ export async function fetchTvSeasons(tmdbId: number): Promise<TmdbEnrichment['tm
   const url = `${API_BASE}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`;
   const details = await tmdbFetchJson<TvDetailResult>(url);
   const baseUrl = await getImageBaseUrl();
-  return (details.seasons ?? []).map((season) => ({
-    seasonNumber: season.season_number,
-    name: season.name ?? null,
-    episodeCount: season.episode_count ?? null,
-    airDate: season.air_date ?? null,
-    posterPath: season.poster_path ?? null,
-    posterUrl: season.poster_path ? buildPosterUrl(baseUrl, season.poster_path) : undefined
-  }));
+  const seasons = details.seasons ?? [];
+  return Promise.all(
+    seasons.map(async (season) => {
+      let posterPath = season.poster_path ?? null;
+      if (!posterPath && Number.isFinite(season.season_number)) {
+        const seasonDetails = await fetchTvSeasonDetails(tmdbId, season.season_number);
+        posterPath = seasonDetails?.poster_path ?? posterPath;
+      }
+      return {
+        seasonNumber: season.season_number,
+        name: season.name ?? null,
+        episodeCount: season.episode_count ?? null,
+        airDate: season.air_date ?? null,
+        posterPath,
+        posterUrl: posterPath ? buildPosterUrl(baseUrl, posterPath) : undefined
+      };
+    })
+  );
 }
 
 async function fetchTvSeasonDetails(id: number, season: number, maxRps?: number) {
