@@ -56,6 +56,7 @@ export default async function handler(req: any, res: any) {
     const collectionId = body.collectionId;
     const tmdbId = Number(body.tmdbId);
     const mediaType = body.mediaType === 'tv' ? 'tv' : 'movie';
+    const season = body.season != null && body.season !== '' ? Number(body.season) : null;
     if (!collectionId || !Number.isFinite(tmdbId)) {
       return reject(res, 400, 'collectionId y tmdbId son obligatorios.');
     }
@@ -67,6 +68,13 @@ export default async function handler(req: any, res: any) {
       body: JSON.stringify(payload)
     });
     await upsertDirectors(details);
+    if (mediaType === 'tv' && Number.isFinite(season)) {
+      await supabaseRequest(`Coleccion_Salvatierrez?id=eq.${collectionId}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ Serie: true, Temporada: season })
+      });
+    }
     return res.status(200).json({ ok: true, tmdbId: details.id, mediaType: details.mediaType });
   } catch (error) {
     console.error('Fix TMDb failed', error);

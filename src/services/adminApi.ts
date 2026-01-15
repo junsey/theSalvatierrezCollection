@@ -73,7 +73,12 @@ export async function resolveMovieTmdb(payload: { collectionId: string; tmdbId?:
   });
 }
 
-export async function fixMovieTmdb(payload: { collectionId: string; tmdbId: number; mediaType?: 'movie' | 'tv' }) {
+export async function fixMovieTmdb(payload: {
+  collectionId: string;
+  tmdbId: number;
+  mediaType?: 'movie' | 'tv';
+  season?: number | null;
+}) {
   return adminFetch('/api/movies/fix-tmdb', {
     method: 'PATCH',
     body: JSON.stringify(payload)

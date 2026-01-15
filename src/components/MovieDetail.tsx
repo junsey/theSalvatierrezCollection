@@ -19,6 +19,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   const [adminTmdbType, setAdminTmdbType] = useState<'movie' | 'tv'>(
     movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'
   );
+  const [adminSeason, setAdminSeason] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
@@ -46,6 +47,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     setAdminTmdbId('');
     setAdminTmdbType(movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie');
     setAdminBusy(false);
+    setAdminSeason(movie.season != null ? String(movie.season) : '');
     setSeasonOverrides(null);
   }, [movie.id]);
 
@@ -144,10 +146,21 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
       setAdminMessage('El ID TMDb debe ser numérico.');
       return;
     }
+    const seasonValue = adminSeason.trim();
+    const season = seasonValue ? Number(seasonValue) : null;
+    if (adminTmdbType === 'tv' && seasonValue && !Number.isFinite(season)) {
+      setAdminMessage('La temporada debe ser numérica.');
+      return;
+    }
     setAdminBusy(true);
     setAdminMessage(null);
     try {
-      await fixMovieTmdb({ collectionId: movie.id, tmdbId: parsed.id, mediaType: parsed.mediaType });
+      await fixMovieTmdb({
+        collectionId: movie.id,
+        tmdbId: parsed.id,
+        mediaType: parsed.mediaType,
+        season: parsed.mediaType === 'tv' ? season : null
+      });
       await refreshSupabase();
       setAdminMessage('TMDb corregido.');
       setAdminTmdbId('');
@@ -355,6 +368,18 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
                         <option value="tv">Serie</option>
                       </select>
                     </label>
+                    {adminTmdbType === 'tv' && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>Temporada</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={adminSeason}
+                          onChange={(event) => setAdminSeason(event.target.value)}
+                          style={{ width: 90 }}
+                        />
+                      </label>
+                    )}
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span>ID o link de TMDb</span>
                       <input

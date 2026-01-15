@@ -6,6 +6,8 @@ type CollectionRow = {
   Seccion?: string | null;
   'AAAño'?: number | null;
   'Año'?: number | null;
+  Serie?: boolean | null;
+  Temporada?: number | null;
   Saga?: string | null;
   Titulo?: string | null;
   'Titulo Original'?: string | null;
@@ -89,7 +91,7 @@ function mapRow(row: CollectionRow): MovieRecord {
   return {
     id: row.id,
     seccion: toText(row.Seccion, 'Desconocida'),
-    year: row['AAAño'] ?? row['Año'] ?? null,
+    year: (row as any)['A\u00f1o'] ?? (row as any)['AA\u00f1o'] ?? (row as any)['AAA\u00f1o'] ?? null,
     saga: toText(row.Saga),
     title: toText(row.Titulo, 'Sin tA-tulo'),
     originalTitle: toText(row['Titulo Original']),
@@ -97,6 +99,8 @@ function mapRow(row: CollectionRow): MovieRecord {
     director: toText(row.Director),
     group: toText(row.Grupo),
     seen: row.Vista ?? false,
+    series: row.Serie ?? undefined,
+    season: row.Temporada ?? undefined,
     ratingGloria: row['Puntuacion Gloria'] ?? null,
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
     dubbing: toText(row.Doblaje),
@@ -108,19 +112,33 @@ function mapRow(row: CollectionRow): MovieRecord {
 export async function fetchCollectionFromSupabase(): Promise<FetchMoviesResult | null> {
   logConfigOnce();
   if (!isConfigured()) return null;
-  const params = new URLSearchParams({
-    select: '*',
-    order: 'Titulo'
-  });
-  const rows = await supabaseRequest<Record<string, unknown>[]>(`Coleccion_Salvatierrez?${params.toString()}`);
+  const pageSize = 1000;
+  let offset = 0;
+  const rows: Record<string, unknown>[] = [];
+  while (true) {
+    const params = new URLSearchParams({
+      select: '*',
+      order: 'Titulo',
+      limit: String(pageSize),
+      offset: String(offset)
+    });
+    const chunk = await supabaseRequest<Record<string, unknown>[]>(`Coleccion_Salvatierrez?${params.toString()}`);
+    if (chunk?.length) {
+      rows.push(...chunk);
+    }
+    if (!chunk || chunk.length < pageSize) {
+      break;
+    }
+    offset += pageSize;
+  }
   const mapped = (rows ?? []).map((row) => {
     const record = row as CollectionRow & { [key: string]: unknown };
-    if (record['AAAño'] !== undefined) return mapRow(record);
-    if (record['AAño'] !== undefined) {
-      return mapRow({ ...record, 'AAAño': record['AAño'] as number | null });
+    if ((record as any)['A\u00f1o'] !== undefined) return mapRow(record);
+    if ((record as any)['AA\u00f1o'] !== undefined) {
+      return mapRow({ ...record, 'A\u00f1o': (record as any)['AA\u00f1o'] as number | null });
     }
-    if (record['Año'] !== undefined) {
-      return mapRow({ ...record, 'AAAño': record['Año'] as number | null });
+    if ((record as any)['AAA\u00f1o'] !== undefined) {
+      return mapRow({ ...record, 'A\u00f1o': (record as any)['AAA\u00f1o'] as number | null });
     }
     return mapRow(record);
   });
