@@ -1,4 +1,4 @@
-import { isAdminAuthorized, reject } from '../_admin';
+import { isAdminAuthorized, reject } from '../_admin.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET' && req.method !== 'POST') {

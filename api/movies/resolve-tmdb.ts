@@ -1,5 +1,5 @@
-import { fetchTmdbDetails, searchTmdb } from '../_tmdb';
-import { isAdminAuthorized, readJsonBody, reject, supabaseRequest } from '../_admin';
+import { fetchTmdbDetails, searchTmdb } from '../_tmdb.js';
+import { isAdminAuthorized, readJsonBody, reject, supabaseRequest } from '../_admin.js';
 
 const buildTmdbPayload = (collectionId: string, details: any) => ({
   collection_id: collectionId,
