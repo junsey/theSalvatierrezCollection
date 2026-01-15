@@ -15,6 +15,9 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [adminTmdbId, setAdminTmdbId] = useState('');
+  const [adminTmdbType, setAdminTmdbType] = useState<'movie' | 'tv'>(
+    movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'
+  );
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
 
@@ -39,6 +42,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   useEffect(() => {
     setAdminMessage(null);
     setAdminTmdbId('');
+    setAdminTmdbType(movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie');
     setAdminBusy(false);
   }, [movie.id]);
 
@@ -62,6 +66,31 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     };
   }, [movie.tmdbId, tmdbEnrichmentEnabled]);
 
+  const parseTmdbInput = (value: string, fallbackType: 'movie' | 'tv') => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const urlMatch = trimmed.match(/(?:themoviedb\.org\/)?(movie|tv)\/(\d+)/i);
+    if (urlMatch) {
+      return {
+        id: Number(urlMatch[2]),
+        mediaType: urlMatch[1].toLowerCase() as 'movie' | 'tv'
+      };
+    }
+    if (/^\d+$/.test(trimmed)) {
+      return { id: Number(trimmed), mediaType: fallbackType };
+    }
+    return null;
+  };
+
+  const handleAdminTmdbInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setAdminTmdbId(nextValue);
+    const urlMatch = nextValue.match(/(?:themoviedb\.org\/)?(movie|tv)\/\d+/i);
+    if (urlMatch) {
+      setAdminTmdbType(urlMatch[1].toLowerCase() as 'movie' | 'tv');
+    }
+  };
+
   const handleResolveTmdb = async () => {
     if (!adminSession) return;
     setAdminBusy(true);
@@ -69,7 +98,7 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     try {
       await resolveMovieTmdb({ collectionId: movie.id });
       await refreshSupabase();
-      setAdminMessage('TMDb actualizado desde bAosqueda.');
+      setAdminMessage('TMDb actualizado desde búsqueda.');
     } catch (error) {
       console.error(error);
       setAdminMessage('No se pudo resolver TMDb.');
@@ -80,15 +109,15 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
 
   const handleFixTmdb = async () => {
     if (!adminSession) return;
-    const parsed = Number(adminTmdbId);
-    if (!Number.isFinite(parsed)) {
-      setAdminMessage('El ID TMDb debe ser numAcrico.');
+    const parsed = parseTmdbInput(adminTmdbId, adminTmdbType);
+    if (!parsed || !Number.isFinite(parsed.id)) {
+      setAdminMessage('El ID TMDb debe ser numérico.');
       return;
     }
     setAdminBusy(true);
     setAdminMessage(null);
     try {
-      await fixMovieTmdb({ collectionId: movie.id, tmdbId: parsed });
+      await fixMovieTmdb({ collectionId: movie.id, tmdbId: parsed.id, mediaType: parsed.mediaType });
       await refreshSupabase();
       setAdminMessage('TMDb corregido.');
       setAdminTmdbId('');
@@ -267,12 +296,22 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
                       {adminBusy ? 'Buscando...' : 'Buscar en TMDb'}
                     </button>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>ID TMDb correcto</span>
+                      <span>Tipo</span>
+                      <select
+                        value={adminTmdbType}
+                        onChange={(event) => setAdminTmdbType(event.target.value as 'movie' | 'tv')}
+                      >
+                        <option value="movie">Película</option>
+                        <option value="tv">Serie</option>
+                      </select>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>ID o link de TMDb</span>
                       <input
-                        type="number"
+                        type="text"
                         value={adminTmdbId}
-                        onChange={(event) => setAdminTmdbId(event.target.value)}
-                        style={{ width: 140 }}
+                        onChange={handleAdminTmdbInputChange}
+                        style={{ width: 220 }}
                       />
                     </label>
                     <button className="btn" onClick={handleFixTmdb} disabled={adminBusy}>

@@ -86,6 +86,19 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const supabaseHydrated = await hydrateFromSupabase(withLocal);
         setMovies(supabaseHydrated.movies);
         setLoading(false);
+        void (async () => {
+          try {
+            const result = await fetchCollectionFromSupabase();
+            if (!result) return;
+            setSheetMeta(result.meta);
+            const refreshedWithLocal = applyLocalOverrides(result.movies);
+            const refreshedHydrated = await hydrateFromSupabase(refreshedWithLocal);
+            setMovies(refreshedHydrated.movies);
+            saveMovieCache(refreshedHydrated.movies, result.meta);
+          } catch (error) {
+            console.error('Background supabase refresh failed', error);
+          }
+        })();
         return;
       }
     }
