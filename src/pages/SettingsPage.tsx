@@ -131,12 +131,12 @@ export const SettingsPage: React.FC = () => {
     setAdminError(null);
     setAdminMessage(null);
     try {
-      const ok = await verifyAdminCredentials(adminUser.trim(), adminPass);
+      const ok = await verifyAdminCredentials(adminUser.trim(), adminPass.trim());
       if (!ok) {
         setAdminError('Credenciales incorrectas.');
         return;
       }
-      const session = saveAdminSession(adminUser.trim(), adminPass);
+      const session = saveAdminSession(adminUser.trim(), adminPass.trim());
       setAdminSession(session);
       setAdminMessage('Sesión admin iniciada.');
     } catch (error) {

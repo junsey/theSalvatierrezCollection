@@ -9,7 +9,9 @@ const ADMIN_SESSION_KEY = 'salvatierrez-admin-session-v1';
 const isBrowser = typeof window !== 'undefined';
 
 const encodeBase64 = (value: string) => {
-  if (typeof btoa === 'function') return btoa(value);
+  if (typeof btoa === 'function') {
+    return btoa(unescape(encodeURIComponent(value)));
+  }
   throw new Error('Base64 encoder unavailable.');
 };
 

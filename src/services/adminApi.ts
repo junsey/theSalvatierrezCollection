@@ -7,6 +7,7 @@ const adminFetch = async (path: string, options: RequestInit = {}) => {
   }
   const headers = new Headers(options.headers);
   headers.set('Authorization', auth);
+  headers.set('x-admin-token', auth.replace(/^Basic\s+/i, ''));
   if (!headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
@@ -24,7 +25,8 @@ export async function verifyAdminCredentials(user: string, pass: string): Promis
   const response = await fetch('/api/admin/verify', {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${token}`
+      Authorization: `Basic ${token}`,
+      'x-admin-token': token
     }
   });
   return response.ok;
