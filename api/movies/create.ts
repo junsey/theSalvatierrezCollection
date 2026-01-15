@@ -40,7 +40,16 @@ export default async function handler(req: any, res: any) {
       'Puntuacion Rodrigo': body.ratingRodrigo ?? null,
       'Puntuacion Gloria': body.ratingGloria ?? null,
       Funciona: toNullIfEmpty(body.funciona)
-    };
+    } as Record<string, any>;
+    Object.keys(payload).forEach((key) => {
+      const value = payload[key];
+      if (value === '' || value === undefined) {
+        delete payload[key];
+      }
+      if (value === null && key === 'Vista') {
+        delete payload[key];
+      }
+    });
     if (!payload.Seccion || !payload.Titulo) {
       return reject(res, 400, 'Seccion y titulo son obligatorios.');
     }
