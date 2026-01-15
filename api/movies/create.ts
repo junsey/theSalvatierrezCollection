@@ -1,4 +1,4 @@
-import { isAdminAuthorized, readJsonBody, reject, supabaseRequest } from '../_admin.js';
+import { isAdminAuthorized, readJsonBody, reject, supabaseRequest } from '../lib/admin.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {

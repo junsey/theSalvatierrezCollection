@@ -3,12 +3,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ADMIN_USER = process.env.ADMIN_USER?.trim();
 const ADMIN_PASS = process.env.ADMIN_PASS?.trim();
 
-type AdminHeaders = {
-  apikey: string;
-  Authorization: string;
-  'Content-Type': string;
-};
-
 const getAdminToken = (req: any): string | null => {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   if (typeof authHeader === 'string' && authHeader.startsWith('Basic ')) {

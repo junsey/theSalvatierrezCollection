@@ -3,7 +3,7 @@ import express from 'express';
 const normalizeSection = (value: string) =>
   value
     .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
     .trim();
