@@ -3,7 +3,7 @@ import { GenreList } from '../components/GenreList';
 import { useMovies } from '../context/MovieContext';
 
 export const GenresHub: React.FC = () => {
-  const { movies } = useMovies();
+  const { visibleMovies: movies } = useMovies();
   return (
     <section>
       <h1>Géneros</h1>

@@ -11,6 +11,8 @@ const baseFilters: MovieFilters = {
   query: '',
   seccion: null,
   genre: null,
+  saga: null,
+  series: 'all',
   seen: 'all',
   view: 'grid',
   sort: 'title-asc'
@@ -27,9 +29,11 @@ const hasGenre = (movie: MovieRecord, genre: string) => {
 export const GenrePage: React.FC = () => {
   const { name } = useParams();
   const genreName = decodeURIComponent(name ?? '');
-  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
+  const { visibleMovies: movies, ratings } = useMovies();
   const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters, genre: genreName });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
+
+  const handleReset = () => setFilters({ ...baseFilters, genre: genreName });
 
   const genreMovies = useMemo(() => movies.filter((m) => hasGenre(m, genreName)), [movies, genreName]);
 
@@ -37,7 +41,13 @@ export const GenrePage: React.FC = () => {
     return genreMovies
       .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
+      .filter((m) => {
+        if (filters.series === 'series') return Boolean(m.series);
+        if (filters.series === 'movies') return !m.series;
+        return true;
+      })
       .filter((m) => (filters.genre ? hasGenre(m, filters.genre) : true))
+      .filter((m) => (filters.saga ? m.saga === filters.saga : true))
       .filter((m) => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
@@ -68,27 +78,22 @@ export const GenrePage: React.FC = () => {
   return (
     <section>
       <h1>Género: {genreName}</h1>
-      <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={genreMovies} />
+      <FiltersBar
+        filters={filters}
+        onChange={(patch) => setFilters({ ...filters, ...patch })}
+        movies={genreMovies}
+        onReset={handleReset}
+      />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
           {filtered.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} personalRating={ratings[movie.id]} onClick={() => setActiveMovie(movie)} />
+            <MovieCard key={movie.id} movie={movie} onClick={() => setActiveMovie(movie)} />
           ))}
         </div>
       ) : (
-        <MovieTable movies={filtered} personalRatings={ratings} onSelect={setActiveMovie} />
+        <MovieTable movies={filtered} onSelect={setActiveMovie} />
       )}
-      {activeMovie && (
-        <MovieDetail
-          movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
-          personalNote={notes[activeMovie.id]}
-          onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
-          onNoteChange={(note) => updateNote(activeMovie.id, note)}
-        />
-      )}
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>
   );
 };

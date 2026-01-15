@@ -13,6 +13,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
+  const [doubleFeature, setDoubleFeature] = useState<{ first: MovieRecord; second: MovieRecord; link: string } | null>(null);
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
 
@@ -20,70 +21,209 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     return movies.filter((m) => {
       const sectionMatch = selectedSections.length === 0 || selectedSections.includes(m.seccion);
       const seenMatch = excludeSeen ? !m.seen : true;
-      return sectionMatch && seenMatch;
+      const seriesMatch = !m.series;
+      return sectionMatch && seenMatch && seriesMatch;
     });
   }, [movies, selectedSections, excludeSeen]);
+
+  const toggleSection = (section: string) => {
+    setDoubleFeature(null);
+    setChosen(null);
+    setSelectedSections((prev) =>
+      prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section]
+    );
+  };
+
+  const toggleAllSections = () => {
+    setDoubleFeature(null);
+    setChosen(null);
+    setSelectedSections((prev) => (prev.length === sections.length ? [] : sections));
+  };
 
   const summon = () => {
     if (filtered.length === 0) {
       setChosen(null);
+      setDoubleFeature(null);
       return;
     }
     const random = filtered[Math.floor(Math.random() * filtered.length)];
     setChosen(random);
-    onSelect(random);
+    setDoubleFeature(null);
   };
+
+  const pickRelated = (base: MovieRecord) => {
+    const pool = filtered.filter((m) => m.id !== base.id);
+    if (pool.length === 0) return null;
+
+    const sectionMatches = pool.filter((m) => m.seccion === base.seccion);
+    if (sectionMatches.length) {
+      return {
+        movie: sectionMatches[Math.floor(Math.random() * sectionMatches.length)],
+        link: `Sección: ${base.seccion}`
+      };
+    }
+
+    const directorMatches = pool.filter((m) => m.director === base.director);
+    if (directorMatches.length) {
+      return {
+        movie: directorMatches[Math.floor(Math.random() * directorMatches.length)],
+        link: `Director: ${base.director}`
+      };
+    }
+
+    const sharedGenre = (first: MovieRecord, candidate: MovieRecord) => {
+      const baseGenres = first.tmdbGenres ?? first.genreRaw?.split(',').map((g) => g.trim()) ?? [];
+      const candidateGenres = candidate.tmdbGenres ?? candidate.genreRaw?.split(',').map((g) => g.trim()) ?? [];
+      const match = baseGenres.find((g) => candidateGenres.includes(g));
+      return match ?? null;
+    };
+
+    const genreMatches = pool
+      .map((movie) => ({ movie, match: sharedGenre(base, movie) }))
+      .filter((entry): entry is { movie: MovieRecord; match: string } => Boolean(entry.match));
+    if (genreMatches.length) {
+      const selected = genreMatches[Math.floor(Math.random() * genreMatches.length)];
+      return {
+        movie: selected.movie,
+        link: `Género: ${selected.match}`
+      };
+    }
+
+    return {
+      movie: pool[Math.floor(Math.random() * pool.length)],
+      link: 'Selección afinada'
+    };
+  };
+
+  const summonDoubleFeature = () => {
+    if (filtered.length === 0) {
+      setChosen(null);
+      setDoubleFeature(null);
+      return;
+    }
+
+    const primary = filtered[Math.floor(Math.random() * filtered.length)];
+    const secondaryResult = pickRelated(primary);
+
+    if (!secondaryResult) {
+      setChosen(primary);
+      setDoubleFeature(null);
+      return;
+    }
+
+    setChosen(null);
+    setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
+  };
+
+  const renderPoster = (movie: MovieRecord) => (
+    <div className="feature-poster-frame" aria-hidden={!movie.posterUrl}>
+      {movie.posterUrl ? (
+        <img className="feature-poster" src={movie.posterUrl} alt={`Póster de ${movie.title}`} loading="lazy" />
+      ) : (
+        <div className="feature-poster placeholder">Sin póster</div>
+      )}
+    </div>
+  );
 
   return (
     <div className="panel">
       <h2>Ritual of Random Cinema</h2>
       <div className="filters">
-        <div>
-          <small>Sections</small>
-          <select
-            multiple
-            value={selectedSections}
-            onChange={(e) =>
-              setSelectedSections(Array.from(e.target.selectedOptions).map((opt) => opt.value))
-            }
-            style={{ minWidth: 240, minHeight: 120, background: 'var(--panel)', color: 'var(--text)' }}
-          >
+        <div className="section-filter">
+          <small>Secciones</small>
+          <div className="section-pills">
+            <button
+              className={`pill ${selectedSections.length === sections.length && sections.length > 0 ? 'active' : ''}`}
+              onClick={toggleAllSections}
+              type="button"
+            >
+              Todas
+            </button>
             {sections.map((section) => (
-              <option key={section} value={section}>
+              <button
+                key={section}
+                className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
+                onClick={() => toggleSection(section)}
+                type="button"
+              >
                 {section}
-              </option>
+              </button>
             ))}
-          </select>
-          <p style={{ fontSize: 12, opacity: 0.8 }}>Selecciona una o varias secciones (Ctrl/Cmd + click).</p>
+          </div>
+          <p className="pill-hint">Selecciona una o varias secciones o invoca todas.</p>
         </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input type="checkbox" checked={excludeSeen} onChange={(e) => setExcludeSeen(e.target.checked)} /> Exclude seen
-        </label>
+        <button
+          className={`toggle-control ${excludeSeen ? 'on' : ''}`}
+          onClick={() => setExcludeSeen((prev) => !prev)}
+          type="button"
+        >
+          <span className="toggle-track">
+            <span className="toggle-thumb" />
+          </span>
+          <span className="toggle-label">{excludeSeen ? 'Excluir vistas' : 'Incluir vistas'}</span>
+        </button>
       </div>
       <div className="random-area">
-        <button onClick={summon} style={{ fontSize: 18, padding: '12px 18px' }}>
-          Summon a Movie
-        </button>
+        <div className="random-actions">
+          <button onClick={summon} className="action-large">
+            Summon a Movie
+          </button>
+          <button onClick={summonDoubleFeature} className="action-large secondary">
+            Summon a Double Feature
+          </button>
+        </div>
         {filtered.length === 0 && <p>No movies match the ritual filters.</p>}
-        {chosen && (
-          <div style={{ marginTop: 16, animation: 'fadeIn 0.3s ease' }}>
-            <strong>{chosen.title}</strong>
-            <p>
-              {chosen.tmdbYear ?? chosen.year ?? 'Year ?'} • {chosen.seccion}
-              <br /> TMDb: {chosen.tmdbRating?.toFixed(1) ?? 'N/A'}
-            </p>
-            <img
-              src={chosen.posterUrl ?? 'https://via.placeholder.com/200x300/0b0f17/ffffff?text=No+Poster'}
-              alt={chosen.title}
-              style={{ maxWidth: 200, width: '100%', borderRadius: 12 }}
-            />
-            <div style={{ marginTop: 10, display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => onSelect(chosen)}>Open details</button>
-              <button onClick={summon}>Roll again</button>
-            </div>
-          </div>
-        )}
       </div>
+      {(chosen || doubleFeature) && (
+        <div className="surprise-modal" role="dialog" aria-label="Resultados de Surprise Night">
+          <div className="surprise-card">
+            <div className="surprise-card__header">
+              <h3>{doubleFeature ? 'Double Feature' : 'Selección'}</h3>
+              <button className="ghost" onClick={() => { setChosen(null); setDoubleFeature(null); }}>
+                Cerrar
+              </button>
+            </div>
+
+            {chosen && (
+              <div className="summon-result minimal">
+                <div className="feature-simple">
+                  {renderPoster(chosen)}
+                  <strong>{chosen.title}</strong>
+                </div>
+                <div className="result-actions tight">
+                  <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
+                  <button onClick={summon}>Volver a invocar</button>
+                </div>
+              </div>
+            )}
+
+            {doubleFeature && (
+              <div className="double-feature minimal">
+                <div className="double-heading">
+                  <p className="link-reason">Enlace: {doubleFeature.link}</p>
+                </div>
+                <div className="feature-duo">
+                  {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
+                    <div key={item.id} className="feature-card simple">
+                      <div className="feature-meta">
+                        <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
+                        {renderPoster(item)}
+                        <strong>{item.title}</strong>
+                      </div>
+                      <div className="result-actions tight">
+                        <button onClick={() => onSelect(item)}>Abrir detalles</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="result-actions tight">
+                  <button onClick={summonDoubleFeature}>Volver a invocar</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

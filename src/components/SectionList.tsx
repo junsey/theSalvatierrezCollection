@@ -1,8 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { MovieRecord } from '../types/MovieRecord';
-import sectionSigil from '../assets/section-sigil.svg';
-import { getSectionArt } from '../data/sectionArt';
+import { SectionCard } from './SectionCard';
 
 export const SectionList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
   const sections = Array.from(new Set(movies.map((m) => m.seccion))).sort();
@@ -17,21 +15,12 @@ export const SectionList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => 
   return (
     <div className="section-grid">
       {sections.map((section) => (
-        <Link key={section} to={`/sections/${encodeURIComponent(section)}`} className="section-card">
-          <div
-            className="section-thumb"
-            style={{ backgroundImage: `url(${getSectionArt(section)})` }}
-            aria-hidden="true"
-          />
-          <div className="card-crest" aria-hidden="true">
-            <img src={sectionSigil} alt="" />
-          </div>
-          <div className="section-meta">
-            <strong className="section-title">{section}</strong>
-            <small className="section-count">{sectionStats[section]?.total ?? 0} películas</small>
-            <small className="section-count">{sectionStats[section]?.seen ?? 0} vistas</small>
-          </div>
-        </Link>
+        <SectionCard
+          key={section}
+          name={section}
+          total={sectionStats[section]?.total ?? 0}
+          seen={sectionStats[section]?.seen ?? 0}
+        />
       ))}
     </div>
   );

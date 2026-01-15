@@ -5,10 +5,9 @@ import { PawRating } from './PawRating';
 interface Props {
   movies: MovieRecord[];
   onSelect: (movie: MovieRecord) => void;
-  personalRatings: Record<string, number>;
 }
 
-export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings }) => {
+export const MovieTable: React.FC<Props> = ({ movies, onSelect }) => {
   return (
     <table className="table-list">
       <thead>
@@ -23,7 +22,6 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
           <th>Gloria</th>
           <th>Rodrigo</th>
           <th>Promedio</th>
-          <th>Mi puntuación</th>
         </tr>
       </thead>
       <tbody>
@@ -56,7 +54,6 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect, personalRatings 
               <td style={{ textAlign: 'center' }}>
                 {promedio != null ? <PawRating value={promedio} size="small" /> : '—'}
               </td>
-              <td>{personalRatings[movie.id] ?? '—'}</td>
             </tr>
           );
         })}

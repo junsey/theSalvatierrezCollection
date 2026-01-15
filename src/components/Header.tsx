@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 
 const navItems = [
@@ -11,28 +11,39 @@ const navItems = [
 ];
 
 export const Header: React.FC = () => {
+  const [open, setOpen] = useState(false);
+
+  const toggleMenu = () => setOpen((prev) => !prev);
+  const closeMenu = () => setOpen(false);
+
   return (
     <header className="navbar">
-      <Link to="/" className="logo" style={{ fontFamily: 'UnifrakturMaguntia, serif', color: 'var(--accent-2)', fontSize: 26 }}>
-        The Salvatierrez Collection
-      </Link>
-      <nav className="nav-links">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-            style={({ isActive }) => ({
-              color: isActive ? 'var(--accent)' : undefined,
-              borderColor: isActive ? 'rgba(255, 54, 93, 0.5)' : undefined
-            })}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      <div className="navbar__inner">
+        <Link to="/" className="logo">The Salvatierrez Collection</Link>
+        <button className={`menu-toggle ${open ? 'open' : ''}`} onClick={toggleMenu} aria-label="Toggle navigation">
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav className={`nav-links ${open ? 'open' : ''}`}>
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={closeMenu}
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'active' : ''}`
+              }
+              style={({ isActive }) => ({
+                color: isActive ? 'var(--accent)' : undefined,
+                borderColor: isActive ? 'rgba(255, 54, 93, 0.5)' : undefined
+              })}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </header>
   );
 };

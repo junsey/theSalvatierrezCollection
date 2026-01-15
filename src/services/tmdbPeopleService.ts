@@ -1,12 +1,21 @@
 import { tmdbFetchJson, TMDB_API_KEY, getTmdbImageBaseUrl } from './tmdbApi';
+import { CachedDirector, clearDirectorCache, loadDirectorCache, saveDirectorCache } from './localStorage';
 
 const API_BASE = 'https://api.themoviedb.org/3';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
+const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
+const CACHE_LIMITS: Record<string, number> = {
+  [PERSON_CACHE_KEY]: 150,
+  [PERSON_SEARCH_CACHE_KEY]: 200,
+  [CREDITS_CACHE_KEY]: 150,
+  [CONFIG_CACHE_KEY]: 5
+};
 
 type PersonCacheEntry<T> = { fetchedAt: number; data: T };
+type SearchCacheEntry = { id: number; name: string } | null;
 
 type PersonDetails = {
   id: number;
@@ -20,37 +29,94 @@ type PersonDetails = {
   alsoKnownAs?: string[];
 };
 
-type DirectedMovie = {
+export type DirectedMovie = {
   id: number;
   title: string;
   year: number | null;
-  posterPath?: string | null;
   posterUrl?: string;
+  posterPath?: string | null;
+  popularity?: number;
+  mediaType?: 'movie' | 'tv';
+  job?: string;
+  releaseDate?: string | null;
+  firstAirDate?: string | null;
+};
+
+export type DirectorProfile = {
+  name: string;
+  displayName: string;
+  tmdbId: number | null;
+  profileUrl?: string | null;
+};
+
+export type DirectorLookup = {
+  name: string;
+  tmdbId?: number | null;
 };
 
 type ConfigCache = { fetchedAt: number; baseUrl: string; size: string };
 
-const personDetailsCache: Record<number, PersonCacheEntry<PersonDetails>> = loadCache<PersonDetails>(PERSON_CACHE_KEY);
-const personCreditsCache: Record<number, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personDetailsCache: Record<string, PersonCacheEntry<PersonDetails>> = loadCache<PersonDetails>(PERSON_CACHE_KEY);
+const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = loadCache<SearchCacheEntry>(
+  PERSON_SEARCH_CACHE_KEY
+);
+const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
 
-function loadCache<T>(key: string): Record<number, PersonCacheEntry<T>> {
+function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return {};
-    return JSON.parse(raw) as Record<number, PersonCacheEntry<T>>;
+    return JSON.parse(raw) as Record<string, PersonCacheEntry<T>>;
   } catch (error) {
     console.warn('No se pudo leer la caché de personas TMDb', error);
     return {};
   }
 }
 
-function saveCache<T>(key: string, payload: Record<number, PersonCacheEntry<T>>) {
+function pruneCacheEntries<T>(
+  payload: Record<string, PersonCacheEntry<T>>,
+  limit: number
+): Record<string, PersonCacheEntry<T>> {
+  const entries = Object.entries(payload);
+  if (entries.length <= limit) return payload;
+
+  const sorted = entries.sort(([, a], [, b]) => (b?.fetchedAt ?? 0) - (a?.fetchedAt ?? 0));
+  const trimmedEntries = sorted.slice(0, limit);
+  const keepKeys = new Set(trimmedEntries.map(([key]) => key));
+
+  Object.keys(payload).forEach((key) => {
+    if (!keepKeys.has(key)) delete payload[key];
+  });
+
+  return Object.fromEntries(trimmedEntries);
+}
+
+function saveCache<T>(key: string, payload: Record<string, PersonCacheEntry<T>>) {
   if (typeof localStorage === 'undefined') return;
+  const limit = CACHE_LIMITS[key];
+  const boundedPayload = limit ? pruneCacheEntries(payload, limit) : payload;
   try {
-    localStorage.setItem(key, JSON.stringify(payload));
+    localStorage.setItem(key, JSON.stringify(boundedPayload));
   } catch (error) {
     console.warn('No se pudo guardar la caché de personas TMDb', error);
+
+    if (limit && Object.keys(boundedPayload).length > 0) {
+      const tighterLimit = Math.max(10, Math.floor(limit * 0.7));
+      const pruned = pruneCacheEntries(payload, tighterLimit);
+      try {
+        localStorage.setItem(key, JSON.stringify(pruned));
+        return;
+      } catch (retryError) {
+        console.warn('No se pudo guardar la caché de personas TMDb tras recortar', retryError);
+      }
+    }
+
+    try {
+      localStorage.removeItem(key);
+    } catch (cleanupError) {
+      console.warn('No se pudo limpiar la caché de personas TMDb tras un error de cuota', cleanupError);
+    }
   }
 }
 
@@ -58,6 +124,29 @@ function isFresh(entry?: PersonCacheEntry<any>): boolean {
   if (!entry) return false;
   return Date.now() - entry.fetchedAt < SIX_MONTHS_MS;
 }
+
+const normalizeName = (value: string) => value.trim().toLowerCase();
+
+const buildOverrideMap = (
+  overrides?: Map<string, number | null> | Record<string, number | null | undefined>
+): Map<string, number> => {
+  if (!overrides) return new Map();
+
+  const map = new Map<string, number>();
+  const addEntry = (key: string, value?: number | null) => {
+    if (value == null) return;
+    if (!Number.isFinite(value)) return;
+    map.set(normalizeName(key), value);
+  };
+
+  if (overrides instanceof Map) {
+    overrides.forEach((value, key) => addEntry(key, value ?? null));
+  } else {
+    Object.entries(overrides).forEach(([key, value]) => addEntry(key, value ?? null));
+  }
+
+  return map;
+};
 
 async function getProfileBase(): Promise<{ baseUrl: string; size: string }> {
   if (typeof localStorage !== 'undefined') {
@@ -122,14 +211,38 @@ export async function getDirectorFromMovie(movieId: number): Promise<{ id: numbe
   }
 }
 
-export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
+export async function searchPersonByName(name: string): Promise<{ id: number; name: string } | null> {
   if (!TMDB_API_KEY) return null;
-  const cached = personDetailsCache[personId];
+  const normalized = normalizeName(name);
+  const cached = personSearchCache[normalized];
   if (isFresh(cached)) return cached.data;
 
   try {
-    const url = `${API_BASE}/person/${personId}?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{
+    const url = new URL(`${API_BASE}/search/person`);
+    url.searchParams.set('api_key', TMDB_API_KEY);
+    url.searchParams.set('query', name.trim());
+    url.searchParams.set('language', 'es-ES');
+    const data = await tmdbFetchJson<{ results?: { id: number; name: string }[] }>(url.toString());
+    const match = data.results?.[0];
+    const payload = match ? { id: match.id, name: match.name } : null;
+    personSearchCache[normalized] = { fetchedAt: Date.now(), data: payload };
+    saveCache(PERSON_SEARCH_CACHE_KEY, personSearchCache);
+    return payload;
+  } catch (error) {
+    console.warn('No se pudo buscar el director en TMDb', error);
+    return null;
+  }
+}
+
+export async function getPersonDetails(personId: number): Promise<PersonDetails | null> {
+  if (!TMDB_API_KEY) return null;
+  const cacheKey = String(personId);
+  const cached = personDetailsCache[cacheKey];
+  if (isFresh(cached)) return cached.data;
+
+  const requestDetails = async (language: string) => {
+    const url = `${API_BASE}/person/${personId}?api_key=${TMDB_API_KEY}&language=${language}`;
+    return tmdbFetchJson<{
       id: number;
       name: string;
       biography?: string | null;
@@ -139,19 +252,32 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
       deathday?: string | null;
       also_known_as?: string[];
     }>(url);
+  };
+
+  try {
     const profileBase = await getProfileBase();
+    const primary = await requestDetails('es-ES');
+    const needsFallback = !primary?.biography || primary.biography.trim() === '';
+    const fallback = needsFallback ? await requestDetails('en-US') : null;
+    const chosen = primary ?? fallback;
+
+    if (!chosen) return null;
+
+    const biography = needsFallback ? fallback?.biography ?? primary?.biography : primary?.biography;
+    const profilePath = chosen.profile_path ?? primary?.profile_path ?? fallback?.profile_path;
     const payload: PersonDetails = {
-      id: data.id,
-      name: data.name,
-      biography: data.biography,
-      profilePath: data.profile_path,
-      profileUrl: buildProfileUrl(profileBase, data.profile_path),
-      placeOfBirth: data.place_of_birth,
-      birthday: data.birthday,
-      deathday: data.deathday,
-      alsoKnownAs: data.also_known_as
+      id: chosen.id,
+      name: chosen.name,
+      biography: biography ?? null,
+      profilePath,
+      profileUrl: buildProfileUrl(profileBase, profilePath),
+      placeOfBirth: chosen.place_of_birth ?? primary?.place_of_birth ?? fallback?.place_of_birth,
+      birthday: chosen.birthday ?? primary?.birthday ?? fallback?.birthday,
+      deathday: chosen.deathday ?? primary?.deathday ?? fallback?.deathday,
+      alsoKnownAs: chosen.also_known_as ?? primary?.also_known_as ?? fallback?.also_known_as
     };
-    personDetailsCache[personId] = { fetchedAt: Date.now(), data: payload };
+
+    personDetailsCache[cacheKey] = { fetchedAt: Date.now(), data: payload };
     saveCache(PERSON_CACHE_KEY, personDetailsCache);
     return payload;
   } catch (error) {
@@ -160,31 +286,259 @@ export async function getPersonDetails(personId: number): Promise<PersonDetails 
   }
 }
 
+const isFeatureLengthProduction = (item: {
+  title?: string | null;
+  name?: string | null;
+  video?: boolean | null;
+  genre_ids?: number[];
+}) => {
+  const title = (item.title ?? item.name ?? '').toLowerCase();
+  const isMarkedVideo = item.video === true;
+  const looksLikeShort = /\bshort\b|\bcorto\b/.test(title);
+
+  return !isMarkedVideo && !looksLikeShort;
+};
+
 export async function getPersonDirectedMovies(personId: number): Promise<DirectedMovie[]> {
   if (!TMDB_API_KEY) return [];
-  const cached = personCreditsCache[personId];
+  const cacheKey = String(personId);
+  const cached = personCreditsCache[cacheKey];
   if (isFresh(cached)) return cached.data;
 
   try {
-    const url = `${API_BASE}/person/${personId}/movie_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const data = await tmdbFetchJson<{ crew?: { id: number; title: string; job: string; release_date?: string | null; poster_path?: string | null }[] }>(url);
+    const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{
+      crew?: {
+        id: number;
+        media_type?: string;
+        title?: string;
+        name?: string;
+        job?: string;
+        release_date?: string | null;
+        first_air_date?: string | null;
+        poster_path?: string | null;
+        popularity?: number;
+        video?: boolean | null;
+        genre_ids?: number[];
+      }[];
+    }>(url);
+
     const base = await getTmdbImageBaseUrl();
-    const directed = (data.crew ?? [])
-      .filter((item) => item.job === 'Director')
-      .map((item) => ({
-        id: item.id,
-        title: item.title,
-        year: parseYear(item.release_date),
-        posterPath: item.poster_path ?? null,
-        posterUrl: item.poster_path ? `${base}w300${item.poster_path}` : undefined
-      }));
-    personCreditsCache[personId] = { fetchedAt: Date.now(), data: directed };
+    const directedMovies = new Map<number, DirectedMovie>();
+
+    (data.crew ?? [])
+      .filter((item) => {
+        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
+        const job = item.job?.trim().toLowerCase();
+        const isPrimaryDirector = job === 'director' || job === 'series director' || job === 'director de la serie';
+        const isSeriesCreator = job === 'creator' || job === 'series creator';
+        if (!isPrimaryDirector && !isSeriesCreator) return false;
+        if (item.media_type === 'movie' && !isFeatureLengthProduction(item)) return false;
+        return true;
+      })
+      .forEach((item) => {
+        const title = item.title ?? item.name ?? 'ProducciA3n sin tA-tulo';
+        const releaseDate = item.release_date ?? null;
+        const firstAirDate = item.first_air_date ?? null;
+        const year = item.media_type === 'tv' ? parseYear(firstAirDate) : parseYear(releaseDate);
+        const posterPath = item.poster_path ?? null;
+        const entry: DirectedMovie = {
+          id: item.id,
+          title,
+          year,
+          posterPath,
+          posterUrl: posterPath ? `${base}w342${posterPath}` : undefined,
+          popularity: item.popularity,
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+          job: item.job,
+          releaseDate,
+          firstAirDate
+        };
+
+        directedMovies.set(item.id, entry);
+      });
+
+    const sorted = Array.from(directedMovies.values()).sort((a, b) => {
+      const yearA = a.year ?? Number.POSITIVE_INFINITY;
+      const yearB = b.year ?? Number.POSITIVE_INFINITY;
+      const byYear = yearA - yearB;
+      if (byYear !== 0) return byYear;
+      return (b.popularity ?? 0) - (a.popularity ?? 0);
+    });
+
+    personCreditsCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
     saveCache(CREDITS_CACHE_KEY, personCreditsCache);
-    return directed;
+    return sorted;
   } catch (error) {
+
     console.warn('No se pudo obtener la filmografía del director', error);
     return [];
   }
 }
 
-export type { PersonDetails, DirectedMovie };
+export async function fetchDirectorFromTMDb(
+  director: DirectorLookup
+): Promise<{ person: PersonDetails | null; credits: DirectedMovie[]; resolvedName: string; tmdbId: number | null } | null> {
+  if (!TMDB_API_KEY) return null;
+
+  const loadById = async (id: number) => {
+    const [person, credits] = await Promise.all([getPersonDetails(id), getPersonDirectedMovies(id)]);
+    return {
+      person,
+      credits,
+      resolvedName: person?.name ?? director.name,
+      tmdbId: id
+    };
+  };
+
+  try {
+    if (director.tmdbId) {
+      return await loadById(director.tmdbId);
+    }
+
+    const match = await searchPersonByName(director.name);
+    if (!match) return null;
+
+    const [person, credits] = await Promise.all([getPersonDetails(match.id), getPersonDirectedMovies(match.id)]);
+    return {
+      person,
+      credits,
+      resolvedName: person?.name ?? match.name ?? director.name,
+      tmdbId: match.id
+    };
+  } catch (error) {
+    console.warn('No se pudo obtener al director desde TMDb', director.name, error);
+    return null;
+  }
+}
+
+export async function buildDirectorProfiles(
+  names: string[],
+  options?: {
+    forceRefresh?: boolean;
+    onProgress?: (current: number, total: number) => void;
+    overrides?: Map<string, number | null> | Record<string, number | null | undefined>;
+  }
+): Promise<DirectorProfile[]> {
+  const unique = Array.from(new Set(names.map((n) => n.trim()).filter(Boolean)));
+  if (unique.length === 0) return [];
+  if (!TMDB_API_KEY) {
+    return unique.map((name) => ({ name, displayName: name, tmdbId: null, profileUrl: null }));
+  }
+
+  const total = unique.length;
+  let completed = 0;
+  const report = () => options?.onProgress?.(completed, total);
+
+  const overrideMap = buildOverrideMap(options?.overrides);
+
+  const cachedPayload = options?.forceRefresh ? null : loadDirectorCache();
+  const cachedMap = new Map<string, CachedDirector>();
+  cachedPayload?.directors.forEach((director) => {
+    cachedMap.set(normalizeName(director.name), director);
+  });
+
+  const missing: string[] = options?.forceRefresh ? [...unique] : [];
+  const now = Date.now();
+
+  if (!options?.forceRefresh) {
+    for (const name of unique) {
+      const cached = cachedMap.get(normalizeName(name));
+      const overrideId = overrideMap.get(normalizeName(name));
+      const cacheMatchesOverride = overrideId === undefined || cached?.tmdbId === overrideId;
+      if (cached && cacheMatchesOverride) {
+        completed += 1;
+      } else {
+        missing.push(name);
+      }
+    }
+  }
+
+  report();
+
+  const fetched: CachedDirector[] = [];
+  for (const target of missing) {
+    try {
+      let profileUrl: string | undefined;
+      let resolvedName = target;
+      let tmdbId: number | null = null;
+      const overrideTmdbId = overrideMap.get(normalizeName(target));
+
+      if (overrideTmdbId !== undefined) {
+        tmdbId = overrideTmdbId;
+        const details = await getPersonDetails(overrideTmdbId);
+        profileUrl = details?.profileUrl ?? undefined;
+        resolvedName = details?.name ?? resolvedName;
+      } else {
+        const search = await searchPersonByName(target);
+        resolvedName = search?.name ?? target;
+        tmdbId = search?.id ?? null;
+
+        if (search?.id) {
+          const details = await getPersonDetails(search.id);
+          profileUrl = details?.profileUrl ?? undefined;
+          resolvedName = details?.name ?? resolvedName;
+        }
+      }
+
+      fetched.push({
+        name: target,
+        resolvedName,
+        tmdbId,
+        profileUrl: profileUrl ?? null,
+        fetchedAt: now
+      });
+    } catch (error) {
+      console.warn('No se pudo enriquecer al director', target, error);
+      fetched.push({ name: target, resolvedName: target, tmdbId: null, profileUrl: null, fetchedAt: now });
+    }
+
+    completed += 1;
+    report();
+  }
+
+  const mergedMap = new Map<string, CachedDirector>();
+  const existing = cachedPayload?.directors ?? [];
+  existing.forEach((entry) => {
+    if (!options?.forceRefresh || missing.includes(entry.name)) {
+      mergedMap.set(normalizeName(entry.name), entry);
+    }
+  });
+  fetched.forEach((entry) => mergedMap.set(normalizeName(entry.name), entry));
+
+  const mergedList = unique.map((name) => {
+    const entry = mergedMap.get(normalizeName(name)) ?? {
+      name,
+      resolvedName: name,
+      tmdbId: overrideMap.get(normalizeName(name)) ?? null,
+      profileUrl: null,
+      fetchedAt: now
+    };
+    return entry;
+  });
+
+  const savedPayload = options?.forceRefresh ? mergedList : [...mergedMap.values()];
+  saveDirectorCache(savedPayload);
+
+  return mergedList.map((entry) => ({
+    name: entry.name,
+    displayName: entry.resolvedName || entry.name,
+    tmdbId: entry.tmdbId ?? null,
+    profileUrl: entry.profileUrl ?? null
+  }));
+}
+
+export function clearPeopleCaches() {
+  clearDirectorCache();
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(PERSON_CACHE_KEY);
+    localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
+    localStorage.removeItem(CREDITS_CACHE_KEY);
+    localStorage.removeItem(CONFIG_CACHE_KEY);
+  }
+  Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
+  Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
+  Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
+}
+
+export type { PersonDetails };

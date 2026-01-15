@@ -1,226 +1,382 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { FiltersBar } from '../components/FiltersBar';
-import { MovieCard } from '../components/MovieCard';
-import { MovieDetail } from '../components/MovieDetail';
-import { MovieTable } from '../components/MovieTable';
+import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
-import { getDirectorProfile } from '../data/directorProfiles';
+import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
+import { MovieRecord } from '../types/MovieRecord';
+import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
-import { DirectedMovie } from '../services/tmdbPeopleService';
-import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
-const baseFilters: MovieFilters = {
-  query: '',
-  seccion: null,
-  genre: null,
-  seen: 'all',
-  view: 'grid',
-  sort: 'title-asc'
-};
+const FALLBACK_PORTRAIT =
+  'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
-const splitDirectors = (value: string) =>
-  value
-    .split(/[,;/&]/g)
-    .map((d) => d.trim())
-    .filter(Boolean);
+const normalizeTitle = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
-const matchesDirector = (movie: MovieRecord, directorName: string) => {
-  const target = directorName.toLowerCase();
-  return (
-    splitDirectors(movie.director).some((d) => d.toLowerCase() === target) ||
-    movie.director.toLowerCase().includes(target)
-  );
+const buildDirectorCollections = (directorName: string, collection: MovieRecord[]) => {
+  const normalizedDirector = normalizeDirectorName(directorName);
+  const ownedIds = new Set<number>();
+  const ownedTitles = new Set<string>();
+  const hiddenOwnedIds = new Set<number>();
+  const hiddenOwnedTitles = new Set<string>();
+
+  collection.forEach((movie) => {
+    const matchesDirector = splitDirectors(movie.director)
+      .map(normalizeDirectorName)
+      .includes(normalizedDirector);
+
+    if (!matchesDirector) return;
+
+    const isHidden = movie.seccion.trim().toLowerCase() === 'z-inexistente';
+
+    if (Number.isFinite(movie.tmdbId) && movie.tmdbId != null) {
+      ownedIds.add(movie.tmdbId);
+      if (isHidden) {
+        hiddenOwnedIds.add(movie.tmdbId);
+      }
+    }
+
+    const normalizedTitle = normalizeTitle(movie.title);
+    ownedTitles.add(normalizedTitle);
+    if (isHidden) {
+      hiddenOwnedTitles.add(normalizedTitle);
+    }
+    if (movie.tmdbTitle) {
+      const normalizedTmdbTitle = normalizeTitle(movie.tmdbTitle);
+      ownedTitles.add(normalizedTmdbTitle);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedTmdbTitle);
+      }
+    }
+    if (movie.originalTitle) {
+      const normalizedOriginal = normalizeTitle(movie.originalTitle);
+      ownedTitles.add(normalizedOriginal);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedOriginal);
+      }
+    }
+    if (movie.tmdbOriginalTitle) {
+      const normalizedTmdbOriginal = normalizeTitle(movie.tmdbOriginalTitle);
+      ownedTitles.add(normalizedTmdbOriginal);
+      if (isHidden) {
+        hiddenOwnedTitles.add(normalizedTmdbOriginal);
+      }
+    }
+  });
+
+  return { ownedIds, ownedTitles, hiddenOwnedIds, hiddenOwnedTitles };
 };
 
 export const DirectorPage: React.FC = () => {
   const { name } = useParams();
-  const { movies, updateSeen, updateRating, updateNote, ratings, notes } = useMovies();
-  const directorName = decodeURIComponent(name ?? '');
-  const profile = getDirectorProfile(directorName);
-  const [supabaseProfile, setSupabaseProfile] = useState<{ image?: string; filmography: DirectedMovie[] } | null>(null);
-  const [filters, setFilters] = useState<MovieFilters>({ ...baseFilters });
-  const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
+  const directorName = decodeURIComponent(name ?? '').trim();
+  const { movies } = useMovies();
+  const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const directorCollection = useMemo(
+    () => buildDirectorCollections(directorName, movies),
+    [directorName, movies]
+  );
 
-  const directorMovies = useMemo(() => movies.filter((m) => matchesDirector(m, directorName)), [movies, directorName]);
-
-  const directorStats = useMemo(() => {
-    const total = directorMovies.length;
-    const seen = directorMovies.filter((m) => m.seen).length;
-    return { total, seen };
-  }, [directorMovies]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [personName, setPersonName] = useState<string>(directorName);
+  const [biography, setBiography] = useState<string | null>(null);
+  const [profileUrl, setProfileUrl] = useState<string | undefined>();
+  const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
 
   useEffect(() => {
     let active = true;
-    async function loadSupabaseProfile() {
+    async function loadDirector() {
+      setLoading(true);
+      setError(null);
+      setBiography(null);
+      setProfileUrl(undefined);
+      setKnownFor([]);
+
+      if (!directorName) {
+        setError('No se especificó director.');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const director = await fetchDirectorByName(directorName);
-        if (!director || !director.tmdb_person_id) {
-          if (active) setSupabaseProfile(null);
+        const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
+        const supabaseDirector = await fetchDirectorByName(directorName);
+        const supabaseTmdbId = supabaseDirector?.tmdb_person_id ?? overrideTmdbId ?? null;
+        const supabaseProfile = await buildDirectorProfileUrl(supabaseDirector?.profile_path ?? null);
+        const supabaseFilmography = supabaseTmdbId
+          ? await fetchDirectorFilmographyByPersonId(supabaseTmdbId)
+          : [];
+
+        if (!active) return;
+
+        if (supabaseDirector?.name) {
+          setPersonName(supabaseDirector.name);
+        }
+        if (supabaseProfile) {
+          setProfileUrl(supabaseProfile);
+        }
+        if (supabaseFilmography.length > 0) {
+          setKnownFor(supabaseFilmography);
+        }
+
+        const needsFallback = !supabaseFilmography.length || !supabaseProfile;
+        if (!needsFallback) {
+          setLoading(false);
           return;
         }
-        const [filmography, image] = await Promise.all([
-          fetchDirectorFilmographyByPersonId(director.tmdb_person_id),
-          buildDirectorProfileUrl(director.profile_path ?? null)
-        ]);
+
+        const result = await fetchDirectorFromTMDb({ name: directorName, tmdbId: supabaseTmdbId ?? overrideTmdbId });
         if (!active) return;
-        setSupabaseProfile({ image, filmography });
-      } catch (error) {
-        console.warn('No se pudo cargar el director desde Supabase', error);
-        if (active) setSupabaseProfile(null);
+
+        if (!result) {
+          setError('No se encontrA3 al director en TMDb.');
+          setLoading(false);
+          return;
+        }
+
+        setPersonName(result.person?.name ?? result.resolvedName ?? directorName);
+        setBiography(result.person?.biography ?? null);
+        setProfileUrl((supabaseProfile ?? result.person?.profileUrl) ?? undefined);
+        if (!supabaseFilmography.length) {
+          setKnownFor(result.credits);
+        }
+      } catch (err) {
+        console.warn('Error al cargar el director', err);
+        if (active) setError('No se pudieron obtener los datos del director.');
+      } finally {
+        if (active) setLoading(false);
       }
     }
-    if (directorName) {
-      loadSupabaseProfile();
-    }
+
+    loadDirector();
     return () => {
       active = false;
     };
-  }, [directorName]);
+  }, [directorName, directorOverrides]);
 
-  const collectionTitles = useMemo(
-    () => directorMovies.map((m) => m.title.toLowerCase()),
-    [directorMovies]
-  );
+  const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
+    const directorJobs = new Set(['director', 'series director', 'director de la serie']);
+    const creatorJobs = new Set(['creator', 'series creator']);
 
-  const collectionTmdbIds = useMemo(() => {
-    return new Set(directorMovies.map((m) => m.tmdbId).filter(Boolean) as number[]);
-  }, [directorMovies]);
+    const movieSeen = new Set<number>();
+    const seriesSeen = new Set<number>();
 
-  const hasSupabaseFilmography = (supabaseProfile?.filmography?.length ?? 0) > 0;
+    const isOwned = (title: string, id: number) =>
+      directorCollection.ownedIds.has(id) || directorCollection.ownedTitles.has(normalizeTitle(title));
+    const isHiddenOwned = (title: string, id: number) =>
+      directorCollection.hiddenOwnedIds.has(id) ||
+      directorCollection.hiddenOwnedTitles.has(normalizeTitle(title));
 
-  const filmographyEntries = useMemo(() => {
-    const supabaseFilms = supabaseProfile?.filmography ?? [];
-    if (supabaseFilms.length > 0) {
-      return supabaseFilms.map((film) => ({
-        id: film.id,
-        title: film.title,
-        year: film.year,
-        posterUrl: film.posterUrl,
-        inCollection: collectionTmdbIds.has(film.id)
-      }));
-    }
-    const planned = profile.filmography ?? [];
-    return planned.map((title) => ({
-      title,
-      inCollection: collectionTitles.includes(title.toLowerCase())
-    }));
-  }, [profile.filmography, collectionTitles, supabaseProfile, collectionTmdbIds]);
+    const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
+      const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
+      const dateB = b.mediaType === 'tv' ? b.firstAirDate : b.releaseDate;
 
-  const filtered = useMemo(() => {
-    return directorMovies
-      .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
-      .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
-      .filter((m) => {
-        if (filters.genre) {
-          return m.genreRaw.toLowerCase().includes(filters.genre.toLowerCase());
-        }
+      const tsA = dateA ? Date.parse(dateA) : Number.POSITIVE_INFINITY;
+      const tsB = dateB ? Date.parse(dateB) : Number.POSITIVE_INFINITY;
+
+      if (tsA !== tsB) return tsA - tsB;
+      return (a.title || '').localeCompare(b.title || '');
+    };
+
+    const directed = knownFor
+      .filter((credit) => credit.mediaType === 'movie' && directorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (movieSeen.has(credit.id)) return false;
+        movieSeen.add(credit.id);
         return true;
       })
-      .filter((m) => {
-        if (filters.seen === 'all') return true;
-        if (filters.seen === 'seen') return m.seen;
-        return !m.seen;
+      .map((credit) => ({
+        ...credit,
+        owned: isOwned(credit.title, credit.id),
+        hiddenOwned: isHiddenOwned(credit.title, credit.id)
+      }))
+      .sort(sortByDate);
+
+    const created = knownFor
+      .filter((credit) => credit.mediaType === 'tv' && creatorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => {
+        if (seriesSeen.has(credit.id)) return false;
+        seriesSeen.add(credit.id);
+        return true;
       })
-      .sort((a, b) => {
-        switch (filters.sort) {
-          case 'title-desc':
-            return b.title.localeCompare(a.title);
-          case 'year-asc':
-            return (a.year ?? 0) - (b.year ?? 0);
-          case 'year-desc':
-            return (b.year ?? 0) - (a.year ?? 0);
-          case 'tmdb-asc':
-            return (a.tmdbRating ?? 0) - (b.tmdbRating ?? 0);
-          case 'tmdb-desc':
-            return (b.tmdbRating ?? 0) - (a.tmdbRating ?? 0);
-          case 'rating-asc': {
-            const ra = ratings[a.id] ?? null;
-            const rb = ratings[b.id] ?? null;
-            return (ra ?? 0) - (rb ?? 0);
-          }
-          case 'rating-desc': {
-            const ra = ratings[a.id] ?? null;
-            const rb = ratings[b.id] ?? null;
-            return (rb ?? 0) - (ra ?? 0);
-          }
-          case 'title-asc':
-          default:
-            return a.title.localeCompare(b.title);
-        }
-      });
-  }, [directorMovies, filters, ratings]);
+      .map((credit) => ({
+        ...credit,
+        owned: isOwned(credit.title, credit.id),
+        hiddenOwned: isHiddenOwned(credit.title, credit.id)
+      }))
+      .sort(sortByDate);
+
+    const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
+    const totalCount = directed.length + created.length;
+    const ratio = totalCount > 0 ? ownedCount / totalCount : 0;
+
+    return {
+      directedMovies: directed,
+      createdSeries: created,
+      ownedCount,
+      totalCount,
+      medalUnlocks: {
+        bronze: ratio > 0.5,
+        silver: ratio > 0.75,
+        gold: ratio >= 1
+      }
+    };
+  }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
+
+  const detailMedal = useMemo(() => {
+    if (!totalCount || totalCount <= 0) return null;
+    if (medalUnlocks.gold) return 'gold';
+    if (medalUnlocks.silver) return 'silver';
+    if (medalUnlocks.bronze) return 'bronze';
+    return null;
+  }, [medalUnlocks, totalCount]);
+
+  const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="filmography-block">
+          <h2>{title}</h2>
+          <p className="muted">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    type DisplayItem = (DirectedMovie & { owned?: boolean; hiddenOwned?: boolean }) | { id: string; placeholder: true };
+    const placeholders = Array.from({ length: Math.max(0, 7 - items.length) }, (_, idx) => ({
+      id: `${title}-placeholder-${idx}`,
+      placeholder: true as const
+    }));
+    const displayItems: DisplayItem[] = [...items, ...placeholders];
+
+    return (
+      <div className="filmography-block">
+        <h2>{title}</h2>
+        <div className="known-for-grid">
+          {displayItems.map((item) => {
+            if ('placeholder' in item) {
+              return (
+                <div key={item.id} className="known-for-card known-for-card--placeholder" aria-hidden>
+                  <div className="known-for-card__poster" />
+                  <div className="known-for-card__meta" />
+                </div>
+              );
+            }
+
+            const owned = item.owned;
+            const hiddenOwned = owned && 'hiddenOwned' in item && Boolean(item.hiddenOwned);
+            const mediaLabel = item.mediaType === 'tv' ? 'Serie' : 'Película';
+            return (
+              <div
+                key={item.id}
+                className={`known-for-card ${owned ? 'owned' : 'missing'}`}
+                aria-label={owned ? 'En la colección' : 'Fuera de la colección'}
+              >
+                {hiddenOwned && <span className="known-for-card__badge">No Editado</span>}
+                <div className="known-for-card__poster">
+                  {item.posterUrl ? (
+                    <img src={item.posterUrl} alt={item.title} className={!owned ? 'is-muted' : undefined} />
+                  ) : (
+                    <div className={`poster-fallback ${!owned ? 'is-muted' : ''}`} aria-hidden />
+                  )}
+                </div>
+                <div className="known-for-card__meta">
+                  <div className="known-for-card__meta-row">
+                    <p className={!owned ? 'muted' : undefined}>{item.title}</p>
+                  </div>
+                  <div className="known-for-card__meta-row known-for-card__meta-row--footer">
+                    {item.year && <small>{item.year}</small>}
+                    <span className="media-tag" aria-label={title}>
+                      {mediaLabel}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section>
+      <div style={{ marginBottom: 12 }}>
+        <Link to="/directors" className="btn" style={{ padding: '6px 12px' }}>
+          ← Volver a directores
+        </Link>
+      </div>
       <div className="director-hero">
         <div
           className="director-portrait"
-          style={{ backgroundImage: `url(${supabaseProfile?.image ?? profile.image})` }}
+          style={{ backgroundImage: `url(${profileUrl ?? FALLBACK_PORTRAIT})` }}
           aria-hidden="true"
         />
         <div className="director-legend">
-          <p className="eyebrow">Directores</p>
-          <h1>{directorName}</h1>
-          <p className="text-muted">{profile.bio}</p>
-          <div className="stats-row">
-            <div className="stat-pill">
-              <strong>{directorStats.total}</strong>
-              <span>películas en la colección</span>
+          <div className="director-legend__top">
+            <div className="director-legend__titles">
+              <p className="eyebrow">Directores</p>
+              <h1>{personName || directorName}</h1>
             </div>
-            <div className="stat-pill">
-              <strong>{directorStats.seen}</strong>
-              <span>vistas</span>
+            <div
+              className={['collection-badge', detailMedal ? `collection-badge--${detailMedal}` : '']
+                .filter(Boolean)
+                .join(' ')}
+              aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}
+            >
+              <span className="collection-badge__label">En colección</span>
+              <div className="collection-badge__stats">
+                <span className="collection-badge__value">{ownedCount}</span>
+                <span className="collection-badge__divider">/</span>
+                <span className="collection-badge__total">{totalCount || '—'}</span>
+                {detailMedal && (
+                  <span
+                    className={`collection-badge__medal director-coverage__medal director-coverage__medal--${detailMedal}`}
+                    aria-hidden
+                  >
+                    ★
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          {loading && <p className="text-muted">Recopilando biografía...</p>}
+          {!loading && biography && <p className="text-muted director-legend__bio">{biography}</p>}
+          {!loading && !biography && <p className="text-muted director-legend__bio">Biografía no disponible.</p>}
         </div>
       </div>
-      <FiltersBar filters={filters} onChange={(patch) => setFilters({ ...filters, ...patch })} movies={directorMovies} />
-      {filters.view === 'grid' ? (
-        <div className="movie-grid">
-          {filtered.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} personalRating={ratings[movie.id]} onClick={() => setActiveMovie(movie)} />
-          ))}
-        </div>
-      ) : (
-        <MovieTable movies={filtered} personalRatings={ratings} onSelect={setActiveMovie} />
-      )}
-      {activeMovie && (
-        <MovieDetail
-          movie={activeMovie}
-          personalRating={ratings[activeMovie.id]}
-          personalNote={notes[activeMovie.id]}
-          onClose={() => setActiveMovie(null)}
-          onSeenChange={(seen) => updateSeen(activeMovie.id, seen)}
-          onRatingChange={(rating) => updateRating(activeMovie.id, rating)}
-          onNoteChange={(note) => updateNote(activeMovie.id, note)}
-        />
-      )}
-      {filmographyEntries.length > 0 && (
-        <div className="filmography-block">
-          <h2>{hasSupabaseFilmography ? 'Filmografia' : 'Filmografia sugerida'}</h2>
-          <p className="text-muted">
-            {hasSupabaseFilmography
-              ? 'Filmografia completa del director. Las peliculas de tu coleccion aparecen marcadas.'
-              : 'Titulos clave del director para completar la coleccion. Los que ya tienes aparecen como marcados.'}
-          </p>
-          <ul className="filmography-list">
-            {filmographyEntries.map((entry) => {
-              const label = entry.year ? `${entry.title} (${entry.year})` : entry.title;
-              return (
-                <li key={`${entry.title}-${entry.year ?? 'na'}`} className={entry.inCollection ? 'owned' : 'pending'}>
-                  <div className="filmography-item">
-                    {entry.posterUrl && (
-                      <img className="filmography-poster" src={entry.posterUrl} alt="" loading="lazy" />
-                    )}
-                    <span>{label}</span>
-                  </div>
-                  <span className="pill">{entry.inCollection ? 'En la coleccion' : 'Pendiente'}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+
+      {error && <p className="muted">{error}</p>}
+
+      {!error && (
+        <>
+          {loading ? (
+            <div className="filmography-block">
+              <h2>Filmografía</h2>
+              <p className="muted">Cargando filmografía...</p>
+            </div>
+          ) : (
+            <>
+              {directedMovies.length > 0
+                ? renderSection('Obras dirigidas (cine)', directedMovies, 'No hay películas dirigidas registradas.')
+                : renderSection('Obras dirigidas (cine)', directedMovies, 'No se encontraron películas dirigidas para esta persona.')}
+
+              {createdSeries.length > 0
+                ? renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series creadas registradas para esta persona.'
+                  )
+                : renderSection(
+                    'Series creadas (TV)',
+                    createdSeries,
+                    'No hay series en las que conste como creador/a.'
+                  )}
+
+              {directedMovies.length === 0 && createdSeries.length === 0 && (
+                <p className="muted">No se encontraron obras con los criterios actuales.</p>
+              )}
+            </>
+          )}
+        </>
       )}
     </section>
   );
