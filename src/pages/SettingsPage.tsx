@@ -55,6 +55,10 @@ export const SettingsPage: React.FC = () => {
     () => Array.from(new Set(movies.flatMap((movie) => splitDirectors(movie.director)))).sort(),
     [movies]
   );
+  const sectionOptions = useMemo(
+    () => Array.from(new Set(movies.map((movie) => movie.seccion).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [movies]
+  );
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
   const damagedMovies = useMemo(
     () => movies.filter((movie) => movie.funcionaStatus === 'damaged'),
@@ -259,7 +263,7 @@ export const SettingsPage: React.FC = () => {
         {!adminSession ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
-              Inicia sesiA3n para habilitar acciones de escritura en Supabase.
+              Inicia sesi?n para habilitar acciones de escritura en Supabase.
             </p>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <strong>Usuario</strong>
@@ -271,7 +275,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>ContraseA?a</strong>
+              <strong>Contrase?a</strong>
               <input
                 type="password"
                 value={adminPass}
@@ -280,7 +284,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <button className="btn" onClick={handleAdminLogin} disabled={adminBusy}>
-              {adminBusy ? 'Validando...' : 'Iniciar sesiA3n'}
+              {adminBusy ? 'Validando...' : 'Iniciar sesi?n'}
             </button>
             {adminMessage && <p className="muted">{adminMessage}</p>}
             {adminError && <p style={{ color: 'var(--accent)' }}>{adminError}</p>}
@@ -288,28 +292,34 @@ export const SettingsPage: React.FC = () => {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
-              SesiA3n activa para <strong>{adminSession.user}</strong>.
+              Sesi?n activa para <strong>{adminSession.user}</strong>.
             </p>
             <button className="btn" onClick={handleAdminLogout}>
-              Cerrar sesiA3n
+              Cerrar sesi?n
             </button>
           </div>
         )}
       </div>
       {adminSession && (
         <div className="panel" style={{ marginBottom: 16 }}>
-          <h2>Nueva pelA-cula</h2>
+          <h2>Nueva pel?cula</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>SecciA3n</strong>
-              <input
-                type="text"
+              <strong>Secci?n</strong>
+              <select
                 value={newMovie.seccion}
                 onChange={(event) => setNewMovie({ ...newMovie, seccion: event.target.value })}
-              />
+              >
+                <option value="">Selecciona secci?n</option>
+                {sectionOptions.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>TAtulo</strong>
+              <strong>T?tulo</strong>
               <input
                 type="text"
                 value={newMovie.title}
@@ -317,7 +327,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>AA?o</strong>
+              <strong>A?o</strong>
               <input
                 type="number"
                 value={newMovie.year}
@@ -333,7 +343,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>GAcnero</strong>
+              <strong>G?nero</strong>
               <input
                 type="text"
                 value={newMovie.genreRaw}
@@ -349,7 +359,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>TA-tulo original</strong>
+              <strong>T?tulo original</strong>
               <input
                 type="text"
                 value={newMovie.originalTitle}
@@ -381,7 +391,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>PuntuaciA3n Gloria</strong>
+              <strong>Puntuaci?n Gloria</strong>
               <input
                 type="number"
                 step="0.5"
@@ -390,7 +400,7 @@ export const SettingsPage: React.FC = () => {
               />
             </label>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>PuntuaciA3n Rodrigo</strong>
+              <strong>Puntuaci?n Rodrigo</strong>
               <input
                 type="number"
                 step="0.5"
@@ -409,7 +419,7 @@ export const SettingsPage: React.FC = () => {
           </div>
           <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
             <button className="btn" onClick={handleCreateMovie} disabled={newMovieBusy}>
-              {newMovieBusy ? 'Guardando...' : 'Crear pelA-cula'}
+              {newMovieBusy ? 'Guardando...' : 'Crear pel?cula'}
             </button>
             {newMovieStatus && <span className="muted">{newMovieStatus}</span>}
           </div>
@@ -448,43 +458,43 @@ export const SettingsPage: React.FC = () => {
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar todo</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Recarga el Excel desde Google Sheets y regenera todos los datos de TMDb (ignora cachAc existente).
+              Recarga el Excel desde Google Sheets y regenera todos los datos de TMDb (ignora cach? existente).
             </p>
             <button className="btn" onClick={handleRefreshAll} disabled={loading}>
-              {loading ? 'Regenerando???' : 'Regenerar todo'}
+              {loading ? 'Regenerando...' : 'Regenerar todo'}
             </button>
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Recargar Excel</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo recarga los datos desde Google Sheets. Solo enriquece las pelA-culas nuevas que no tienen cachAc.
+              Solo recarga los datos desde Google Sheets. Solo enriquece las pel?culas nuevas que no tienen cach?.
             </p>
             <button className="btn" onClick={handleRefreshSheet} disabled={loading}>
-              {loading ? 'Recargando???' : 'Recargar Excel'}
+              {loading ? 'Recargando...' : 'Recargar Excel'}
             </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar faltantes</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Solo enriquece las pelA-culas que no tienen cachAc o estA-n en error. No recarga el Excel.
+              Solo enriquece las pel?culas que no tienen cach? o est?n en error. No recarga el Excel.
             </p>
             <button className="btn" onClick={handleRefreshMissing} disabled={loading}>
-              {loading ? 'Regenerando???' : 'Regenerar faltantes'}
+              {loading ? 'Regenerando...' : 'Regenerar faltantes'}
             </button>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             <h3 style={{ marginBottom: 8, fontSize: '1em' }}>Regenerar directores</h3>
             <p style={{ fontSize: '0.9em', color: 'var(--text-muted)', marginBottom: 8 }}>
-              Limpia la cachAc de directores y vuelve a solicitar las biografA-as y retratos basados en los nombres del Excel.
+              Limpia la cach? de directores y vuelve a solicitar las biograf?as y retratos basados en los nombres del Excel.
             </p>
             <button
               className="btn"
               onClick={handleRefreshDirectors}
               disabled={loading || regeneratingDirectors || directorNames.length === 0}
             >
-              {regeneratingDirectors ? 'Regenerando???' : 'Regenerar directores'}
+              {regeneratingDirectors ? 'Regenerando...' : 'Regenerar directores'}
             </button>
           </div>
         </div>

@@ -11,7 +11,7 @@ export default async function handler(req: any, res: any) {
     const body = await readJsonBody(req);
     const payload = {
       Seccion: body.seccion ?? null,
-      'AAAño': body.year ?? null,
+      'AAño': body.year ?? null,
       Saga: body.saga ?? '',
       Titulo: body.title ?? null,
       'Titulo Original': body.originalTitle ?? '',
