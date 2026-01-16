@@ -2340,21 +2340,6 @@ a.ghost {
   color: var(--text-muted);
 }
 
-.director-list-card__complete {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(255, 215, 101, 0.18);
-  border: 1px solid rgba(255, 215, 101, 0.45);
-  color: #ffd765;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
 .director-list-card--neutral {
   border-color: rgba(255, 255, 255, 0.12);
 }

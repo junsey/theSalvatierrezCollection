@@ -616,9 +616,6 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               >
                 🎬 {label}
               </span>
-              {progressClass === 'director-list-card--complete' && (
-                <span className="director-list-card__complete">Completo</span>
-              )}
               <div
                 className="director-list-card__thumb"
                 style={{ backgroundImage: `url(${supabasePortrait ?? director.profileUrl ?? FALLBACK_PORTRAIT})` }}
