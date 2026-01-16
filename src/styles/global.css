@@ -1656,6 +1656,8 @@ a.ghost {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .detail-sheet__rating-mini {
@@ -1684,6 +1686,7 @@ a.ghost {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+  text-align: center;
 }
 
 .detail-sheet__rating-users {
@@ -1691,12 +1694,16 @@ a.ghost {
   gap: 12px;
 }
 
-.detail-sheet__rating-row {
+.detail-sheet__rating-user {
   display: grid;
-  grid-template-columns: minmax(90px, 120px) minmax(0, 1fr) 48px;
-  gap: 12px;
+  gap: 8px;
+}
+
+.detail-sheet__rating-user-header {
+  display: flex;
   align-items: center;
-  min-height: 36px;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .detail-sheet__rating-name {
@@ -1705,7 +1712,7 @@ a.ghost {
 }
 
 .detail-sheet__rating-bar {
-  width: clamp(180px, 22vw, 240px);
+  width: 100%;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;

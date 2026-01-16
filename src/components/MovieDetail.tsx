@@ -250,8 +250,11 @@ const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
         {userRatings.map((user) => {
           const filledCount = user.value != null ? Math.round(user.value) : 0;
           return (
-            <div key={user.name} className="detail-sheet__rating-row">
-              <span className="detail-sheet__rating-name">{user.name}</span>
+            <div key={user.name} className="detail-sheet__rating-user">
+              <div className="detail-sheet__rating-user-header">
+                <span className="detail-sheet__rating-name">{user.name}</span>
+                <span className="detail-sheet__rating-score">{renderScore(user.value)}</span>
+              </div>
               <div className="detail-sheet__rating-bar" aria-hidden="true">
                 <div className="detail-sheet__rating-paws">
                   {paws.map((paw) => (
@@ -259,7 +262,6 @@ const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
                   ))}
                 </div>
               </div>
-              <span className="detail-sheet__rating-score">{renderScore(user.value)}</span>
             </div>
           );
         })}
