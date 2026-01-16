@@ -955,8 +955,20 @@ button:hover {
 }
 
 .ritual-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ritual-panel__heading {
   display: grid;
   gap: 6px;
+}
+
+.ritual-panel__toggle {
+  align-self: flex-end;
 }
 
 .ritual-flow {
@@ -982,9 +994,8 @@ button:hover {
 
 .ritual-selector__pills {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
 }
 
 .ritual-selector__pills .pill {

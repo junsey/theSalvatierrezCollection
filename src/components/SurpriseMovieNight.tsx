@@ -17,15 +17,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
   const [doubleFeature, setDoubleFeature] = useState<{ first: MovieRecord; second: MovieRecord; link: string } | null>(null);
-  const [showAllSections, setShowAllSections] = useState(false);
   const [isSummoning, setIsSummoning] = useState(false);
   const [statusInputs, setStatusInputs] = useState<
     Record<string, { seen: boolean; ratingGloria: string; ratingRodrigo: string; busy?: boolean; error?: string }>
   >({});
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
-  const initialSections = useMemo(() => sections.slice(0, 5), [sections]);
-  const visibleSections = showAllSections ? sections : initialSections;
 
   const filtered = useMemo(() => {
     return movies.filter((m) => {
@@ -275,8 +272,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   return (
     <div className="ritual-panel">
       <header className="ritual-panel__header">
-        <h2>Surprise Movie Night</h2>
-        <p className="ritual-panel__subtitle">Ritual configuration</p>
+        <div className="ritual-panel__heading">
+          <h2>Surprise Movie Night</h2>
+          <p className="ritual-panel__subtitle">Ritual configuration</p>
+        </div>
+        <button
+          className={`toggle-control ritual-panel__toggle ${excludeSeen ? 'on' : ''}`}
+          onClick={() => setExcludeSeen((prev) => !prev)}
+          type="button"
+        >
+          <span className="toggle-track">
+            <span className="toggle-thumb" />
+          </span>
+          <span className="toggle-label">Excluir vistas</span>
+        </button>
       </header>
 
       <section className="ritual-flow">
@@ -289,7 +298,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             >
               Todas
             </button>
-            {visibleSections.map((section) => (
+            {sections.map((section) => (
               <button
                 key={section}
                 className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
@@ -299,26 +308,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                 {section}
               </button>
             ))}
-            {sections.length > initialSections.length && (
-              <button
-                className="pill ghost"
-                type="button"
-                onClick={() => setShowAllSections((prev) => !prev)}
-              >
-                {showAllSections ? 'Ver menos' : 'Ver más secciones'}
-              </button>
-            )}
           </div>
-          <button
-            className={`toggle-control ${excludeSeen ? 'on' : ''}`}
-            onClick={() => setExcludeSeen((prev) => !prev)}
-            type="button"
-          >
-            <span className="toggle-track">
-              <span className="toggle-thumb" />
-            </span>
-            <span className="toggle-label">Excluir vistas</span>
-          </button>
         </div>
         <div className="random-actions ritual-actions">
           <button onClick={summon} className="action-large">
