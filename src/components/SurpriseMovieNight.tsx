@@ -275,51 +275,39 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   return (
     <div className="ritual-panel">
       <header className="ritual-panel__header">
-        <p className="ritual-panel__eyebrow">Surprise Movie Night</p>
-        <h2>El ritual de la colección</h2>
-        <p className="text-muted">Prepara los filtros, invoca el azar y descubre la próxima película.</p>
+        <h2>Surprise Movie Night</h2>
+        <p className="ritual-panel__subtitle">Ritual configuration</p>
       </header>
 
       <section className="ritual-flow">
-        <div className="random-actions ritual-actions">
-          <button onClick={summon} className="action-large">
-            Summon a Movie
-          </button>
-          <button onClick={summonDoubleFeature} className="action-large secondary">
-            Summon a Double Feature
-          </button>
-        </div>
-        <div className="ritual-filters">
-          <div className="ritual-sections">
-            <span className="ritual-section__label">Secciones</span>
-            <div className="section-pills">
+        <div className="ritual-selector">
+          <div className="section-pills ritual-selector__pills">
+            <button
+              className={`pill ${selectedSections.length === sections.length && sections.length > 0 ? 'active' : ''}`}
+              onClick={toggleAllSections}
+              type="button"
+            >
+              Todas
+            </button>
+            {visibleSections.map((section) => (
               <button
-                className={`pill ${selectedSections.length === sections.length && sections.length > 0 ? 'active' : ''}`}
-                onClick={toggleAllSections}
+                key={section}
+                className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
+                onClick={() => toggleSection(section)}
                 type="button"
               >
-                Todas
+                {section}
               </button>
-              {visibleSections.map((section) => (
-                <button
-                  key={section}
-                  className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
-                  onClick={() => toggleSection(section)}
-                  type="button"
-                >
-                  {section}
-                </button>
-              ))}
-              {sections.length > initialSections.length && (
-                <button
-                  className="pill ghost"
-                  type="button"
-                  onClick={() => setShowAllSections((prev) => !prev)}
-                >
-                  {showAllSections ? 'Ver menos' : 'Ver más secciones'}
-                </button>
-              )}
-            </div>
+            ))}
+            {sections.length > initialSections.length && (
+              <button
+                className="pill ghost"
+                type="button"
+                onClick={() => setShowAllSections((prev) => !prev)}
+              >
+                {showAllSections ? 'Ver menos' : 'Ver más secciones'}
+              </button>
+            )}
           </div>
           <button
             className={`toggle-control ${excludeSeen ? 'on' : ''}`}
@@ -329,7 +317,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             <span className="toggle-track">
               <span className="toggle-thumb" />
             </span>
-            <span className="toggle-label">{excludeSeen ? 'Excluir vistas' : 'Incluir vistas'}</span>
+            <span className="toggle-label">Excluir vistas</span>
+          </button>
+        </div>
+        <div className="random-actions ritual-actions">
+          <button onClick={summon} className="action-large">
+            Summon
+          </button>
+          <button onClick={summonDoubleFeature} className="action-large secondary">
+            Double Summon
           </button>
         </div>
         {filtered.length === 0 && <p className="muted">No hay películas para invocar con estos filtros.</p>}
@@ -370,32 +366,29 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                     <p className="eyebrow">Surprise Movie Night</p>
                     <h2>{doubleFeature ? 'Revelación doble' : 'Revelación'}</h2>
                   </div>
-                <div className="surprise-detail__actions">
-                  {chosen && <button onClick={() => onSelect(chosen)}>Abrir detalles</button>}
-                  {doubleFeature && (
-                    <>
-                      <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles · Primero</button>
-                      <button onClick={() => onSelect(doubleFeature.second)}>Abrir detalles · Luego</button>
-                    </>
-                  )}
-                  {doubleFeature && (
-                    <button onClick={summonDoubleFeature}>Volver a invocar</button>
-                  )}
-                  {chosen && <button onClick={summon}>Volver a invocar</button>}
-                  <button
-                    className="ghost"
-                    onClick={() => {
-                      setChosen(null);
-                      setDoubleFeature(null);
-                    }}
-                  >
-                    Cerrar
-                  </button>
+                  <div className="surprise-detail__actions">
+                    {chosen && <button onClick={() => onSelect(chosen)}>Abrir detalles</button>}
+                    {doubleFeature && (
+                      <>
+                        <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles · Primero</button>
+                        <button onClick={() => onSelect(doubleFeature.second)}>Abrir detalles · Luego</button>
+                      </>
+                    )}
+                    <button onClick={doubleFeature ? summonDoubleFeature : summon}>Volver a invocar</button>
+                    <button
+                      className="ghost"
+                      onClick={() => {
+                        setChosen(null);
+                        setDoubleFeature(null);
+                      }}
+                    >
+                      Cerrar
+                    </button>
+                  </div>
                 </div>
-              </div>
               {chosen && <div className="surprise-detail__poster">{renderPoster(chosen)}</div>}
-              {doubleFeature && (
-                <div className="surprise-detail__posters">
+                {doubleFeature && (
+                  <div className="surprise-detail__posters">
                     {renderPoster(doubleFeature.first, 'surprise-detail__poster')}
                     {renderPoster(doubleFeature.second, 'surprise-detail__poster')}
                   </div>
@@ -413,6 +406,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                     {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
                       <div key={item.id} className="surprise-detail__duo-item">
                         <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
+                        {renderPoster(item, 'surprise-detail__poster')}
                         <strong>{item.title}</strong>
                         {renderAdminControls(item)}
                       </div>
