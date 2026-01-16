@@ -139,10 +139,10 @@ export const DirectorPage: React.FC = () => {
         return;
       }
 
+      let finalName = directorName;
+      let finalTmdbId: number | null = null;
+      let finalProfileUrl: string | undefined;
       try {
-        let finalName = directorName;
-        let finalTmdbId: number | null = null;
-        let finalProfileUrl: string | undefined;
         const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
         const supabaseDirector = await fetchDirectorByName(directorName);
         const supabaseTmdbId = supabaseDirector?.tmdb_person_id ?? overrideTmdbId ?? null;
