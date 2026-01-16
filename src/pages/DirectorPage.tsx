@@ -193,7 +193,9 @@ export const DirectorPage: React.FC = () => {
         setBiography(result.person?.biography ?? null);
         setProfileUrl((supabaseProfile ?? result.person?.profileUrl) ?? undefined);
         setAdminTmdbId(result.tmdbId ? String(result.tmdbId) : '');
-        setKnownFor(result.credits);
+        if (supabaseFilmography.length === 0) {
+          setKnownFor(result.credits);
+        }
         if (result.tmdbId) {
           const writing = await getPersonWritingCredits(result.tmdbId);
           if (active) {
@@ -255,7 +257,7 @@ export const DirectorPage: React.FC = () => {
     }
   };
 
-  const { directedMovies, writtenWorks, ownedCount, totalCount } = useMemo(() => {
+  const { directedMovies, writtenWorks, directedOwnedCount, directedTotalCount, writtenCount } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
     const writingJobs = new Set(['writer', 'screenplay', 'story', 'teleplay', 'novel', 'book', 'characters']);
 
@@ -314,13 +316,15 @@ export const DirectorPage: React.FC = () => {
       }))
       .sort(sortByDate);
 
-    const ownedCount = directed.filter((item) => item.owned).length + written.filter((item) => item.owned).length;
-    const totalCount = directed.length + written.length;
+    const directedOwnedCount = directed.filter((item) => item.owned).length;
+    const directedTotalCount = directed.length;
+    const writtenCount = written.length;
     return {
       directedMovies: directed,
       writtenWorks: written,
-      ownedCount,
-      totalCount
+      directedOwnedCount,
+      directedTotalCount,
+      writtenCount
     };
   }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor, writtenCredits]);
 
@@ -427,12 +431,15 @@ export const DirectorPage: React.FC = () => {
               <p className="eyebrow">Directores</p>
               <h1>{personName || directorName}</h1>
             </div>
-            <div className="collection-badge director-collection" aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}>
-              <span className="collection-badge__label">Estado de colección</span>
+            <div
+              className="collection-badge director-collection"
+              aria-label={`En coleccion (dirigidas): ${directedOwnedCount} de ${directedTotalCount || '-'}`}
+            >
+              <span className="collection-badge__label">Estado de coleccion</span>
               <div className="collection-badge__stats">
-                <span className="collection-badge__value">{ownedCount}</span>
+                <span className="collection-badge__value">{directedOwnedCount}</span>
                 <span className="collection-badge__divider">/</span>
-                <span className="collection-badge__total">{totalCount || '—'}</span>
+                <span className="collection-badge__total">{directedTotalCount || '-'}</span>
               </div>
             </div>
           </div>
@@ -494,7 +501,7 @@ export const DirectorPage: React.FC = () => {
           ) : (
             <>
               <p className="director-filmography__summary">
-                Filmografia ({totalCount || '-'} obras · {ownedCount} en tu coleccion)
+                Obras dirigidas: {directedTotalCount || 0} (en coleccion: {directedOwnedCount}) · Obras escritas: {writtenCount || 0}
               </p>
               {adminSession && knownFor.length === 0 && (
                 <p className="muted">No hay filmografia en Supabase. Usa "Actualizar TMDb" para generarla.</p>
