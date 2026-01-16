@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
-import { DirectedMovie, fetchDirectorFromTMDb } from '../services/tmdbPeopleService';
+import { DirectedMovie, fetchDirectorFromTMDb, getPersonWritingCredits } from '../services/tmdbPeopleService';
 import { refreshDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
@@ -85,6 +85,7 @@ export const DirectorPage: React.FC = () => {
   const [biography, setBiography] = useState<string | null>(null);
   const [profileUrl, setProfileUrl] = useState<string | undefined>();
   const [knownFor, setKnownFor] = useState<DirectedMovie[]>([]);
+  const [writtenCredits, setWrittenCredits] = useState<DirectedMovie[]>([]);
   const [tmdbPersonId, setTmdbPersonId] = useState<number | null>(null);
   const [adminTmdbId, setAdminTmdbId] = useState('');
   const [refreshBusy, setRefreshBusy] = useState(false);
@@ -131,6 +132,7 @@ export const DirectorPage: React.FC = () => {
       setBiography(null);
       setProfileUrl(undefined);
       setKnownFor([]);
+      setWrittenCredits([]);
       setRefreshMessage(null);
 
       if (!directorName) {
@@ -191,8 +193,12 @@ export const DirectorPage: React.FC = () => {
         setBiography(result.person?.biography ?? null);
         setProfileUrl((supabaseProfile ?? result.person?.profileUrl) ?? undefined);
         setAdminTmdbId(result.tmdbId ? String(result.tmdbId) : '');
-        if (!supabaseFilmography.length) {
-          setKnownFor(result.credits);
+        setKnownFor(result.credits);
+        if (result.tmdbId) {
+          const writing = await getPersonWritingCredits(result.tmdbId);
+          if (active) {
+            setWrittenCredits(writing);
+          }
         }
 
         finalName = result.person?.name ?? result.resolvedName ?? directorName;
@@ -249,12 +255,12 @@ export const DirectorPage: React.FC = () => {
     }
   };
 
-  const { directedMovies, createdSeries, ownedCount, totalCount } = useMemo(() => {
+  const { directedMovies, writtenWorks, ownedCount, totalCount } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
-    const creatorJobs = new Set(['creator', 'series creator']);
+    const writingJobs = new Set(['writer', 'screenplay', 'story', 'teleplay', 'novel', 'book', 'characters']);
 
     const movieSeen = new Set<number>();
-    const seriesSeen = new Set<number>();
+    const writtenSeen = new Set<number>();
 
     const isOwned = (title: string, id: number) =>
       directorCollection.ownedIds.has(id) || directorCollection.ownedTitles.has(normalizeTitle(title));
@@ -281,7 +287,7 @@ export const DirectorPage: React.FC = () => {
     };
 
     const directed = knownFor
-      .filter((credit) => credit.mediaType === 'movie' && directorJobs.has((credit.job ?? '').toLowerCase()))
+      .filter((credit) => directorJobs.has((credit.job ?? '').toLowerCase()))
       .filter((credit) => {
         if (movieSeen.has(credit.id)) return false;
         movieSeen.add(credit.id);
@@ -294,11 +300,11 @@ export const DirectorPage: React.FC = () => {
       }))
       .sort(sortByDate);
 
-    const created = knownFor
-      .filter((credit) => credit.mediaType === 'tv' && creatorJobs.has((credit.job ?? '').toLowerCase()))
+    const written = writtenCredits
+      .filter((credit) => writingJobs.has((credit.job ?? '').toLowerCase()))
       .filter((credit) => {
-        if (seriesSeen.has(credit.id)) return false;
-        seriesSeen.add(credit.id);
+        if (writtenSeen.has(credit.id)) return false;
+        writtenSeen.add(credit.id);
         return true;
       })
       .map((credit) => ({
@@ -308,15 +314,15 @@ export const DirectorPage: React.FC = () => {
       }))
       .sort(sortByDate);
 
-    const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
-    const totalCount = directed.length + created.length;
+    const ownedCount = directed.filter((item) => item.owned).length + written.filter((item) => item.owned).length;
+    const totalCount = directed.length + written.length;
     return {
       directedMovies: directed,
-      createdSeries: created,
+      writtenWorks: written,
       ownedCount,
       totalCount
     };
-  }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
+  }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor, writtenCredits]);
 
   const bioSummary = useMemo(() => {
     if (!biography) return null;
@@ -468,7 +474,7 @@ export const DirectorPage: React.FC = () => {
         <>
           {loading ? (
             <div className="filmography-block">
-              <h2>Filmografía</h2>
+              <h2>Filmografia</h2>
               <div className="known-for-grid">
                 {Array.from({ length: 8 }, (_, idx) => (
                   <div key={`filmography-skeleton-${idx}`} className="known-for-card known-for-card--skeleton" aria-hidden>
@@ -488,28 +494,28 @@ export const DirectorPage: React.FC = () => {
           ) : (
             <>
               <p className="director-filmography__summary">
-                Filmografía ({totalCount || '—'} películas · {ownedCount} en tu colección)
+                Filmografia ({totalCount || '-'} obras · {ownedCount} en tu coleccion)
               </p>
               {adminSession && knownFor.length === 0 && (
-                <p className="muted">No hay filmografía en Supabase. Usa "Actualizar TMDb" para generarla.</p>
+                <p className="muted">No hay filmografia en Supabase. Usa "Actualizar TMDb" para generarla.</p>
               )}
               {directedMovies.length > 0
-                ? renderSection('Obras dirigidas (cine)', directedMovies, 'No hay películas dirigidas registradas.')
-                : renderSection('Obras dirigidas (cine)', directedMovies, 'No se encontraron películas dirigidas para esta persona.')}
+                ? renderSection('Obras dirigidas', directedMovies, 'No hay obras dirigidas registradas.')
+                : renderSection('Obras dirigidas', directedMovies, 'No se encontraron obras dirigidas para esta persona.')}
 
-              {createdSeries.length > 0
+              {writtenWorks.length > 0
                 ? renderSection(
-                    'Series creadas (TV)',
-                    createdSeries,
-                    'No hay series creadas registradas para esta persona.'
+                    'Obras escritas',
+                    writtenWorks,
+                    'No hay obras escritas registradas para esta persona.'
                   )
                 : renderSection(
-                    'Series creadas (TV)',
-                    createdSeries,
-                    'No hay series en las que conste como creador/a.'
+                    'Obras escritas',
+                    writtenWorks,
+                    'No hay obras en las que conste como guionista.'
                   )}
 
-              {directedMovies.length === 0 && createdSeries.length === 0 && (
+              {directedMovies.length === 0 && writtenWorks.length === 0 && (
                 <p className="muted">No se encontraron obras con los criterios actuales.</p>
               )}
             </>

@@ -5,12 +5,14 @@ const API_BASE = 'https://api.themoviedb.org/3';
 const PERSON_CACHE_KEY = 'salvatierrez-tmdb-person-cache-v1';
 const PERSON_SEARCH_CACHE_KEY = 'salvatierrez-tmdb-person-search-cache-v1';
 const CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-credits-cache-v1';
+const WRITING_CREDITS_CACHE_KEY = 'salvatierrez-tmdb-person-writing-cache-v1';
 const CONFIG_CACHE_KEY = 'salvatierrez-tmdb-person-img-config-v1';
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 180;
 const CACHE_LIMITS: Record<string, number> = {
   [PERSON_CACHE_KEY]: 150,
   [PERSON_SEARCH_CACHE_KEY]: 200,
   [CREDITS_CACHE_KEY]: 150,
+  [WRITING_CREDITS_CACHE_KEY]: 150,
   [CONFIG_CACHE_KEY]: 5
 };
 
@@ -61,6 +63,9 @@ const personSearchCache: Record<string, PersonCacheEntry<SearchCacheEntry>> = lo
   PERSON_SEARCH_CACHE_KEY
 );
 const personCreditsCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(CREDITS_CACHE_KEY);
+const personWritingCache: Record<string, PersonCacheEntry<DirectedMovie[]>> = loadCache<DirectedMovie[]>(
+  WRITING_CREDITS_CACHE_KEY
+);
 
 function loadCache<T>(key: string): Record<string, PersonCacheEntry<T>> {
   if (typeof localStorage === 'undefined') return {};
@@ -376,6 +381,89 @@ export async function getPersonDirectedMovies(personId: number): Promise<Directe
   }
 }
 
+export async function getPersonWritingCredits(personId: number): Promise<DirectedMovie[]> {
+  if (!TMDB_API_KEY) return [];
+  const cacheKey = String(personId);
+  const cached = personWritingCache[cacheKey];
+  if (isFresh(cached)) return cached.data;
+
+  try {
+    const url = `${API_BASE}/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=es-ES`;
+    const data = await tmdbFetchJson<{
+      crew?: {
+        id: number;
+        media_type?: string;
+        title?: string;
+        name?: string;
+        job?: string;
+        release_date?: string | null;
+        first_air_date?: string | null;
+        poster_path?: string | null;
+        popularity?: number;
+        video?: boolean | null;
+        genre_ids?: number[];
+      }[];
+    }>(url);
+
+    const base = await getTmdbImageBaseUrl();
+    const writingJobs = new Set([
+      'writer',
+      'screenplay',
+      'story',
+      'teleplay',
+      'novel',
+      'book',
+      'characters'
+    ]);
+    const written = new Map<number, DirectedMovie>();
+
+    (data.crew ?? [])
+      .filter((item) => {
+        if (item.media_type !== 'movie' && item.media_type !== 'tv') return false;
+        const job = item.job?.trim().toLowerCase();
+        if (!job || !writingJobs.has(job)) return false;
+        if (item.media_type === 'movie' && !isFeatureLengthProduction(item)) return false;
+        return true;
+      })
+      .forEach((item) => {
+        const title = item.title ?? item.name ?? 'Produccion sin titulo';
+        const releaseDate = item.release_date ?? null;
+        const firstAirDate = item.first_air_date ?? null;
+        const year = item.media_type === 'tv' ? parseYear(firstAirDate) : parseYear(releaseDate);
+        const posterPath = item.poster_path ?? null;
+        const entry: DirectedMovie = {
+          id: item.id,
+          title,
+          year,
+          posterPath,
+          posterUrl: posterPath ? `${base}w342${posterPath}` : undefined,
+          popularity: item.popularity,
+          mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+          job: item.job,
+          releaseDate,
+          firstAirDate
+        };
+
+        written.set(item.id, entry);
+      });
+
+    const sorted = Array.from(written.values()).sort((a, b) => {
+      const yearA = a.year ?? Number.POSITIVE_INFINITY;
+      const yearB = b.year ?? Number.POSITIVE_INFINITY;
+      const byYear = yearA - yearB;
+      if (byYear !== 0) return byYear;
+      return (b.popularity ?? 0) - (a.popularity ?? 0);
+    });
+
+    personWritingCache[cacheKey] = { fetchedAt: Date.now(), data: sorted };
+    saveCache(WRITING_CREDITS_CACHE_KEY, personWritingCache);
+    return sorted;
+  } catch (error) {
+    console.warn('No se pudo obtener las obras escritas', error);
+    return [];
+  }
+}
+
 export async function fetchDirectorFromTMDb(
   director: DirectorLookup
 ): Promise<{ person: PersonDetails | null; credits: DirectedMovie[]; resolvedName: string; tmdbId: number | null } | null> {
@@ -534,11 +622,13 @@ export function clearPeopleCaches() {
     localStorage.removeItem(PERSON_CACHE_KEY);
     localStorage.removeItem(PERSON_SEARCH_CACHE_KEY);
     localStorage.removeItem(CREDITS_CACHE_KEY);
+    localStorage.removeItem(WRITING_CREDITS_CACHE_KEY);
     localStorage.removeItem(CONFIG_CACHE_KEY);
   }
   Object.keys(personDetailsCache).forEach((key) => delete personDetailsCache[key]);
   Object.keys(personSearchCache).forEach((key) => delete personSearchCache[key]);
   Object.keys(personCreditsCache).forEach((key) => delete personCreditsCache[key]);
+  Object.keys(personWritingCache).forEach((key) => delete personWritingCache[key]);
 }
 
 export type { PersonDetails };

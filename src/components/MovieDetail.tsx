@@ -169,7 +169,9 @@ const Hero: React.FC<{
           <div className="detail-sheet__meta">
             <div>
               <strong>Director(es)</strong>
-              {movie.director && <small className="muted">Dato base: {movie.director}</small>}
+              {movie.director && directorList.length === 0 && (
+                <small className="muted">Dato base: {movie.director}</small>
+              )}
             </div>
             {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
             {!loadingDirectors && directorList.length === 0 && (
