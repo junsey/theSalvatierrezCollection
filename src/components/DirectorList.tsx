@@ -503,13 +503,13 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return sorted.map((entry) => entry.profile);
   }, [letterFilter, searchTerm, uniqueProfiles, coverage, orderBy, collator]);
 
-  const getMedal = (owned: number, total: number | null) => {
-    if (!total || total <= 0) return null;
+  const getProgressClass = (owned: number, total: number | null) => {
+    if (!total || total <= 0) return 'director-list-card--neutral';
     const ratio = owned / total;
-    if (ratio >= 1) return 'gold';
-    if (ratio > 0.75) return 'silver';
-    if (ratio > 0.5) return 'bronze';
-    return null;
+    if (ratio >= 1) return 'director-list-card--complete';
+    if (ratio >= 0.75) return 'director-list-card--strong';
+    if (ratio >= 0.5) return 'director-list-card--soft';
+    return 'director-list-card--neutral';
   };
 
   if (loading) {
@@ -542,33 +542,23 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   return (
     <>
       {(availableLetters.length > 1 || profiles.length > 0) && (
-        <div className="panel" style={{ marginBottom: 12 }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 12,
-              alignItems: 'center',
-              rowGap: 10
-            }}
-          >
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, flexGrow: 1, minWidth: 240 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Buscar:</strong>
+        <div className="director-toolbar">
+          <div className="director-toolbar__inputs">
+            <label className="director-toolbar__field director-toolbar__field--grow">
+              <span className="director-toolbar__label">Buscar director</span>
               <input
                 type="search"
                 placeholder="Nombre del director"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: '100%' }}
               />
             </label>
             {availableLetters.length > 1 && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <strong style={{ whiteSpace: 'nowrap' }}>Filtrar por letra:</strong>
+              <label className="director-toolbar__field">
+                <span className="director-toolbar__label">Letra</span>
                 <select
                   value={letterFilter ?? ''}
                   onChange={(e) => setLetterFilter(e.target.value || null)}
-                  style={{ minWidth: 120 }}
                 >
                   <option value="">Todas</option>
                   {availableLetters.map((letter) => (
@@ -579,59 +569,62 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                 </select>
               </label>
             )}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ whiteSpace: 'nowrap' }}>Ordenar por:</strong>
+            <label className="director-toolbar__field">
+              <span className="director-toolbar__label">Orden</span>
               <select value={orderBy} onChange={(e) => setOrderBy(e.target.value as 'alpha' | 'owned')}>
-                <option value="alpha">Alfabético (A-Z)</option>
-                <option value="owned">Mayor cantidad en colección</option>
+                <option value="alpha">A–Z</option>
+                <option value="owned">Colección</option>
               </select>
             </label>
+          </div>
+          <div className="director-toolbar__status">
+            <span>Mostrando {filteredProfiles.length} directores</span>
+            {(letterFilter || orderBy) && (
+              <span className="director-toolbar__status-meta">
+                {letterFilter ? `Letra: ${letterFilter}` : 'Letra: Todas'} ·{' '}
+                {orderBy === 'alpha' ? 'Orden: A–Z' : 'Orden: Colección'}
+              </span>
+            )}
           </div>
         </div>
       )}
       <div className="director-grid">
+        {letterFilter && (
+          <div className="director-grid__letter" aria-hidden>
+            {letterFilter}
+          </div>
+        )}
         {filteredProfiles.map((director) => {
           const key = director.key;
           const stats = coverage[key];
           const owned = stats?.owned ?? director.worksCount;
           const total = stats?.total ?? null;
-          const medal = getMedal(owned, total);
-          const label = total ? `${owned} de ${total}` : `${owned} en colección`;
+          const progressClass = getProgressClass(owned, total);
+          const label = total ? `${owned} / ${total}` : `${owned} / —`;
           const supabasePortrait =
             supabaseProfiles[(director.displayName || director.name).toLowerCase()]?.profileUrl;
 
           return (
             <Link
               to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
-              className={['director-card', medal ? `director-card--${medal}` : '']
-                .filter(Boolean)
-                .join(' ')}
+              className={['director-list-card', progressClass].join(' ')}
               key={director.key}
             >
-              <span className="director-coverage" aria-label={`Películas en colección: ${label}`}>
-                <span className="director-coverage__counts">
-                  {owned}
-                  <span className="director-coverage__divider">/</span>
-                  {total ?? '—'}
-                </span>
-                {medal && (
-                  <span
-                    className={`director-coverage__medal director-coverage__medal--${medal}`}
-                    aria-hidden
-                  >
-                    ★
-                  </span>
-                )}
+              <span
+                className="director-list-card__badge"
+                title="Películas en tu colección / filmografía total"
+              >
+                🎬 {label}
               </span>
+              {progressClass === 'director-list-card--complete' && (
+                <span className="director-list-card__complete">Completo</span>
+              )}
               <div
-                className="director-thumb"
+                className="director-list-card__thumb"
                 style={{ backgroundImage: `url(${supabasePortrait ?? director.profileUrl ?? FALLBACK_PORTRAIT})` }}
                 aria-hidden
               />
-              <div className="section-meta">
-                <strong className="section-title">{director.displayName || director.name}</strong>
-                <small className="section-count">Ver perfil</small>
-              </div>
+              <strong className="director-list-card__name">{director.displayName || director.name}</strong>
             </Link>
           );
         })}

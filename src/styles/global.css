@@ -2147,12 +2147,22 @@ a.ghost {
 .director-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 /* Keep directors at a consistent multi-column layout even when only a few items match filters */
 .director-grid {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  row-gap: 20px;
+}
+
+.director-grid__letter {
+  grid-column: 1 / -1;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .genre-card,
@@ -2166,89 +2176,25 @@ a.ghost {
   overflow: hidden;
 }
 
-.director-card {
+.director-list-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-height: 240px;
-  justify-content: flex-end;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.02);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  overflow: hidden;
+  cursor: pointer;
 }
 
-.director-coverage {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(6, 6, 10, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 0.9em;
-  color: var(--text-muted);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-}
-
-.director-coverage__counts {
-  letter-spacing: 0.02em;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.director-coverage__divider {
-  opacity: 0.45;
-}
-
-.director-coverage__medal {
-  font-size: 1.15em;
-  line-height: 1;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.45);
-}
-
-.director-coverage__medal--bronze {
-  color: #e0a45e;
-}
-
-.director-coverage__medal--silver {
-  color: #d7dfe7;
-}
-
-.director-coverage__medal--gold {
-  color: #ffd765;
-}
-
-.director-card--bronze,
-.director-card--silver,
-.director-card--gold {
-  border-color: #ffd765;
-  box-shadow: 0 10px 24px rgba(255, 215, 101, 0.28);
-}
-
-.director-card--bronze {
-  border-color: #e0a45e;
-  box-shadow: 0 10px 24px rgba(224, 164, 94, 0.22);
-}
-
-.director-card--silver {
-  border-color: #d7dfe7;
-  box-shadow: 0 10px 24px rgba(215, 223, 231, 0.22);
-}
-
-.director-card--gold {
-  border-color: #ffd765;
-  box-shadow: 0 10px 24px rgba(255, 215, 101, 0.28);
-}
-
-.director-card--bronze:hover,
-.director-card--silver:hover,
-.director-card--gold:hover {
-  transform: scale(1.01);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+.director-list-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .section-thumb {
@@ -2261,7 +2207,7 @@ a.ghost {
   transition: opacity 0.2s ease, transform 0.25s ease;
 }
 
-.director-card::before {
+.director-list-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -2269,7 +2215,7 @@ a.ghost {
   pointer-events: none;
 }
 
-.director-card:hover .director-thumb {
+.director-list-card:hover .director-list-card__thumb {
   opacity: 0.38;
   transform: scale(1.03);
 }
@@ -2355,7 +2301,7 @@ a.ghost {
   opacity: 0.95;
 }
 
-.director-thumb {
+.director-list-card__thumb {
   position: absolute;
   inset: 0;
   background-size: cover;
@@ -2365,24 +2311,137 @@ a.ghost {
   transition: opacity 0.2s ease, transform 0.25s ease;
 }
 
-.section-meta {
+.director-list-card__name {
   position: relative;
   z-index: 1;
+  margin-top: auto;
+  padding: 10px 12px;
   background: rgba(5, 5, 8, 0.65);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 12px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.director-list-card__badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(8, 8, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.director-list-card__complete {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 215, 101, 0.18);
+  border: 1px solid rgba(255, 215, 101, 0.45);
+  color: #ffd765;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.director-list-card--neutral {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.director-list-card--soft {
+  border-color: rgba(224, 160, 64, 0.5);
+}
+
+.director-list-card--strong {
+  border-color: rgba(255, 215, 101, 0.65);
+  box-shadow: 0 12px 24px rgba(255, 215, 101, 0.2);
+}
+
+.director-list-card--complete {
+  border-color: rgba(255, 215, 101, 0.9);
+  box-shadow: 0 14px 26px rgba(255, 215, 101, 0.35);
+}
+
+.director-page__header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.director-page__eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.director-page__subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 720px;
+}
+
+.director-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
   padding: 10px 12px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35), inset 0 0 16px rgba(255, 54, 93, 0.08);
+  margin-bottom: 16px;
+  background: rgba(8, 10, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
 }
 
-.section-title {
-  display: block;
-  margin-bottom: 6px;
+.director-toolbar__inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
-.section-count {
-  display: block;
-  color: var(--muted);
+.director-toolbar__field {
+  display: grid;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.director-toolbar__field--grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.director-toolbar__label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.director-toolbar__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.director-toolbar__status-meta {
+  color: var(--text);
 }
 
 .random-area {
