@@ -2538,6 +2538,56 @@ a.ghost {
   line-height: 1.6;
 }
 
+.director-bio {
+  display: grid;
+  gap: 8px;
+}
+
+.director-bio__button {
+  justify-self: start;
+}
+
+.director-bio-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 24px;
+}
+
+.director-bio-modal {
+  width: min(720px, 100%);
+  max-height: min(80vh, 720px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.director-bio-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.director-bio-modal__header h2 {
+  margin: 0;
+}
+
+.director-bio-modal__body {
+  overflow-y: auto;
+  max-height: 60vh;
+  padding-right: 6px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
 .collection-badge {
   display: grid;
   align-items: center;
