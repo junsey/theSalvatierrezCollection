@@ -1675,6 +1675,19 @@ a.ghost {
   gap: 16px;
 }
 
+.detail-sheet__admin-toolbox {
+  display: grid;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.detail-sheet__admin-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .detail-sheet__admin-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1689,6 +1702,49 @@ a.ghost {
 
 .detail-sheet__field--full {
   grid-column: 1 / -1;
+}
+
+.detail-sheet__admin-danger {
+  background: rgba(255, 54, 93, 0.12);
+  border-color: rgba(255, 54, 93, 0.4);
+  color: var(--text);
+}
+
+.detail-sheet__admin-message {
+  margin: 0;
+}
+
+.detail-sheet__admin-separator {
+  width: 100%;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.status-accordion {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.status-accordion summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.status-accordion__body {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.status-accordion__body ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
 }
 
 .detail-sheet__season-list {

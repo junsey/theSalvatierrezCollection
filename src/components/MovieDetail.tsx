@@ -106,20 +106,12 @@ const Hero: React.FC<{
   loadingDirectors: boolean;
   fallbackDirectors: string[];
   funcionaLabel: string;
-  tmdbUrl: string | null;
-  onResolveTmdb?: () => void;
-  isAdmin: boolean;
-  isAdminBusy: boolean;
 }> = ({
   movie,
   directors,
   loadingDirectors,
   fallbackDirectors,
-  funcionaLabel,
-  tmdbUrl,
-  onResolveTmdb,
-  isAdmin,
-  isAdminBusy
+  funcionaLabel
 }) => {
   const genres = useMemo(() => {
     const base = movie.tmdbGenres?.length ? movie.tmdbGenres : movie.genreRaw?.split(/[,/;|]+/g) ?? [];
@@ -189,18 +181,6 @@ const Hero: React.FC<{
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-          <div className="detail-sheet__cta">
-            {tmdbUrl ? (
-              <a className="secondary" href={tmdbUrl} target="_blank" rel="noreferrer">
-                Abrir en TMDb
-              </a>
-            ) : null}
-            {isAdmin && onResolveTmdb && (
-              <button className="ghost" onClick={onResolveTmdb} disabled={isAdminBusy} type="button">
-                {isAdminBusy ? 'Buscando...' : 'Buscar en TMDb'}
-              </button>
             )}
           </div>
         </div>
@@ -275,11 +255,8 @@ const AdminPanel: React.FC<{
 }) => {
   return (
     <div className="detail-sheet__admin">
-      <div className="detail-sheet__card">
-        <div className="detail-sheet__card-header">
-          <h3>Admin</h3>
-          <span className="detail-sheet__badge">TMDb</span>
-        </div>
+      <div className="detail-sheet__admin-toolbox">
+        <div className="detail-sheet__admin-label">TMDb</div>
         <div className="detail-sheet__admin-grid">
           <button className="secondary" onClick={handleResolveTmdb} disabled={adminBusy} type="button">
             {adminBusy ? 'Buscando...' : 'Buscar en TMDb'}
@@ -309,12 +286,13 @@ const AdminPanel: React.FC<{
             <span>ID o link de TMDb</span>
             <input type="text" value={adminTmdbId} onChange={handleAdminTmdbInputChange} />
           </label>
-          <button onClick={handleFixTmdb} disabled={adminBusy} type="button">
+          <button className="detail-sheet__admin-danger" onClick={handleFixTmdb} disabled={adminBusy} type="button">
             {adminBusy ? 'Actualizando...' : 'Corregir TMDb'}
           </button>
         </div>
-        {adminMessage && <p className="muted" style={{ marginTop: 8 }}>{adminMessage}</p>}
+        {adminMessage && <p className="muted detail-sheet__admin-message">{adminMessage}</p>}
       </div>
+      <hr className="detail-sheet__admin-separator" />
       <details className="status-accordion">
         <summary>Status</summary>
         <div className="status-accordion__body">
@@ -815,10 +793,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             loadingDirectors={loadingDirectors}
             fallbackDirectors={fallbackDirectors}
             funcionaLabel={funcionaLabel}
-            tmdbUrl={tmdbUrl}
-            onResolveTmdb={handleResolveTmdb}
-            isAdmin={Boolean(adminSession)}
-            isAdminBusy={adminBusy}
           />
           <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
         </div>
