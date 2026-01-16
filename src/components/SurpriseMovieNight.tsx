@@ -17,11 +17,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
   const [doubleFeature, setDoubleFeature] = useState<{ first: MovieRecord; second: MovieRecord; link: string } | null>(null);
+  const [showAllSections, setShowAllSections] = useState(false);
+  const [isSummoning, setIsSummoning] = useState(false);
   const [statusInputs, setStatusInputs] = useState<
     Record<string, { seen: boolean; ratingGloria: string; ratingRodrigo: string; busy?: boolean; error?: string }>
   >({});
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
+  const initialSections = useMemo(() => sections.slice(0, 5), [sections]);
+  const visibleSections = showAllSections ? sections : initialSections;
 
   const filtered = useMemo(() => {
     return movies.filter((m) => {
@@ -52,9 +56,13 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       setDoubleFeature(null);
       return;
     }
-    const random = filtered[Math.floor(Math.random() * filtered.length)];
-    setChosen(random);
-    setDoubleFeature(null);
+    setIsSummoning(true);
+    setTimeout(() => {
+      const random = filtered[Math.floor(Math.random() * filtered.length)];
+      setChosen(random);
+      setDoubleFeature(null);
+      setIsSummoning(false);
+    }, 1200);
   };
 
   const pickRelated = (base: MovieRecord) => {
@@ -108,18 +116,49 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       return;
     }
 
-    const primary = filtered[Math.floor(Math.random() * filtered.length)];
-    const secondaryResult = pickRelated(primary);
+    setIsSummoning(true);
+    setTimeout(() => {
+      const primary = filtered[Math.floor(Math.random() * filtered.length)];
+      const secondaryResult = pickRelated(primary);
 
-    if (!secondaryResult) {
-      setChosen(primary);
-      setDoubleFeature(null);
-      return;
-    }
+      if (!secondaryResult) {
+        setChosen(primary);
+        setDoubleFeature(null);
+        setIsSummoning(false);
+        return;
+      }
 
-    setChosen(null);
-    setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
+      setChosen(null);
+      setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
+      setIsSummoning(false);
+    }, 1200);
   };
+
+  useEffect(() => {
+    const hasResult = Boolean(chosen || doubleFeature);
+    const shouldLock = isSummoning || hasResult;
+    if (!shouldLock) return;
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previousOverflow;
+    };
+  }, [chosen, doubleFeature, isSummoning]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (chosen || doubleFeature) {
+        setChosen(null);
+        setDoubleFeature(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [chosen, doubleFeature]);
 
   useEffect(() => {
     const targets = [chosen, doubleFeature?.first, doubleFeature?.second].filter(Boolean) as MovieRecord[];
@@ -193,10 +232,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     if (!adminSession) return null;
     const input = statusInputs[movie.id];
     return (
-      <div style={{ marginTop: 12, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
-        <strong>Marcar como vista</strong>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <details className="ritual-admin">
+        <summary>Marcar como vista</summary>
+        <div className="ritual-admin__body">
+          <label className="ritual-admin__check">
             <input
               type="checkbox"
               checked={input?.seen ?? true}
@@ -204,80 +243,89 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             />
             <span>Vista</span>
           </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Gloria</span>
-            <input
-              type="number"
-              step="0.5"
-              value={input?.ratingGloria ?? ''}
-              onChange={(event) => updateStatusField(movie.id, 'ratingGloria', event.target.value)}
-              style={{ maxWidth: 90 }}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span>Rodrigo</span>
-            <input
-              type="number"
-              step="0.5"
-              value={input?.ratingRodrigo ?? ''}
-              onChange={(event) => updateStatusField(movie.id, 'ratingRodrigo', event.target.value)}
-              style={{ maxWidth: 90 }}
-            />
-          </label>
-          <button
-            className="btn"
-            onClick={() => handleSaveStatus(movie)}
-            disabled={input?.busy}
-            style={{ alignSelf: 'flex-end' }}
-          >
+          <div className="ritual-admin__ratings">
+            <label>
+              <span>Gloria</span>
+              <input
+                type="number"
+                step="0.5"
+                value={input?.ratingGloria ?? ''}
+                onChange={(event) => updateStatusField(movie.id, 'ratingGloria', event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Rodrigo</span>
+              <input
+                type="number"
+                step="0.5"
+                value={input?.ratingRodrigo ?? ''}
+                onChange={(event) => updateStatusField(movie.id, 'ratingRodrigo', event.target.value)}
+              />
+            </label>
+          </div>
+          <button className="btn" onClick={() => handleSaveStatus(movie)} disabled={input?.busy}>
             {input?.busy ? 'Guardando...' : 'Guardar'}
           </button>
+          {input?.error && <p className="ritual-admin__error">{input.error}</p>}
         </div>
-        {input?.error && <p style={{ marginTop: 8, color: 'var(--accent)' }}>{input.error}</p>}
-      </div>
+      </details>
     );
   };
 
   return (
-    <div className="panel">
-      <h2>Ritual of Random Cinema</h2>
-      <div className="filters">
-        <div className="section-filter">
-          <small>Secciones</small>
-          <div className="section-pills">
-            <button
-              className={`pill ${selectedSections.length === sections.length && sections.length > 0 ? 'active' : ''}`}
-              onClick={toggleAllSections}
-              type="button"
-            >
-              Todas
-            </button>
-            {sections.map((section) => (
+    <div className="ritual-panel">
+      <header className="ritual-panel__header">
+        <p className="ritual-panel__eyebrow">Surprise Movie Night</p>
+        <h2>El ritual de la colección</h2>
+        <p className="text-muted">Prepara los filtros, invoca el azar y descubre la próxima película.</p>
+      </header>
+
+      <section className="ritual-stage">
+        <div className="ritual-stage__label">I · Preparación</div>
+        <div className="ritual-filters">
+          <div className="ritual-sections">
+            <span className="ritual-section__label">Secciones</span>
+            <div className="section-pills">
               <button
-                key={section}
-                className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
-                onClick={() => toggleSection(section)}
+                className={`pill ${selectedSections.length === sections.length && sections.length > 0 ? 'active' : ''}`}
+                onClick={toggleAllSections}
                 type="button"
               >
-                {section}
+                Todas
               </button>
-            ))}
+              {visibleSections.map((section) => (
+                <button
+                  key={section}
+                  className={`pill ${selectedSections.includes(section) ? 'active' : ''}`}
+                  onClick={() => toggleSection(section)}
+                  type="button"
+                >
+                  {section}
+                </button>
+              ))}
+              {sections.length > initialSections.length && (
+                <button
+                  className="pill ghost"
+                  type="button"
+                  onClick={() => setShowAllSections((prev) => !prev)}
+                >
+                  {showAllSections ? 'Ver menos' : 'Ver más secciones'}
+                </button>
+              )}
+            </div>
           </div>
-          <p className="pill-hint">Selecciona una o varias secciones o invoca todas.</p>
+          <button
+            className={`toggle-control ${excludeSeen ? 'on' : ''}`}
+            onClick={() => setExcludeSeen((prev) => !prev)}
+            type="button"
+          >
+            <span className="toggle-track">
+              <span className="toggle-thumb" />
+            </span>
+            <span className="toggle-label">{excludeSeen ? 'Excluir vistas' : 'Incluir vistas'}</span>
+          </button>
         </div>
-        <button
-          className={`toggle-control ${excludeSeen ? 'on' : ''}`}
-          onClick={() => setExcludeSeen((prev) => !prev)}
-          type="button"
-        >
-          <span className="toggle-track">
-            <span className="toggle-thumb" />
-          </span>
-          <span className="toggle-label">{excludeSeen ? 'Excluir vistas' : 'Incluir vistas'}</span>
-        </button>
-      </div>
-      <div className="random-area">
-        <div className="random-actions">
+        <div className="random-actions ritual-actions">
           <button onClick={summon} className="action-large">
             Summon a Movie
           </button>
@@ -285,13 +333,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             Summon a Double Feature
           </button>
         </div>
-        {filtered.length === 0 && <p>No movies match the ritual filters.</p>}
-      </div>
+        {filtered.length === 0 && <p className="muted">No hay películas para invocar con estos filtros.</p>}
+      </section>
+
+      {isSummoning && (
+        <div className="ritual-invocation">
+          <div className="ritual-invocation__glow" aria-hidden />
+          <p>Barajando la colección…</p>
+        </div>
+      )}
+
       {(chosen || doubleFeature) && (
         <div className="surprise-modal" role="dialog" aria-label="Resultados de Surprise Night">
           <div className="surprise-card">
             <div className="surprise-card__header">
-              <h3>{doubleFeature ? 'Double Feature' : 'Selección'}</h3>
+              <h3>{doubleFeature ? 'Revelación doble' : 'Revelación'}</h3>
               <button className="ghost" onClick={() => { setChosen(null); setDoubleFeature(null); }}>
                 Cerrar
               </button>
@@ -320,7 +376,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                   {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
                     <div key={item.id} className="feature-card simple">
                       <div className="feature-meta">
-                        <span className="feature-pill">{idx === 0 ? 'Acto I' : 'Acto II'}</span>
+                        <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
                         {renderPoster(item)}
                         <strong>{item.title}</strong>
                       </div>
