@@ -2340,6 +2340,77 @@ a.ghost {
   color: var(--text-muted);
 }
 
+.director-list-card--skeleton {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.01);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.director-list-card--skeleton .director-list-card__badge,
+.director-list-card--skeleton .director-list-card__thumb,
+.director-list-card--skeleton .director-list-card__name {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.known-for-card--skeleton {
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: skeletonShimmer 1.2s ease-in-out infinite;
+}
+
+.director-list-card--skeleton .director-list-card__badge {
+  width: 72px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+.director-list-card--skeleton .director-list-card__thumb {
+  border-radius: 12px;
+  flex: 1;
+  min-height: 160px;
+}
+
+.director-list-card--skeleton .director-list-card__name {
+  height: 18px;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  display: inline-block;
+  width: 100%;
+  height: 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.skeleton-text--short {
+  width: 50%;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .director-list-card--neutral {
   border-color: rgba(255, 255, 255, 0.12);
 }

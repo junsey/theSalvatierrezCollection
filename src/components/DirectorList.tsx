@@ -513,24 +513,16 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   };
 
   if (loading) {
+    const skeletonCards = Array.from({ length: 12 }, (_, idx) => idx);
     return (
-      <div className="panel" style={{ marginBottom: 12 }}>
-        <p style={{ marginBottom: 8 }} className="muted">
-          Cargando directores...
-        </p>
-        {progress && (
-          <>
-            <div className="progress-bar">
-              <div
-                className="progress-bar-fill"
-                style={{ width: `${(progress.current / Math.max(progress.total, 1)) * 100}%` }}
-              />
-            </div>
-            <div style={{ marginTop: 6, fontSize: '0.9em', color: 'var(--text-muted)' }}>
-              {progress.current} de {progress.total}
-            </div>
-          </>
-        )}
+      <div className="director-grid">
+        {skeletonCards.map((idx) => (
+          <div key={idx} className="director-list-card director-list-card--skeleton" aria-hidden>
+            <span className="director-list-card__badge skeleton" />
+            <div className="director-list-card__thumb skeleton" />
+            <span className="director-list-card__name skeleton" />
+          </div>
+        ))}
       </div>
     );
   }

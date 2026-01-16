@@ -212,14 +212,21 @@ export const DirectorPage: React.FC = () => {
       directorCollection.hiddenOwnedIds.has(id) ||
       directorCollection.hiddenOwnedTitles.has(normalizeTitle(title));
 
+    const getYearValue = (item: DirectedMovie) => {
+      if (item.year) return item.year;
+      const date = item.mediaType === 'tv' ? item.firstAirDate : item.releaseDate;
+      if (!date) return null;
+      const parsed = Number.parseInt(date.slice(0, 4), 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
     const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
-      const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
-      const dateB = b.mediaType === 'tv' ? b.firstAirDate : b.releaseDate;
+      const yearA = getYearValue(a);
+      const yearB = getYearValue(b);
 
-      const tsA = dateA ? Date.parse(dateA) : Number.POSITIVE_INFINITY;
-      const tsB = dateB ? Date.parse(dateB) : Number.POSITIVE_INFINITY;
-
-      if (tsA !== tsB) return tsA - tsB;
+      if (yearA != null && yearB != null && yearA !== yearB) return yearA - yearB;
+      if (yearA == null && yearB != null) return 1;
+      if (yearA != null && yearB == null) return -1;
       return (a.title || '').localeCompare(b.title || '');
     };
 
@@ -412,7 +419,21 @@ export const DirectorPage: React.FC = () => {
           {loading ? (
             <div className="filmography-block">
               <h2>Filmografía</h2>
-              <p className="muted">Cargando filmografía...</p>
+              <div className="known-for-grid">
+                {Array.from({ length: 8 }, (_, idx) => (
+                  <div key={`filmography-skeleton-${idx}`} className="known-for-card known-for-card--skeleton" aria-hidden>
+                    <div className="known-for-card__poster skeleton" />
+                    <div className="known-for-card__meta">
+                      <div className="known-for-card__meta-row">
+                        <span className="skeleton skeleton-text" />
+                      </div>
+                      <div className="known-for-card__meta-row known-for-card__meta-row--footer">
+                        <span className="skeleton skeleton-text skeleton-text--short" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <>
