@@ -67,8 +67,9 @@ const TopBar: React.FC<{
   tmdbUrl: string | null;
   onToggleSeen: () => void;
   seen: boolean;
+  showWatchedToggle: boolean;
   closeButtonRef: React.RefObject<HTMLButtonElement>;
-}> = ({ title, showTitle, onClose, tmdbUrl, onToggleSeen, seen, closeButtonRef }) => {
+}> = ({ title, showTitle, onClose, tmdbUrl, onToggleSeen, seen, showWatchedToggle, closeButtonRef }) => {
   return (
     <div className="detail-sheet__topbar">
       <div className="detail-sheet__topbar-left">
@@ -87,9 +88,11 @@ const TopBar: React.FC<{
         {title}
       </div>
       <div className="detail-sheet__topbar-actions">
-        <button className="ghost" onClick={onToggleSeen} type="button">
-          {seen ? 'Watched' : 'Mark as Watched'}
-        </button>
+        {showWatchedToggle && (
+          <button className="ghost" onClick={onToggleSeen} type="button">
+            {seen ? 'Quitar vista' : 'Mark as Watched'}
+          </button>
+        )}
         {tmdbUrl && (
           <a className="ghost" href={tmdbUrl} target="_blank" rel="noreferrer">
             Open TMDb
@@ -370,7 +373,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const [showCompactTitle, setShowCompactTitle] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeTimeoutRef = useRef<number | null>(null);
@@ -408,15 +411,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setPlotExpanded(false);
     setShowCompactTitle(false);
   }, [movie.id]);
-
-  useEffect(() => {
-    const body = document.body;
-    const previousOverflow = body.style.overflow;
-    body.style.overflow = 'hidden';
-    return () => {
-      body.style.overflow = previousOverflow;
-    };
-  }, []);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -597,13 +591,23 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   }, []);
 
   const handleScroll = () => {
-    const top = scrollRef.current?.scrollTop ?? 0;
+    const top = overlayRef.current?.scrollTop ?? 0;
     setShowCompactTitle(top > 140);
   };
 
   const handleToggleSeen = () => {
     updateSeen(movie.id, !movie.seen);
   };
+
+  const dubbingValue = movie.dubbing as unknown;
+  const dubbingLabel =
+    typeof dubbingValue === 'boolean'
+      ? dubbingValue
+        ? 'Sí'
+        : 'No'
+      : movie.dubbing
+      ? movie.dubbing
+      : 'No especificado';
 
   const summaryContent = (
     <div className="detail-sheet__content-grid">
@@ -624,7 +628,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           <div className="detail-sheet__info-grid">
             <div>
               <strong>Doblaje / Formato</strong>
-              <p>{movie.dubbing} / {movie.format}</p>
+              <p>{dubbingLabel} / {movie.format}</p>
             </div>
             <div>
               <strong>Estado físico</strong>
@@ -768,7 +772,12 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   }
 
   return (
-    <div className={`detail-sheet__overlay ${isClosing ? 'is-closing' : 'is-open'}`} onClick={requestClose}>
+    <div
+      className={`detail-sheet__overlay ${isClosing ? 'is-closing' : 'is-open'}`}
+      onClick={requestClose}
+      onScroll={handleScroll}
+      ref={overlayRef}
+    >
       <div
         className={`detail-sheet ${isClosing ? 'is-closing' : 'is-open'}`}
         role="dialog"
@@ -777,25 +786,24 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
       >
-        <div className="detail-sheet__scroll" ref={scrollRef} onScroll={handleScroll}>
-          <TopBar
-            title={movie.title}
-            showTitle={showCompactTitle}
-            onClose={requestClose}
-            tmdbUrl={tmdbUrl}
-            onToggleSeen={handleToggleSeen}
-            seen={movie.seen}
-            closeButtonRef={closeButtonRef}
-          />
-          <Hero
-            movie={movie}
-            directors={directors}
-            loadingDirectors={loadingDirectors}
-            fallbackDirectors={fallbackDirectors}
-            funcionaLabel={funcionaLabel}
-          />
-          <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-        </div>
+        <TopBar
+          title={movie.title}
+          showTitle={showCompactTitle}
+          onClose={requestClose}
+          tmdbUrl={tmdbUrl}
+          onToggleSeen={handleToggleSeen}
+          seen={movie.seen}
+          showWatchedToggle={Boolean(adminSession)}
+          closeButtonRef={closeButtonRef}
+        />
+        <Hero
+          movie={movie}
+          directors={directors}
+          loadingDirectors={loadingDirectors}
+          fallbackDirectors={fallbackDirectors}
+          funcionaLabel={funcionaLabel}
+        />
+        <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
       </div>
     </div>
   );
