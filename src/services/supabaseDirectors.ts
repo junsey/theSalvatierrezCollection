@@ -1,5 +1,6 @@
 import { DirectedMovie } from './tmdbPeopleService';
 import { getTmdbImageBaseUrl } from './tmdbApi';
+import { normalizeDirectorName } from './directors';
 
 type SupabaseDirectorRow = {
   id: string;
@@ -140,10 +141,17 @@ export async function fetchAllDirectorProfiles(): Promise<Record<string, { profi
   const map: Record<string, { profileUrl?: string; tmdbId?: number | null }> = {};
   for (const row of rows ?? []) {
     if (!row.name) continue;
-    map[row.name.toLowerCase()] = {
+    const normalized = normalizeDirectorName(row.name);
+    const tmdbKey = Number.isFinite(row.tmdb_person_id) ? `tmdb-${row.tmdb_person_id}` : null;
+    const entry = {
       profileUrl: row.profile_path ? `${base}w300${row.profile_path}` : undefined,
       tmdbId: row.tmdb_person_id ?? null
     };
+    map[row.name.toLowerCase()] = entry;
+    map[normalized] = entry;
+    if (tmdbKey) {
+      map[tmdbKey] = entry;
+    }
   }
   return map;
 }

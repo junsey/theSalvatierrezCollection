@@ -593,7 +593,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           const total = stats?.total ?? null;
           const progressClass = getProgressClass(owned, total);
           const label = total ? `${owned} / ${total}` : `${owned} / —`;
+          const supabaseKey =
+            director.tmdbId != null ? `tmdb-${director.tmdbId}` : normalizeDirectorName(director.displayName || director.name);
           const supabasePortrait =
+            supabaseProfiles[supabaseKey]?.profileUrl ??
             supabaseProfiles[(director.displayName || director.name).toLowerCase()]?.profileUrl;
 
           return (
