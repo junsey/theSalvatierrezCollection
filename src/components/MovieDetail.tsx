@@ -795,24 +795,26 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
       >
-        <TopBar
-          title={movie.title}
-          showTitle={showCompactTitle}
-          onClose={requestClose}
-          tmdbUrl={tmdbUrl}
-          onToggleSeen={handleToggleSeen}
-          seen={movie.seen}
-          showWatchedToggle={Boolean(adminSession)}
-          closeButtonRef={closeButtonRef}
-        />
-        <Hero
-          movie={movie}
-          directors={directors}
-          loadingDirectors={loadingDirectors}
-          fallbackDirectors={fallbackDirectors}
-          funcionaLabel={funcionaLabel}
-        />
-        <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+        <div className="detail-sheet__inner">
+          <TopBar
+            title={movie.title}
+            showTitle={showCompactTitle}
+            onClose={requestClose}
+            tmdbUrl={tmdbUrl}
+            onToggleSeen={handleToggleSeen}
+            seen={movie.seen}
+            showWatchedToggle={Boolean(adminSession)}
+            closeButtonRef={closeButtonRef}
+          />
+          <Hero
+            movie={movie}
+            directors={directors}
+            loadingDirectors={loadingDirectors}
+            fallbackDirectors={fallbackDirectors}
+            funcionaLabel={funcionaLabel}
+          />
+          <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+        </div>
       </div>
     </div>
   );

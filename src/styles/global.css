@@ -1335,10 +1335,10 @@ a.ghost {
 }
 
 .detail-sheet {
-  width: min(1200px, 100%);
+  width: 100%;
   max-height: none;
-  margin: 0 auto;
-  padding: 0 24px 32px;
+  margin: 0;
+  padding: 0;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -1347,10 +1347,19 @@ a.ghost {
   display: flex;
   flex-direction: column;
   animation: detailSheetIn 0.26s ease-out;
+  box-sizing: border-box;
 }
 
 .detail-sheet.is-closing {
   animation: detailSheetOut 0.22s ease-in forwards;
+}
+
+.detail-sheet__inner {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 0 24px 32px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 
@@ -1426,7 +1435,7 @@ a.ghost {
 
 .detail-sheet__hero {
   position: relative;
-  padding: 10px 20px 0;
+  padding: 10px 0 0;
 }
 
 .detail-sheet__hero-backdrop {
@@ -1541,7 +1550,7 @@ a.ghost {
 .detail-tabs {
   display: grid;
   gap: 16px;
-  padding: 0 20px 24px;
+  padding: 0 0 24px;
 }
 
 .detail-tabs__list {
@@ -1569,9 +1578,10 @@ a.ghost {
 
 .detail-sheet__content-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
   gap: 24px;
   align-items: start;
+  box-sizing: border-box;
 }
 
 .detail-sheet__main {
@@ -1622,6 +1632,7 @@ a.ghost {
   background: rgba(255, 255, 255, 0.03);
   display: grid;
   gap: 12px;
+  box-sizing: border-box;
 }
 
 .detail-sheet__card-header {
@@ -1820,6 +1831,10 @@ a.ghost {
   .detail-sheet {
     width: 100%;
     border-radius: 0;
+    padding: 0;
+  }
+
+  .detail-sheet__inner {
     padding: 0 16px 24px;
   }
 
