@@ -217,8 +217,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     }
   };
 
-  const renderPoster = (movie: MovieRecord) => (
-    <div className="feature-poster-frame" aria-hidden={!movie.posterUrl}>
+  const renderPoster = (movie: MovieRecord, className?: string) => (
+    <div className={className ?? 'feature-poster-frame'} aria-hidden={!movie.posterUrl}>
       {movie.posterUrl ? (
         <img className="feature-poster" src={movie.posterUrl} alt={`Póster de ${movie.title}`} loading="lazy" />
       ) : (
@@ -280,8 +280,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
         <p className="text-muted">Prepara los filtros, invoca el azar y descubre la próxima película.</p>
       </header>
 
-      <section className="ritual-stage">
-        <div className="ritual-stage__label">I · Preparación</div>
+      <section className="ritual-flow">
+        <div className="random-actions ritual-actions">
+          <button onClick={summon} className="action-large">
+            Summon a Movie
+          </button>
+          <button onClick={summonDoubleFeature} className="action-large secondary">
+            Summon a Double Feature
+          </button>
+        </div>
         <div className="ritual-filters">
           <div className="ritual-sections">
             <span className="ritual-section__label">Secciones</span>
@@ -325,14 +332,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             <span className="toggle-label">{excludeSeen ? 'Excluir vistas' : 'Incluir vistas'}</span>
           </button>
         </div>
-        <div className="random-actions ritual-actions">
-          <button onClick={summon} className="action-large">
-            Summon a Movie
-          </button>
-          <button onClick={summonDoubleFeature} className="action-large secondary">
-            Summon a Double Feature
-          </button>
-        </div>
         {filtered.length === 0 && <p className="muted">No hay películas para invocar con estos filtros.</p>}
       </section>
 
@@ -344,46 +343,84 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       )}
 
       {(chosen || doubleFeature) && (
-        <div className="surprise-modal" role="dialog" aria-label="Resultados de Surprise Night">
-          <div className="surprise-card">
-            <div className="surprise-card__header">
-              <h3>{doubleFeature ? 'Revelación doble' : 'Revelación'}</h3>
-              <button className="ghost" onClick={() => { setChosen(null); setDoubleFeature(null); }}>
-                Cerrar
-              </button>
+        <div
+          className="detail-sheet__overlay surprise-detail__overlay"
+          role="dialog"
+          aria-label="Resultados de Surprise Night"
+          onClick={() => {
+            setChosen(null);
+            setDoubleFeature(null);
+          }}
+        >
+          <div
+            className="detail-sheet surprise-detail"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="detail-sheet__inner surprise-detail__inner">
+              <header className="surprise-detail__hero">
+                <div
+                  className="detail-sheet__hero-backdrop"
+                  style={{
+                    backgroundImage: `url(${chosen?.posterUrl ?? doubleFeature?.first.posterUrl ?? ''})`
+                  }}
+                  aria-hidden
+                />
+                <div className="surprise-detail__hero-content">
+                  <div className="surprise-detail__titles">
+                    <p className="eyebrow">Surprise Movie Night</p>
+                    <h2>{doubleFeature ? 'Revelación doble' : 'Revelación'}</h2>
+                  </div>
+                <div className="surprise-detail__actions">
+                  {chosen && <button onClick={() => onSelect(chosen)}>Abrir detalles</button>}
+                  {doubleFeature && (
+                    <>
+                      <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles · Primero</button>
+                      <button onClick={() => onSelect(doubleFeature.second)}>Abrir detalles · Luego</button>
+                    </>
+                  )}
+                  {doubleFeature && (
+                    <button onClick={summonDoubleFeature}>Volver a invocar</button>
+                  )}
+                  {chosen && <button onClick={summon}>Volver a invocar</button>}
+                  <button
+                    className="ghost"
+                    onClick={() => {
+                      setChosen(null);
+                      setDoubleFeature(null);
+                    }}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+              {chosen && <div className="surprise-detail__poster">{renderPoster(chosen)}</div>}
+              {doubleFeature && (
+                <div className="surprise-detail__posters">
+                    {renderPoster(doubleFeature.first, 'surprise-detail__poster')}
+                    {renderPoster(doubleFeature.second, 'surprise-detail__poster')}
+                  </div>
+                )}
+              </header>
+              <div className="surprise-detail__content">
+                {chosen && (
+                  <>
+                    <strong className="surprise-detail__title">{chosen.title}</strong>
+                    {renderAdminControls(chosen)}
+                  </>
+                )}
+                {doubleFeature && (
+                  <div className="surprise-detail__duo">
+                    {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
+                      <div key={item.id} className="surprise-detail__duo-item">
+                        <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
+                        <strong>{item.title}</strong>
+                        {renderAdminControls(item)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-
-            {chosen && (
-              <div className="ritual-reveal">
-                {renderPoster(chosen)}
-                <strong className="ritual-reveal__title">{chosen.title}</strong>
-                <div className="ritual-reveal__actions">
-                  <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
-                  <button onClick={summon}>Volver a invocar</button>
-                </div>
-                {renderAdminControls(chosen)}
-              </div>
-            )}
-
-            {doubleFeature && (
-              <div className="ritual-duo">
-                <p className="link-reason">Enlace: {doubleFeature.link}</p>
-                <div className="ritual-duo__grid">
-                  {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
-                    <div key={item.id} className="ritual-duo__item">
-                      <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
-                      {renderPoster(item)}
-                      <strong className="ritual-duo__title">{item.title}</strong>
-                      <button onClick={() => onSelect(item)}>Abrir detalles</button>
-                      {renderAdminControls(item)}
-                    </div>
-                  ))}
-                </div>
-                <div className="ritual-reveal__actions">
-                  <button onClick={summonDoubleFeature}>Volver a invocar</button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

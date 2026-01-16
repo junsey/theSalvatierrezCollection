@@ -967,6 +967,11 @@ button:hover {
   margin: 0;
 }
 
+.ritual-flow {
+  display: grid;
+  gap: 14px;
+}
+
 .ritual-stage {
   display: grid;
   gap: 12px;
@@ -1103,24 +1108,6 @@ a.ghost {
   color: var(--text);
 }
 
-.ritual-reveal {
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-  text-align: center;
-}
-
-.ritual-reveal__title {
-  font-size: 1.1rem;
-}
-
-.ritual-reveal__actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
 .plot-snippet {
   margin: 0;
   color: var(--text-muted);
@@ -1136,28 +1123,6 @@ a.ghost {
 
 .result-actions.tight {
   justify-content: center;
-}
-
-.ritual-duo {
-  display: grid;
-  gap: 12px;
-}
-
-.ritual-duo__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.ritual-duo__item {
-  display: grid;
-  gap: 10px;
-  justify-items: center;
-  text-align: center;
-}
-
-.ritual-duo__title {
-  font-size: 1rem;
 }
 
 .surprise-modal {
@@ -1213,6 +1178,79 @@ a.ghost {
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: 0 0 18px rgba(0, 0, 0, 0.4);
+}
+
+.surprise-detail__overlay {
+  padding: 12px;
+}
+
+.surprise-detail__inner {
+  padding-bottom: 24px;
+}
+
+.surprise-detail__hero {
+  position: relative;
+  padding: 20px 0 10px;
+}
+
+.surprise-detail__hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.surprise-detail__titles h2 {
+  margin: 0;
+}
+
+.surprise-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.surprise-detail__poster {
+  margin-top: 14px;
+}
+
+.surprise-detail__posters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.surprise-detail__content {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.surprise-detail__title {
+  font-size: 1.2rem;
+}
+
+.surprise-detail__duo {
+  display: grid;
+  gap: 16px;
+}
+
+.surprise-detail__duo-item {
+  display: grid;
+  gap: 8px;
+}
+
+.ritual-admin {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.ritual-admin__body {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .feature-poster.placeholder {
