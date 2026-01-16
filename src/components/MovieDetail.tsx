@@ -5,7 +5,6 @@ import { fixMovieTmdb, resolveMovieTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { fetchTvSeasons } from '../services/tmdbApi';
-import { PawRating } from './PawRating';
 
 interface Props {
   movie: MovieRecord;
@@ -193,40 +192,78 @@ const Hero: React.FC<{
 };
 
 const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
+  const avgRating =
+    movie.ratingGloria != null && movie.ratingRodrigo != null
+      ? (movie.ratingGloria + movie.ratingRodrigo) / 2
+      : null;
+
+  const userRatings = [
+    { name: 'Gloria', value: movie.ratingGloria },
+    { name: 'Rodrigo', value: movie.ratingRodrigo }
+  ];
+
+  const paws = Array.from({ length: 10 }, (_, i) => i + 1);
+
+  const PawGlyph: React.FC<{ filled: boolean }> = ({ filled }) => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      style={{
+        color: filled ? 'var(--accent-2)' : 'var(--text-muted)',
+        opacity: filled ? 1 : 0.35
+      }}
+    >
+      <path
+        d="M12 14c-2.9 0-5 1.9-5 4.2 0 1.2.8 2.3 2 2.3 1.4 0 2.2-.7 2.8-1.5.2-.3.6-.3.8 0 .6.8 1.4 1.5 2.8 1.5 1.2 0 2-.9 2-2.2C17.5 15.9 14.9 14 12 14Z"
+        fill="currentColor"
+      />
+      <circle cx="6.5" cy="9" r="2.2" fill="currentColor" />
+      <circle cx="10.5" cy="6.5" r="2.2" fill="currentColor" />
+      <circle cx="14.5" cy="6.5" r="2.2" fill="currentColor" />
+      <circle cx="18.5" cy="9" r="2.2" fill="currentColor" />
+    </svg>
+  );
+
+  const renderScore = (value: number | null | undefined) => (value != null ? value.toFixed(1) : '—');
+
   return (
     <div className="detail-sheet__card">
       <div className="detail-sheet__card-header">
         <h3>Puntuaciones</h3>
-        <span className="detail-sheet__badge">IMDb / TMDb</span>
       </div>
-      <div className="detail-sheet__rating-grid">
-        <div className="detail-sheet__rating-chip">
-          <span className="muted">IMDb / TMDb</span>
-          <strong>{movie.tmdbRating?.toFixed(1) ?? 'N/A'}</strong>
+      <div className="detail-sheet__rating-summary">
+        <div className="detail-sheet__rating-mini">
+          <span className="detail-sheet__rating-label">IMDb</span>
+          <strong className="detail-sheet__rating-value">{movie.tmdbRating?.toFixed(1) ?? '—'}</strong>
         </div>
-        {movie.ratingGloria != null && movie.ratingRodrigo != null && (
-          <div className="detail-sheet__rating-chip">
-            <span className="muted">Promedio paws</span>
-            <strong>{((movie.ratingGloria + movie.ratingRodrigo) / 2).toFixed(1)}</strong>
-          </div>
-        )}
+        <div className="detail-sheet__rating-mini">
+          <span className="detail-sheet__rating-label">Paws</span>
+          <strong className="detail-sheet__rating-value">{avgRating != null ? avgRating.toFixed(1) : '—'}</strong>
+        </div>
       </div>
-      {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
-        <div className="detail-sheet__rating-list">
-          {movie.ratingGloria != null && (
-            <div className="detail-sheet__rating-row">
-              <span className="detail-sheet__badge">Gloria</span>
-              <PawRating value={movie.ratingGloria} />
+      <div className="detail-sheet__rating-scale">Escala 0–10</div>
+      <div className="detail-sheet__rating-users">
+        {userRatings.map((user) => {
+          const filledCount = user.value != null ? Math.round(user.value) : 0;
+          return (
+            <div key={user.name} className="detail-sheet__rating-row">
+              <span className="detail-sheet__rating-name">{user.name}</span>
+              <div className="detail-sheet__rating-bar" aria-hidden="true">
+                <div className="detail-sheet__rating-paws">
+                  {paws.map((paw) => (
+                    <PawGlyph key={paw} filled={paw <= filledCount} />
+                  ))}
+                </div>
+              </div>
+              <span className="detail-sheet__rating-score">{renderScore(user.value)}</span>
             </div>
-          )}
-          {movie.ratingRodrigo != null && (
-            <div className="detail-sheet__rating-row">
-              <span className="detail-sheet__badge">Rodrigo</span>
-              <PawRating value={movie.ratingRodrigo} />
-            </div>
-          )}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };

@@ -1652,13 +1652,14 @@ a.ghost {
   color: var(--text-muted);
 }
 
-.detail-sheet__rating-grid {
+.detail-sheet__rating-summary {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.detail-sheet__rating-chip {
-  padding: 10px 12px;
+.detail-sheet__rating-mini {
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
@@ -1666,16 +1667,64 @@ a.ghost {
   gap: 6px;
 }
 
-.detail-sheet__rating-list {
+.detail-sheet__rating-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.detail-sheet__rating-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.detail-sheet__rating-scale {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.detail-sheet__rating-users {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .detail-sheet__rating-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(90px, 120px) minmax(0, 1fr) 48px;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
-  justify-content: space-between;
+  min-height: 36px;
+}
+
+.detail-sheet__rating-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.detail-sheet__rating-bar {
+  width: clamp(180px, 22vw, 240px);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.detail-sheet__rating-paws {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+  justify-items: center;
+  align-items: center;
+}
+
+.detail-sheet__rating-score {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
 }
 
 .detail-sheet__admin {
