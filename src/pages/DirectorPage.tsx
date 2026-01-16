@@ -364,8 +364,8 @@ export const DirectorPage: React.FC = () => {
               <p className="eyebrow">Directores</p>
               <h1>{personName || directorName}</h1>
             </div>
-            <div className="collection-badge" aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}>
-              <span className="collection-badge__label">En colección</span>
+            <div className="collection-badge director-collection" aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}>
+              <span className="collection-badge__label">Estado de colección</span>
               <div className="collection-badge__stats">
                 <span className="collection-badge__value">{ownedCount}</span>
                 <span className="collection-badge__divider">/</span>
@@ -416,6 +416,9 @@ export const DirectorPage: React.FC = () => {
             </div>
           ) : (
             <>
+              <p className="director-filmography__summary">
+                Filmografía ({totalCount || '—'} películas · {ownedCount} en tu colección)
+              </p>
               {adminSession && knownFor.length === 0 && (
                 <p className="muted">No hay filmografía en Supabase. Usa "Actualizar TMDb" para generarla.</p>
               )}
