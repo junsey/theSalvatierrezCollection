@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
-import { fixMovieTmdb, resolveMovieTmdb } from '../services/adminApi';
+import { fixMovieTmdb, resolveMovieTmdb, updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { fetchTvSeasons } from '../services/tmdbApi';
@@ -395,7 +395,7 @@ const AdminPanel: React.FC<{
 };
 
 export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
-  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, updateSeen } = useMovies();
+  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, updateSeen, applyMovieStatusUpdate } = useMovies();
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [adminTmdbId, setAdminTmdbId] = useState('');
@@ -405,6 +405,10 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const [adminSeason, setAdminSeason] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [inventoryBusy, setInventoryBusy] = useState(false);
+  const [inventoryMessage, setInventoryMessage] = useState<string | null>(null);
+  const [localDeposito, setLocalDeposito] = useState(movie.enDeposito ?? false);
+  const [localFuncionaStatus, setLocalFuncionaStatus] = useState(movie.funcionaStatus);
   const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
   const [plotExpanded, setPlotExpanded] = useState(false);
@@ -424,7 +428,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     : [];
 
   const funcionaLabel = (() => {
-    switch (movie.funcionaStatus) {
+    switch (localFuncionaStatus) {
       case 'working':
         return 'Funciona correctamente';
       case 'damaged':
@@ -434,12 +438,21 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     }
   })();
 
+  const displayMovie = useMemo(
+    () => ({ ...movie, enDeposito: localDeposito, funcionaStatus: localFuncionaStatus }),
+    [movie, localDeposito, localFuncionaStatus]
+  );
+
   const tmdbUrl = movie.tmdbId
     ? `https://www.themoviedb.org/${movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'}/${movie.tmdbId}`
     : null;
 
   useEffect(() => {
     setAdminMessage(null);
+    setInventoryMessage(null);
+    setInventoryBusy(false);
+    setLocalDeposito(movie.enDeposito ?? false);
+    setLocalFuncionaStatus(movie.funcionaStatus);
     setAdminTmdbId('');
     setAdminTmdbType(movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie');
     setAdminBusy(false);
@@ -608,6 +621,42 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
       setAdminMessage('No se pudo corregir TMDb.');
     } finally {
       setAdminBusy(false);
+    }
+  };
+
+  const handleToggleDeposito = async () => {
+    if (!adminSession) return;
+    const nextValue = !localDeposito;
+    setInventoryBusy(true);
+    setInventoryMessage(null);
+    try {
+      await updateMovieStatus({ collectionId: movie.id, enDeposito: nextValue });
+      applyMovieStatusUpdate(movie.id, { enDeposito: nextValue });
+      setLocalDeposito(nextValue);
+      setInventoryMessage(nextValue ? 'Movida a deposito.' : 'Devuelta a la coleccion.');
+    } catch (error) {
+      console.error(error);
+      setInventoryMessage('No se pudo actualizar el deposito.');
+    } finally {
+      setInventoryBusy(false);
+    }
+  };
+
+  const handleToggleFunciona = async () => {
+    if (!adminSession) return;
+    const nextStatus = localFuncionaStatus === 'working' ? 'damaged' : 'working';
+    setInventoryBusy(true);
+    setInventoryMessage(null);
+    try {
+      await updateMovieStatus({ collectionId: movie.id, funcionaStatus: nextStatus });
+      applyMovieStatusUpdate(movie.id, { funcionaStatus: nextStatus });
+      setLocalFuncionaStatus(nextStatus);
+      setInventoryMessage(nextStatus === 'working' ? 'Marcada como funcional.' : 'Marcada como no funcional.');
+    } catch (error) {
+      console.error(error);
+      setInventoryMessage('No se pudo actualizar el estado.');
+    } finally {
+      setInventoryBusy(false);
     }
   };
 
@@ -845,12 +894,26 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             closeButtonRef={closeButtonRef}
           />
           <Hero
-            movie={movie}
+            movie={displayMovie}
             directors={directors}
             loadingDirectors={loadingDirectors}
             fallbackDirectors={fallbackDirectors}
             funcionaLabel={funcionaLabel}
           />
+          {adminSession && (
+            <div
+              className="detail-sheet__admin-actions"
+              style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '0 24px' }}
+            >
+              <button className="btn" onClick={handleToggleDeposito} disabled={inventoryBusy} type="button">
+                {localDeposito ? 'Traer a la coleccion' : 'Mover al deposito'}
+              </button>
+              <button className="btn" onClick={handleToggleFunciona} disabled={inventoryBusy} type="button">
+                {localFuncionaStatus === 'working' ? 'Marcar no funciona' : 'Marcar funciona'}
+              </button>
+              {inventoryMessage && <span className="muted">{inventoryMessage}</span>}
+            </div>
+          )}
           <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
         </div>
       </div>

@@ -41,6 +41,8 @@ export async function createMovie(payload: {
   genreRaw?: string;
   director?: string;
   group?: string;
+  series?: boolean;
+  season?: number | null;
   seen?: boolean;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
@@ -59,6 +61,8 @@ export async function updateMovieStatus(payload: {
   seen?: boolean;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
+  enDeposito?: boolean | null;
+  funcionaStatus?: 'working' | 'damaged' | 'untested';
 }) {
   return adminFetch('/api/movies/status', {
     method: 'PATCH',

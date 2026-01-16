@@ -19,7 +19,8 @@ type CollectionRow = {
   Formato?: string | null;
   'Puntuacion Rodrigo'?: number | null;
   'Puntuacion Gloria'?: number | null;
-  Funciona?: string | null;
+  Funciona?: string | boolean | null;
+  'En depA3sito'?: boolean | string | null;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -74,11 +75,18 @@ const parseFunciona = (value: unknown): 'working' | 'damaged' | 'untested' => {
   if (!normalized) return 'untested';
 
   const workingTokens = ['si', 'sA-', 'yes', 'y', 'true', 'ok', 'bueno', 'funciona', 'bien'];
-  const damagedTokens = ['no', 'daAñado', 'daniado', 'malo', 'broken', 'defectuoso'];
+  const damagedTokens = ['no', 'false', 'daAñado', 'daniado', 'malo', 'broken', 'defectuoso'];
 
   if (workingTokens.includes(normalized)) return 'working';
   if (damagedTokens.includes(normalized)) return 'damaged';
   return 'untested';
+};
+
+const parseEnDeposito = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (value == null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return Boolean(value);
 };
 
 const toText = (value: unknown, fallback = ''): string => {
@@ -105,6 +113,7 @@ function mapRow(row: CollectionRow): MovieRecord {
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
     dubbing: toText(row.Doblaje),
     format: toText(row.Formato),
+    enDeposito: parseEnDeposito((row as any)['En depA3sito']),
     funcionaStatus: parseFunciona(row.Funciona ?? '')
   };
 }

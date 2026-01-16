@@ -84,6 +84,8 @@ export const SettingsPage: React.FC = () => {
 
     director: '',
 
+    season: '',
+
     group: '',
 
     seen: false,
@@ -97,6 +99,8 @@ export const SettingsPage: React.FC = () => {
     format: ''
 
   });
+
+  const [newMovieType, setNewMovieType] = useState<'movie' | 'series'>('movie');
 
   const [newMovieBusy, setNewMovieBusy] = useState(false);
 
@@ -322,6 +326,12 @@ export const SettingsPage: React.FC = () => {
 
     setNewMovieStatus(null);
 
+    const seasonValue =
+      newMovieType === 'series' && newMovie.season
+        ? Number(newMovie.season)
+        : null;
+    const season = Number.isFinite(seasonValue) ? seasonValue : null;
+
     try {
 
       const payload = {
@@ -331,6 +341,10 @@ export const SettingsPage: React.FC = () => {
         title: newMovie.title.trim(),
 
         year: newMovie.year ? Number(newMovie.year) : null,
+
+        series: newMovieType === 'series',
+
+        season: newMovieType === 'series' ? season : null,
 
         saga: newMovie.saga.trim(),
 
@@ -384,6 +398,8 @@ export const SettingsPage: React.FC = () => {
 
         director: '',
 
+        season: '',
+
         group: '',
 
         seen: false,
@@ -397,6 +413,8 @@ export const SettingsPage: React.FC = () => {
         format: ''
 
       });
+
+      setNewMovieType('movie');
 
     } catch (error) {
 
@@ -612,6 +630,26 @@ export const SettingsPage: React.FC = () => {
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 
+              <strong>Tipo</strong>
+
+              <select
+
+                value={newMovieType}
+
+                onChange={(event) => setNewMovieType(event.target.value as 'movie' | 'series')}
+
+              >
+
+                <option value="movie">Pelicula</option>
+
+                <option value="series">Serie</option>
+
+              </select>
+
+            </label>
+
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+
               <strong>Sección</strong>
 
               <select
@@ -669,6 +707,26 @@ export const SettingsPage: React.FC = () => {
               />
 
             </label>
+
+            {newMovieType === 'series' && (
+
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+
+                <strong>Temporada</strong>
+
+                <input
+
+                  type="number"
+
+                  value={newMovie.season}
+
+                  onChange={(event) => setNewMovie({ ...newMovie, season: event.target.value })}
+
+                />
+
+              </label>
+
+            )}
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 

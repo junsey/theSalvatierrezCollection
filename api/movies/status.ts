@@ -13,11 +13,36 @@ export default async function handler(req: any, res: any) {
     if (!id) {
       return reject(res, 400, 'collectionId es obligatorio.');
     }
-    const payload = {
-      Vista: body.seen ?? null,
-      'Puntuacion Rodrigo': body.ratingRodrigo ?? null,
-      'Puntuacion Gloria': body.ratingGloria ?? null
+    const toBoolOrNull = (value: any) => {
+      if (typeof value === 'boolean') return value;
+      if (value == null || value === '') return null;
+      if (value === 1 || value === '1' || value === 'true') return true;
+      if (value === 0 || value === '0' || value === 'false') return false;
+      return null;
     };
+    const payload = {} as Record<string, any>;
+    if (body.seen !== undefined) {
+      payload.Vista = body.seen;
+    }
+    if (body.ratingRodrigo !== undefined) {
+      payload['Puntuacion Rodrigo'] = body.ratingRodrigo;
+    }
+    if (body.ratingGloria !== undefined) {
+      payload['Puntuacion Gloria'] = body.ratingGloria;
+    }
+    if (body.enDeposito !== undefined) {
+      payload['En depA3sito'] = toBoolOrNull(body.enDeposito);
+    }
+    if (body.funcionaStatus) {
+      if (body.funcionaStatus === 'working') payload.Funciona = true;
+      if (body.funcionaStatus === 'damaged') payload.Funciona = false;
+      if (body.funcionaStatus === 'untested') payload.Funciona = null;
+    } else if (body.funciona !== undefined) {
+      payload.Funciona = toBoolOrNull(body.funciona);
+    }
+    if (Object.keys(payload).length === 0) {
+      return reject(res, 400, 'No hay campos para actualizar.');
+    }
     const rows = await supabaseRequest<any[]>(
       `Coleccion_Salvatierrez?id=eq.${id}&select=*`,
       {

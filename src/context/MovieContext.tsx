@@ -46,7 +46,16 @@ interface MovieContextValue {
   refreshMissing: () => Promise<void>;
   refreshSupabase: () => Promise<void>;
   setAdminSession: (session: AdminSession | null) => void;
-  applyMovieStatusUpdate: (id: string, updates: { seen?: boolean; ratingGloria?: number | null; ratingRodrigo?: number | null }) => void;
+  applyMovieStatusUpdate: (
+    id: string,
+    updates: {
+      seen?: boolean;
+      ratingGloria?: number | null;
+      ratingRodrigo?: number | null;
+      enDeposito?: boolean;
+      funcionaStatus?: MovieRecord['funcionaStatus'];
+    }
+  ) => void;
   setTmdbEnrichmentEnabled: (value: boolean) => void;
   updateSeen: (id: string, seen: boolean) => void;
   updateRating: (id: string, rating: number) => void;
@@ -341,7 +350,13 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const applyMovieStatusUpdate = (
     id: string,
-    updates: { seen?: boolean; ratingGloria?: number | null; ratingRodrigo?: number | null }
+    updates: {
+      seen?: boolean;
+      ratingGloria?: number | null;
+      ratingRodrigo?: number | null;
+      enDeposito?: boolean;
+      funcionaStatus?: MovieRecord['funcionaStatus'];
+    }
   ) => {
     setMovies((prev) => {
       const next = prev.map((movie) => {
@@ -350,7 +365,9 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ...movie,
           seen: updates.seen ?? movie.seen,
           ratingGloria: updates.ratingGloria ?? movie.ratingGloria,
-          ratingRodrigo: updates.ratingRodrigo ?? movie.ratingRodrigo
+          ratingRodrigo: updates.ratingRodrigo ?? movie.ratingRodrigo,
+          enDeposito: updates.enDeposito ?? movie.enDeposito,
+          funcionaStatus: updates.funcionaStatus ?? movie.funcionaStatus
         };
       });
       const cached = loadMovieCache();

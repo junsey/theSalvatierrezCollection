@@ -6,12 +6,14 @@ import { refreshDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
-import { clearDirectorCache } from '../lib/directorCache';
+import { CACHE_VERSION, clearDirectorCache, loadDirectorCache, saveDirectorCache } from '../lib/directorCache';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
 
 const normalizeTitle = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+const buildDirectorKey = (name: string, tmdbId?: number | null) =>
+  Number.isFinite(tmdbId) ? `tmdb-${tmdbId}` : `name-${normalizeDirectorName(name)}`;
 
 const buildDirectorCollections = (directorName: string, collection: MovieRecord[]) => {
   const normalizedDirector = normalizeDirectorName(directorName);
@@ -89,6 +91,38 @@ export const DirectorPage: React.FC = () => {
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [bioOpen, setBioOpen] = useState(false);
 
+  const updateDirectorCache = (name: string, tmdbId: number | null, profileUrl?: string) => {
+    if (!name) return;
+    const cache = loadDirectorCache();
+    const normalizedKey = buildDirectorKey(name, null);
+    const tmdbKey = buildDirectorKey(name, tmdbId ?? null);
+    const existing = cache?.directors?.[tmdbKey] ?? cache?.directors?.[normalizedKey];
+
+    const nextCache = {
+      version: CACHE_VERSION,
+      directors: { ...(cache?.directors ?? {}) }
+    };
+
+    const nextEntry = {
+      key: tmdbKey,
+      name,
+      displayName: existing?.displayName ?? name,
+      tmdbId: tmdbId ?? existing?.tmdbId,
+      profileUrl: profileUrl ?? existing?.profileUrl,
+      worksCountOwned: existing?.worksCountOwned ?? 0,
+      totalWorksDirected: existing?.totalWorksDirected ?? null,
+      totalWorksCreated: existing?.totalWorksCreated ?? null,
+      updatedAt: new Date().toISOString()
+    };
+
+    nextCache.directors[tmdbKey] = nextEntry;
+    if (normalizedKey !== tmdbKey) {
+      nextCache.directors[normalizedKey] = { ...nextEntry, key: normalizedKey };
+    }
+
+    saveDirectorCache(nextCache);
+  };
+
   useEffect(() => {
     let active = true;
     async function loadDirector() {
@@ -106,6 +140,9 @@ export const DirectorPage: React.FC = () => {
       }
 
       try {
+        let finalName = directorName;
+        let finalTmdbId: number | null = null;
+        let finalProfileUrl: string | undefined;
         const overrideTmdbId = directorOverrides.get(normalizeDirectorName(directorName));
         const supabaseDirector = await fetchDirectorByName(directorName);
         const supabaseTmdbId = supabaseDirector?.tmdb_person_id ?? overrideTmdbId ?? null;
@@ -113,6 +150,12 @@ export const DirectorPage: React.FC = () => {
         const supabaseFilmography = supabaseTmdbId
           ? await fetchDirectorFilmographyByPersonId(supabaseTmdbId)
           : [];
+
+        finalTmdbId = supabaseTmdbId ?? null;
+        finalProfileUrl = supabaseProfile ?? undefined;
+        if (supabaseDirector?.name) {
+          finalName = supabaseDirector.name;
+        }
 
         if (!active) return;
 
@@ -138,6 +181,7 @@ export const DirectorPage: React.FC = () => {
         if (!active) return;
 
         if (!result) {
+          updateDirectorCache(finalName, finalTmdbId, finalProfileUrl);
           setError('No se encontrA3 al director en TMDb.');
           setLoading(false);
           return;
@@ -150,7 +194,13 @@ export const DirectorPage: React.FC = () => {
         if (!supabaseFilmography.length) {
           setKnownFor(result.credits);
         }
+
+        finalName = result.person?.name ?? result.resolvedName ?? directorName;
+        finalTmdbId = result.tmdbId ?? finalTmdbId;
+        finalProfileUrl = (supabaseProfile ?? result.person?.profileUrl) ?? finalProfileUrl;
+        updateDirectorCache(finalName, finalTmdbId, finalProfileUrl);
       } catch (err) {
+        updateDirectorCache(finalName, finalTmdbId, finalProfileUrl);
         console.warn('Error al cargar el director', err);
         if (active) setError('No se pudieron obtener los datos del director.');
       } finally {
