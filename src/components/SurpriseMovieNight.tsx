@@ -344,13 +344,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           >
             <div className="detail-sheet__inner surprise-detail__inner">
               <header className="surprise-detail__hero">
-                <div
-                  className="detail-sheet__hero-backdrop"
-                  style={{
-                    backgroundImage: `url(${chosen?.posterUrl ?? doubleFeature?.first.posterUrl ?? ''})`
-                  }}
-                  aria-hidden
-                />
+                {chosen && (
+                  <div
+                    className="detail-sheet__hero-backdrop"
+                    style={{
+                      backgroundImage: `url(${chosen.posterUrl ?? ''})`
+                    }}
+                    aria-hidden
+                  />
+                )}
                 <div className="surprise-detail__hero-content">
                   <div className="surprise-detail__titles">
                     <p className="eyebrow">Surprise Movie Night</p>
@@ -376,13 +378,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                     </button>
                   </div>
                 </div>
-              {chosen && <div className="surprise-detail__poster">{renderPoster(chosen)}</div>}
-                {doubleFeature && (
-                  <div className="surprise-detail__posters">
-                    {renderPoster(doubleFeature.first, 'surprise-detail__poster')}
-                    {renderPoster(doubleFeature.second, 'surprise-detail__poster')}
-                  </div>
-                )}
+                {chosen && <div className="surprise-detail__poster">{renderPoster(chosen)}</div>}
               </header>
               <div className="surprise-detail__content">
                 {chosen && (
