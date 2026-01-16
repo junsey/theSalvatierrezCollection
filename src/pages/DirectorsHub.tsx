@@ -5,9 +5,11 @@ import { useMovies } from '../context/MovieContext';
 export const DirectorsHub: React.FC = () => {
   const { movies } = useMovies();
   return (
-    <section>
-      <h1>Directores</h1>
-      <p className="text-muted">Explora la colección por autoría. Solo aparecen los directores registrados en el Excel.</p>
+    <section className="director-page">
+      <header className="director-page__header">
+        <p className="director-page__eyebrow">Archivo de autoría</p>
+        <h1>Directores</h1>
+      </header>
       <DirectorList movies={movies} />
     </section>
   );

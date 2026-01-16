@@ -87,6 +87,7 @@ export const DirectorPage: React.FC = () => {
   const [adminTmdbId, setAdminTmdbId] = useState('');
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [bioOpen, setBioOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -198,7 +199,7 @@ export const DirectorPage: React.FC = () => {
     }
   };
 
-  const { directedMovies, createdSeries, ownedCount, totalCount, medalUnlocks } = useMemo(() => {
+  const { directedMovies, createdSeries, ownedCount, totalCount } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
     const creatorJobs = new Set(['creator', 'series creator']);
 
@@ -211,14 +212,21 @@ export const DirectorPage: React.FC = () => {
       directorCollection.hiddenOwnedIds.has(id) ||
       directorCollection.hiddenOwnedTitles.has(normalizeTitle(title));
 
+    const getYearValue = (item: DirectedMovie) => {
+      if (item.year) return item.year;
+      const date = item.mediaType === 'tv' ? item.firstAirDate : item.releaseDate;
+      if (!date) return null;
+      const parsed = Number.parseInt(date.slice(0, 4), 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
     const sortByDate = (a: DirectedMovie, b: DirectedMovie) => {
-      const dateA = a.mediaType === 'tv' ? a.firstAirDate : a.releaseDate;
-      const dateB = b.mediaType === 'tv' ? b.firstAirDate : b.releaseDate;
+      const yearA = getYearValue(a);
+      const yearB = getYearValue(b);
 
-      const tsA = dateA ? Date.parse(dateA) : Number.POSITIVE_INFINITY;
-      const tsB = dateB ? Date.parse(dateB) : Number.POSITIVE_INFINITY;
-
-      if (tsA !== tsB) return tsA - tsB;
+      if (yearA != null && yearB != null && yearA !== yearB) return yearA - yearB;
+      if (yearA == null && yearB != null) return 1;
+      if (yearA != null && yearB == null) return -1;
       return (a.title || '').localeCompare(b.title || '');
     };
 
@@ -252,28 +260,30 @@ export const DirectorPage: React.FC = () => {
 
     const ownedCount = directed.filter((item) => item.owned).length + created.filter((item) => item.owned).length;
     const totalCount = directed.length + created.length;
-    const ratio = totalCount > 0 ? ownedCount / totalCount : 0;
-
     return {
       directedMovies: directed,
       createdSeries: created,
       ownedCount,
-      totalCount,
-      medalUnlocks: {
-        bronze: ratio > 0.5,
-        silver: ratio > 0.75,
-        gold: ratio >= 1
-      }
+      totalCount
     };
   }, [directorCollection.ownedIds, directorCollection.ownedTitles, knownFor]);
 
-  const detailMedal = useMemo(() => {
-    if (!totalCount || totalCount <= 0) return null;
-    if (medalUnlocks.gold) return 'gold';
-    if (medalUnlocks.silver) return 'silver';
-    if (medalUnlocks.bronze) return 'bronze';
-    return null;
-  }, [medalUnlocks, totalCount]);
+  const bioSummary = useMemo(() => {
+    if (!biography) return null;
+    const trimmed = biography.trim();
+    if (trimmed.length <= 300) return trimmed;
+    return `${trimmed.slice(0, 300).trim()}…`;
+  }, [biography]);
+
+  useEffect(() => {
+    if (!bioOpen) return;
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previousOverflow;
+    };
+  }, [bioOpen]);
 
   const renderSection = (title: string, items: (DirectedMovie & { owned?: boolean })[], emptyMessage: string) => {
     if (items.length === 0) {
@@ -361,30 +371,26 @@ export const DirectorPage: React.FC = () => {
               <p className="eyebrow">Directores</p>
               <h1>{personName || directorName}</h1>
             </div>
-            <div
-              className={['collection-badge', detailMedal ? `collection-badge--${detailMedal}` : '']
-                .filter(Boolean)
-                .join(' ')}
-              aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}
-            >
-              <span className="collection-badge__label">En colección</span>
+            <div className="collection-badge director-collection" aria-label={`En colección: ${ownedCount} de ${totalCount || '—'}`}>
+              <span className="collection-badge__label">Estado de colección</span>
               <div className="collection-badge__stats">
                 <span className="collection-badge__value">{ownedCount}</span>
                 <span className="collection-badge__divider">/</span>
                 <span className="collection-badge__total">{totalCount || '—'}</span>
-                {detailMedal && (
-                  <span
-                    className={`collection-badge__medal director-coverage__medal director-coverage__medal--${detailMedal}`}
-                    aria-hidden
-                  >
-                    ★
-                  </span>
-                )}
               </div>
             </div>
           </div>
           {loading && <p className="text-muted">Recopilando biografía...</p>}
-          {!loading && biography && <p className="text-muted director-legend__bio">{biography}</p>}
+          {!loading && bioSummary && (
+            <div className="director-bio">
+              <p className="text-muted director-legend__bio">{bioSummary}</p>
+              {biography && biography.length > 300 && (
+                <button className="ghost director-bio__button" type="button" onClick={() => setBioOpen(true)}>
+                  Ver bio completa
+                </button>
+              )}
+            </div>
+          )}
           {!loading && !biography && <p className="text-muted director-legend__bio">Biografía no disponible.</p>}
           {adminSession && (
             <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -413,10 +419,27 @@ export const DirectorPage: React.FC = () => {
           {loading ? (
             <div className="filmography-block">
               <h2>Filmografía</h2>
-              <p className="muted">Cargando filmografía...</p>
+              <div className="known-for-grid">
+                {Array.from({ length: 8 }, (_, idx) => (
+                  <div key={`filmography-skeleton-${idx}`} className="known-for-card known-for-card--skeleton" aria-hidden>
+                    <div className="known-for-card__poster skeleton" />
+                    <div className="known-for-card__meta">
+                      <div className="known-for-card__meta-row">
+                        <span className="skeleton skeleton-text" />
+                      </div>
+                      <div className="known-for-card__meta-row known-for-card__meta-row--footer">
+                        <span className="skeleton skeleton-text skeleton-text--short" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <>
+              <p className="director-filmography__summary">
+                Filmografía ({totalCount || '—'} películas · {ownedCount} en tu colección)
+              </p>
               {adminSession && knownFor.length === 0 && (
                 <p className="muted">No hay filmografía en Supabase. Usa "Actualizar TMDb" para generarla.</p>
               )}
@@ -442,6 +465,27 @@ export const DirectorPage: React.FC = () => {
             </>
           )}
         </>
+      )}
+      {bioOpen && biography && (
+        <div className="director-bio-modal__overlay" onClick={() => setBioOpen(false)}>
+          <div
+            className="director-bio-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Biografía de ${personName || directorName}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="director-bio-modal__header">
+              <h2>Biografía completa</h2>
+              <button className="ghost" type="button" onClick={() => setBioOpen(false)} aria-label="Cerrar biografía">
+                ✕
+              </button>
+            </div>
+            <div className="director-bio-modal__body">
+              <p>{biography}</p>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );
