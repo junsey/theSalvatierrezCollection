@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { fixMovieTmdb, resolveMovieTmdb } from '../services/adminApi';
@@ -11,8 +11,372 @@ interface Props {
   movie: MovieRecord;
   onClose: () => void;
 }
-export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
-  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled } = useMovies();
+
+type TabId = 'summary' | 'details' | 'admin';
+
+type TabItem = {
+  id: TabId;
+  label: string;
+  content: React.ReactNode;
+};
+
+const focusableSelector =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const Tabs: React.FC<{
+  tabs: TabItem[];
+  activeId: TabId;
+  onChange: (id: TabId) => void;
+}> = ({ tabs, activeId, onChange }) => {
+  return (
+    <div className="detail-tabs">
+      <div className="detail-tabs__list" role="tablist" aria-label="Secciones de detalles">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            role="tab"
+            aria-selected={activeId === tab.id}
+            aria-controls={`tab-panel-${tab.id}`}
+            className={`detail-tabs__tab ${activeId === tab.id ? 'is-active' : ''}`}
+            onClick={() => onChange(tab.id)}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {tabs.map((tab) => (
+        <div
+          key={tab.id}
+          id={`tab-panel-${tab.id}`}
+          role="tabpanel"
+          hidden={activeId !== tab.id}
+          className="detail-tabs__panel"
+        >
+          {tab.content}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TopBar: React.FC<{
+  title: string;
+  showTitle: boolean;
+  onClose: () => void;
+  tmdbUrl: string | null;
+  onToggleSeen: () => void;
+  seen: boolean;
+  closeButtonRef: React.RefObject<HTMLButtonElement>;
+}> = ({ title, showTitle, onClose, tmdbUrl, onToggleSeen, seen, closeButtonRef }) => {
+  return (
+    <div className="detail-sheet__topbar">
+      <div className="detail-sheet__topbar-left">
+        <button
+          ref={closeButtonRef}
+          className="detail-sheet__icon-button"
+          onClick={onClose}
+          type="button"
+          aria-label="Cerrar detalles"
+        >
+          ✕
+        </button>
+        <span className="detail-sheet__hint">Esc</span>
+      </div>
+      <div className={`detail-sheet__topbar-title ${showTitle ? 'is-visible' : ''}`} aria-hidden={!showTitle}>
+        {title}
+      </div>
+      <div className="detail-sheet__topbar-actions">
+        <button className="ghost" onClick={onToggleSeen} type="button">
+          {seen ? 'Watched' : 'Mark as Watched'}
+        </button>
+        {tmdbUrl && (
+          <a className="ghost" href={tmdbUrl} target="_blank" rel="noreferrer">
+            Open TMDb
+          </a>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Hero: React.FC<{
+  movie: MovieRecord;
+  directors: string[];
+  loadingDirectors: boolean;
+  fallbackDirectors: string[];
+  funcionaLabel: string;
+  tmdbUrl: string | null;
+  onResolveTmdb?: () => void;
+  isAdmin: boolean;
+  isAdminBusy: boolean;
+}> = ({
+  movie,
+  directors,
+  loadingDirectors,
+  fallbackDirectors,
+  funcionaLabel,
+  tmdbUrl,
+  onResolveTmdb,
+  isAdmin,
+  isAdminBusy
+}) => {
+  const genres = useMemo(() => {
+    const base = movie.tmdbGenres?.length ? movie.tmdbGenres : movie.genreRaw?.split(/[,/;|]+/g) ?? [];
+    return base.map((item) => item.trim()).filter(Boolean);
+  }, [movie.genreRaw, movie.tmdbGenres]);
+
+  const directorList = directors.length > 0 ? directors : fallbackDirectors;
+  const heroBackdrop = movie.posterUrl;
+
+  return (
+    <section className="detail-sheet__hero" aria-label="Resumen de película">
+      <div
+        className="detail-sheet__hero-backdrop"
+        style={heroBackdrop ? { backgroundImage: `url(${heroBackdrop})` } : undefined}
+      />
+      <div className="detail-sheet__hero-content">
+        <div className="detail-sheet__poster">
+          <img
+            src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
+            alt={movie.title}
+          />
+        </div>
+        <div className="detail-sheet__hero-text">
+          <div className="detail-sheet__eyebrow">
+            <span>{movie.tmdbYear ?? movie.year ?? 'Year ?'}</span>
+            <span>•</span>
+            <span>{movie.seccion}</span>
+          </div>
+          <h2 className="detail-sheet__title">{movie.title}</h2>
+          {(movie.originalTitle || movie.tmdbOriginalTitle) && (
+            <p className="detail-sheet__subtitle">
+              {movie.originalTitle && <span>Título original: {movie.originalTitle}</span>}
+              {movie.tmdbOriginalTitle && movie.tmdbOriginalTitle !== movie.originalTitle && (
+                <em>TMDb: {movie.tmdbOriginalTitle}</em>
+              )}
+            </p>
+          )}
+          <div className="detail-sheet__chips">
+            {movie.seen && <span className="detail-sheet__chip detail-sheet__chip--accent">Vista</span>}
+            {movie.enDeposito && <span className="detail-sheet__chip">En depósito</span>}
+            <span className="detail-sheet__chip">{funcionaLabel}</span>
+            {movie.saga && (
+              <span className="detail-sheet__chip detail-sheet__chip--saga">
+                Saga: <Link to={`/movies?saga=${encodeURIComponent(movie.saga)}`}>{movie.saga}</Link>
+              </span>
+            )}
+            {genres.map((genre) => (
+              <span key={genre} className="detail-sheet__chip">
+                {genre}
+              </span>
+            ))}
+          </div>
+          <div className="detail-sheet__meta">
+            <div>
+              <strong>Director(es)</strong>
+              {movie.director && <small className="muted">Dato base: {movie.director}</small>}
+            </div>
+            {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
+            {!loadingDirectors && directorList.length === 0 && (
+              <p className="muted">No hay directores registrados.</p>
+            )}
+            {directorList.length > 0 && (
+              <ul className="detail-sheet__link-list">
+                {directorList.map((director) => (
+                  <li key={director}>
+                    <Link to={`/directors/${encodeURIComponent(director)}`}>{director}</Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="detail-sheet__cta">
+            {tmdbUrl ? (
+              <a className="secondary" href={tmdbUrl} target="_blank" rel="noreferrer">
+                Abrir en TMDb
+              </a>
+            ) : null}
+            {isAdmin && onResolveTmdb && (
+              <button className="ghost" onClick={onResolveTmdb} disabled={isAdminBusy} type="button">
+                {isAdminBusy ? 'Buscando...' : 'Buscar en TMDb'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
+  return (
+    <div className="detail-sheet__card">
+      <div className="detail-sheet__card-header">
+        <h3>Puntuaciones</h3>
+        <span className="detail-sheet__badge">IMDb / TMDb</span>
+      </div>
+      <div className="detail-sheet__rating-grid">
+        <div className="detail-sheet__rating-chip">
+          <span className="muted">IMDb / TMDb</span>
+          <strong>{movie.tmdbRating?.toFixed(1) ?? 'N/A'}</strong>
+        </div>
+        {movie.ratingGloria != null && movie.ratingRodrigo != null && (
+          <div className="detail-sheet__rating-chip">
+            <span className="muted">Promedio paws</span>
+            <strong>{((movie.ratingGloria + movie.ratingRodrigo) / 2).toFixed(1)}</strong>
+          </div>
+        )}
+      </div>
+      {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
+        <div className="detail-sheet__rating-list">
+          {movie.ratingGloria != null && (
+            <div className="detail-sheet__rating-row">
+              <span className="detail-sheet__badge">Gloria</span>
+              <PawRating value={movie.ratingGloria} />
+            </div>
+          )}
+          {movie.ratingRodrigo != null && (
+            <div className="detail-sheet__rating-row">
+              <span className="detail-sheet__badge">Rodrigo</span>
+              <PawRating value={movie.ratingRodrigo} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AdminPanel: React.FC<{
+  adminBusy: boolean;
+  adminMessage: string | null;
+  adminSeason: string;
+  adminTmdbId: string;
+  adminTmdbType: 'movie' | 'tv';
+  handleAdminTmdbInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handleFixTmdb: () => void;
+  handleResolveTmdb: () => void;
+  movie: MovieRecord;
+  setAdminSeason: (value: string) => void;
+  setAdminTmdbType: (value: 'movie' | 'tv') => void;
+}> = ({
+  adminBusy,
+  adminMessage,
+  adminSeason,
+  adminTmdbId,
+  adminTmdbType,
+  handleAdminTmdbInputChange,
+  handleFixTmdb,
+  handleResolveTmdb,
+  movie,
+  setAdminSeason,
+  setAdminTmdbType
+}) => {
+  return (
+    <div className="detail-sheet__admin">
+      <div className="detail-sheet__card">
+        <div className="detail-sheet__card-header">
+          <h3>Admin</h3>
+          <span className="detail-sheet__badge">TMDb</span>
+        </div>
+        <div className="detail-sheet__admin-grid">
+          <button className="secondary" onClick={handleResolveTmdb} disabled={adminBusy} type="button">
+            {adminBusy ? 'Buscando...' : 'Buscar en TMDb'}
+          </button>
+          <label className="detail-sheet__field">
+            <span>Tipo</span>
+            <select
+              value={adminTmdbType}
+              onChange={(event) => setAdminTmdbType(event.target.value as 'movie' | 'tv')}
+            >
+              <option value="movie">Película</option>
+              <option value="tv">Serie</option>
+            </select>
+          </label>
+          {adminTmdbType === 'tv' && (
+            <label className="detail-sheet__field">
+              <span>Temporada</span>
+              <input
+                type="number"
+                min={1}
+                value={adminSeason}
+                onChange={(event) => setAdminSeason(event.target.value)}
+              />
+            </label>
+          )}
+          <label className="detail-sheet__field detail-sheet__field--full">
+            <span>ID o link de TMDb</span>
+            <input type="text" value={adminTmdbId} onChange={handleAdminTmdbInputChange} />
+          </label>
+          <button onClick={handleFixTmdb} disabled={adminBusy} type="button">
+            {adminBusy ? 'Actualizando...' : 'Corregir TMDb'}
+          </button>
+        </div>
+        {adminMessage && <p className="muted" style={{ marginTop: 8 }}>{adminMessage}</p>}
+      </div>
+      <details className="status-accordion">
+        <summary>Status</summary>
+        <div className="status-accordion__body">
+          {movie.tmdbStatus ? (
+            <ul>
+              <li>
+                <strong>Estado:</strong>{' '}
+                {(() => {
+                  const map: Record<string, string> = {
+                    network: 'Respuesta en línea',
+                    cache: 'Desde caché vigente',
+                    'stale-cache': 'Caché expirada',
+                    'not-found': 'Sin coincidencias',
+                    error: 'Error en TMDb',
+                    none: 'Sin consulta'
+                  };
+                  return map[movie.tmdbStatus?.source] ?? 'Desconocido';
+                })()}{' '}
+                {movie.tmdbStatus.message && <span>({movie.tmdbStatus.message})</span>}
+              </li>
+              <li>
+                <strong>Títulos consultados:</strong> {movie.tmdbStatus.requestedTitles.join(' · ') || '—'}
+              </li>
+              <li>
+                <strong>Año enviado:</strong> {movie.tmdbStatus.requestedYear ?? '—'}
+              </li>
+              <li>
+                <strong>Coincidencia TMDb:</strong>{' '}
+                {movie.tmdbStatus.matchedId ? (
+                  <>
+                    #{movie.tmdbStatus.matchedId} — {movie.tmdbStatus.matchedTitle}
+                    {movie.tmdbStatus.matchedOriginalTitle && (
+                      <span className="muted"> (Original: {movie.tmdbStatus.matchedOriginalTitle})</span>
+                    )}
+                  </>
+                ) : (
+                  '—'
+                )}
+              </li>
+              {movie.tmdbStatus.fetchedAt && (
+                <li>
+                  <strong>Última consulta:</strong>{' '}
+                  {new Date(movie.tmdbStatus.fetchedAt).toLocaleString('es-ES')}
+                </li>
+              )}
+              {movie.tmdbStatus.error && (
+                <li className="status-accordion__error">
+                  <strong>Error:</strong> {movie.tmdbStatus.error}
+                </li>
+              )}
+            </ul>
+          ) : (
+            <p className="muted">Sin estado TMDb registrado.</p>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+};
+
+export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
+  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, updateSeen } = useMovies();
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [adminTmdbId, setAdminTmdbId] = useState('');
@@ -23,6 +387,15 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('summary');
+  const [plotExpanded, setPlotExpanded] = useState(false);
+  const [showCompactTitle, setShowCompactTitle] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
 
   const fallbackDirectors = movie.director
     ? movie.director
@@ -42,6 +415,10 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     }
   })();
 
+  const tmdbUrl = movie.tmdbId
+    ? `https://www.themoviedb.org/${movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'}/${movie.tmdbId}`
+    : null;
+
   useEffect(() => {
     setAdminMessage(null);
     setAdminTmdbId('');
@@ -49,7 +426,23 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
     setAdminBusy(false);
     setAdminSeason(movie.season != null ? String(movie.season) : '');
     setSeasonOverrides(null);
+    setActiveTab('summary');
+    setPlotExpanded(false);
+    setShowCompactTitle(false);
   }, [movie.id]);
+
+  useEffect(() => {
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -97,6 +490,33 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
       active = false;
     };
   }, [movie.tmdbId, movie.tmdbType, movie.tmdbSeasons, tmdbEnrichmentEnabled]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        requestClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      if (!dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelector));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const parseTmdbInput = (value: string, fallbackType: 'movie' | 'tv') => {
     const trimmed = value.trim();
@@ -182,283 +602,229 @@ export const MovieDetail: React.FC<Props> = ({ movie, onClose }) => {
       : overrides;
   }, [movie.tmdbSeasons, seasonOverrides]);
 
+  const requestClose = () => {
+    if (closeTimeoutRef.current != null) return;
+    setIsClosing(true);
+    closeTimeoutRef.current = window.setTimeout(() => {
+      onClose();
+    }, 260);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleScroll = () => {
+    const top = scrollRef.current?.scrollTop ?? 0;
+    setShowCompactTitle(top > 140);
+  };
+
+  const handleToggleSeen = () => {
+    updateSeen(movie.id, !movie.seen);
+  };
+
+  const summaryContent = (
+    <div className="detail-sheet__content-grid">
+      <div className="detail-sheet__main">
+        <div className="detail-sheet__section">
+          <h3>Sinopsis</h3>
+          <p className={`detail-sheet__plot ${plotExpanded ? 'is-expanded' : ''}`}>
+            {movie.plot ?? 'No plot available.'}
+          </p>
+          {movie.plot && movie.plot.length > 180 && (
+            <button className="ghost" onClick={() => setPlotExpanded((prev) => !prev)} type="button">
+              {plotExpanded ? 'Ver menos' : 'Ver más'}
+            </button>
+          )}
+        </div>
+        <div className="detail-sheet__section">
+          <h3>Detalles principales</h3>
+          <div className="detail-sheet__info-grid">
+            <div>
+              <strong>Doblaje / Formato</strong>
+              <p>{movie.dubbing} / {movie.format}</p>
+            </div>
+            <div>
+              <strong>Estado físico</strong>
+              <p>{funcionaLabel}</p>
+            </div>
+            {movie.group && (
+              <div>
+                <strong>Group</strong>
+                <p>{movie.group}</p>
+              </div>
+            )}
+            {movie.saga && (
+              <div>
+                <strong>Saga</strong>
+                <p>
+                  <Link to={`/movies?saga=${encodeURIComponent(movie.saga)}`}>{movie.saga}</Link>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        {movie.tmdbType === 'tv' && (
+          <div className="detail-sheet__section">
+            <div className="director-section__heading">
+              <strong>Temporadas</strong>
+              {movie.season != null && <small className="muted"> Temporada solicitada: {movie.season}</small>}
+            </div>
+            {displaySeasons && displaySeasons.length > 0 ? (
+              <ul className="detail-sheet__season-list">
+                {displaySeasons.map((season) => (
+                  <li key={season.seasonNumber}>
+                    <div>
+                      T{season.seasonNumber}{' '}
+                      {season.name && <em className="muted">({season.name})</em>}
+                      {movie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+                    </div>
+                    <div className="muted">
+                      Episodios: {season.episodeCount ?? 'A??'}{' '}
+                      {season.airDate && <span>• Estreno: {season.airDate}</span>}
+                    </div>
+                    {season.posterUrl && (
+                      <div className="detail-sheet__season-poster">
+                        <img
+                          src={season.posterUrl}
+                          alt={season.name ?? `Temporada ${season.seasonNumber}`}
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted">Sin temporadas registradas.</p>
+            )}
+          </div>
+        )}
+      </div>
+      <aside className="detail-sheet__sidebar">
+        <RatingsCard movie={movie} />
+      </aside>
+    </div>
+  );
+
+  const detailsContent = (
+    <div className="detail-sheet__content-grid">
+      <div className="detail-sheet__main">
+        <div className="detail-sheet__section">
+          <h3>Ficha</h3>
+          <div className="detail-sheet__info-grid">
+            <div>
+              <strong>Año</strong>
+              <p>{movie.tmdbYear ?? movie.year ?? 'Year ?'}</p>
+            </div>
+            <div>
+              <strong>Sección</strong>
+              <p>{movie.seccion}</p>
+            </div>
+            <div>
+              <strong>Género</strong>
+              <p>{movie.genreRaw}</p>
+              {movie.tmdbGenres && movie.tmdbGenres.length > 0 && (
+                <small className="muted">TMDb: {movie.tmdbGenres.join(', ')}</small>
+              )}
+            </div>
+            <div>
+              <strong>Tipo</strong>
+              <p>{movie.tmdbType === 'tv' || movie.series ? 'Serie' : 'Película'}</p>
+            </div>
+            {movie.originalTitle && (
+              <div>
+                <strong>Título original</strong>
+                <p>{movie.originalTitle}</p>
+              </div>
+            )}
+            {movie.tmdbOriginalTitle && movie.tmdbOriginalTitle !== movie.originalTitle && (
+              <div>
+                <strong>TMDb original</strong>
+                <p>{movie.tmdbOriginalTitle}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <aside className="detail-sheet__sidebar">
+        <div className="detail-sheet__card">
+          <div className="detail-sheet__card-header">
+            <h3>Notas rápidas</h3>
+          </div>
+          <p className="muted">Revisa la sección de resumen para sinopsis y puntuaciones.</p>
+        </div>
+      </aside>
+    </div>
+  );
+
+  const tabs: TabItem[] = [
+    { id: 'summary', label: 'Resumen', content: summaryContent },
+    { id: 'details', label: 'Detalles', content: detailsContent }
+  ];
+
+  if (adminSession) {
+    tabs.push({
+      id: 'admin',
+      label: 'Admin',
+      content: (
+        <AdminPanel
+          adminBusy={adminBusy}
+          adminMessage={adminMessage}
+          adminSeason={adminSeason}
+          adminTmdbId={adminTmdbId}
+          adminTmdbType={adminTmdbType}
+          handleAdminTmdbInputChange={handleAdminTmdbInputChange}
+          handleFixTmdb={handleFixTmdb}
+          handleResolveTmdb={handleResolveTmdb}
+          movie={movie}
+          setAdminSeason={setAdminSeason}
+          setAdminTmdbType={setAdminTmdbType}
+        />
+      )
+    });
+  }
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className={`detail-sheet__overlay ${isClosing ? 'is-closing' : 'is-open'}`} onClick={requestClose}>
       <div
-        className="panel modal movie-detail"
+        className={`detail-sheet ${isClosing ? 'is-closing' : 'is-open'}`}
         role="dialog"
         aria-modal="true"
         aria-label={`Detalles de ${movie.title}`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        ref={dialogRef}
       >
-        <div className="movie-detail__body">
-          <div className="movie-detail__layout">
-            <div className="movie-detail__poster">
-              <img
-                className="poster"
-                src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
-                alt={movie.title}
-              />
-            </div>
-            <div className="movie-detail__content">
-              <div className="movie-detail__header">
-                <div className="movie-detail__title-row">
-                  <h2>{movie.title}</h2>
-                  {movie.seen && (
-                    <span className="movie-detail__seen-flag" title="Vista">
-                      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path
-                          d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9Zm-1.05 13.44-3.4-3.39 1.41-1.42 1.99 1.99 4.69-4.69 1.41 1.42-6.1 6.09Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                      <span>Vista</span>
-                    </span>
-                  )}
-                  {movie.enDeposito && (
-                    <span className="movie-detail__seen-flag" title="En depósito">
-                      <span>En depósito</span>
-                    </span>
-                  )}
-                </div>
-                <p className="movie-detail__meta">
-                  {movie.originalTitle && (
-                    <span className="muted">Título original: {movie.originalTitle}</span>
-                  )}
-                  {movie.tmdbOriginalTitle && movie.tmdbOriginalTitle !== movie.originalTitle && (
-                    <em className="muted">TMDb: {movie.tmdbOriginalTitle}</em>
-                  )}
-                  <span className="movie-detail__year">
-                    <strong>{movie.tmdbYear ?? movie.year ?? 'Year ?'}</strong> • {movie.seccion}
-                  </span>
-                </p>
-              </div>
-              <p>
-                <strong>Género:</strong> {movie.genreRaw}
-                {movie.tmdbGenres && movie.tmdbGenres.length > 0 && (
-                  <>
-                    {' '}
-                    <small>(TMDb: {movie.tmdbGenres.join(', ')})</small>
-                  </>
-                )}
-              </p>
-              {movie.saga && (
-                <p>
-                  <strong>Saga:</strong>{' '}
-                  <Link to={`/movies?saga=${encodeURIComponent(movie.saga)}`}>{movie.saga}</Link>
-                </p>
-              )}
-              <div className="director-section">
-                <div className="director-section__heading">
-                  <strong>Director(es)</strong>
-                  {movie.director && <small className="muted">Dato base: {movie.director}</small>}
-                </div>
-                {movie.tmdbId && loadingDirectors && <p className="muted">Invocando créditos de TMDb...</p>}
-                {!loadingDirectors && directors.length === 0 && fallbackDirectors.length === 0 && (
-                  <p className="muted">No hay directores registrados.</p>
-                )}
-                <ul className="director-link-list">
-                  {(directors.length > 0 ? directors : fallbackDirectors).map((director) => (
-                    <li key={director}>
-                      <Link to={`/directors/${encodeURIComponent(director)}`}>{director}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {movie.group && (
-                <p>
-                  <strong>Group:</strong> {movie.group}
-                </p>
-              )}
-              <p>
-                <strong>Doblaje / Formato:</strong> {movie.dubbing} / {movie.format}
-              </p>
-              <p>
-                <strong>Estado físico:</strong> {funcionaLabel}
-              </p>
-              <p>
-                <strong>Plot:</strong> {movie.plot ?? 'No plot available.'}
-              </p>
-              {movie.tmdbType === 'tv' && (
-                <div className="director-section">
-                  <div className="director-section__heading">
-                    <strong>Temporadas</strong>
-                    {movie.season != null && (
-                      <small className="muted"> Temporada solicitada: {movie.season}</small>
-                    )}
-                  </div>
-                  {displaySeasons && displaySeasons.length > 0 ? (
-                    <ul className="director-link-list">
-                      {displaySeasons.map((season) => (
-                        <li key={season.seasonNumber}>
-                          <span>
-                            T{season.seasonNumber}{' '}
-                            {season.name && <em style={{ color: 'var(--text-muted)' }}>({season.name})</em>}
-                            {movie.season === season.seasonNumber && <strong> ??" Seleccionada</strong>}
-                          </span>
-                          <div className="muted" style={{ fontSize: '0.9em' }}>
-                            Episodios: {season.episodeCount ?? 'A??'}{' '}
-                            {season.airDate && <span>??? Estreno: {season.airDate}</span>}
-                          </div>
-                          {season.posterUrl && (
-                            <div style={{ marginTop: 8 }}>
-                              <img
-                                src={season.posterUrl}
-                                alt={season.name ?? `Temporada ${season.seasonNumber}`}
-                                style={{ width: 120, borderRadius: 8 }}
-                                loading="lazy"
-                              />
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="muted">Sin temporadas registradas.</p>
-                  )}
-                </div>
-              )}
-              <div className="movie-detail__ratings">
-                <h3>Puntuaciones</h3>
-                <div className="movie-detail__ratings-grid">
-                  <div className="movie-detail__rating-compare">
-                    <div className="movie-detail__rating-chip">
-                      <span className="muted">IMDb / TMDb</span>
-                      <strong>{movie.tmdbRating?.toFixed(1) ?? 'N/A'}</strong>
-                    </div>
-                    {movie.ratingGloria != null && movie.ratingRodrigo != null && (
-                      <div className="movie-detail__rating-chip">
-                        <span className="muted">Promedio paws</span>
-                        <strong>{((movie.ratingGloria + movie.ratingRodrigo) / 2).toFixed(1)}</strong>
-                      </div>
-                    )}
-                  </div>
-                  {(movie.ratingGloria != null || movie.ratingRodrigo != null) && (
-                    <div className="movie-detail__rating-list">
-                      {movie.ratingGloria != null && (
-                        <div className="movie-detail__rating-row">
-                          <strong>Gloria:</strong>
-                          <PawRating value={movie.ratingGloria} />
-                        </div>
-                      )}
-                      {movie.ratingRodrigo != null && (
-                        <div className="movie-detail__rating-row">
-                          <strong>Rodrigo:</strong>
-                          <PawRating value={movie.ratingRodrigo} />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              {adminSession && (
-                <div className="movie-detail__ratings" style={{ marginTop: 16 }}>
-                  <h3>Admin</h3>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-                    <button className="btn" onClick={handleResolveTmdb} disabled={adminBusy}>
-                      {adminBusy ? 'Buscando...' : 'Buscar en TMDb'}
-                    </button>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>Tipo</span>
-                      <select
-                        value={adminTmdbType}
-                        onChange={(event) => setAdminTmdbType(event.target.value as 'movie' | 'tv')}
-                      >
-                        <option value="movie">Película</option>
-                        <option value="tv">Serie</option>
-                      </select>
-                    </label>
-                    {adminTmdbType === 'tv' && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>Temporada</span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={adminSeason}
-                          onChange={(event) => setAdminSeason(event.target.value)}
-                          style={{ width: 90 }}
-                        />
-                      </label>
-                    )}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span>ID o link de TMDb</span>
-                      <input
-                        type="text"
-                        value={adminTmdbId}
-                        onChange={handleAdminTmdbInputChange}
-                        style={{ width: 220 }}
-                      />
-                    </label>
-                    <button className="btn" onClick={handleFixTmdb} disabled={adminBusy}>
-                      {adminBusy ? 'Actualizando...' : 'Corregir TMDb'}
-                    </button>
-                  </div>
-                  {adminMessage && <p className="muted" style={{ marginTop: 8 }}>{adminMessage}</p>}
-                </div>
-              )}
-              <details className="status-accordion">
-                <summary>Status</summary>
-                <div className="status-accordion__body">
-                  {movie.tmdbStatus ? (
-                    <ul>
-                      <li>
-                        <strong>Estado:</strong>{' '}
-                        {(() => {
-                          const map: Record<string, string> = {
-                            network: 'Respuesta en línea',
-                            cache: 'Desde caché vigente',
-                            'stale-cache': 'Caché expirada',
-                            'not-found': 'Sin coincidencias',
-                            error: 'Error en TMDb',
-                            none: 'Sin consulta'
-                          };
-                          return map[movie.tmdbStatus?.source] ?? 'Desconocido';
-                        })()}{' '}
-                        {movie.tmdbStatus.message && <span>({movie.tmdbStatus.message})</span>}
-                      </li>
-                      <li>
-                        <strong>Títulos consultados:</strong> {movie.tmdbStatus.requestedTitles.join(' · ') || '—'}
-                      </li>
-                      <li>
-                        <strong>Año enviado:</strong> {movie.tmdbStatus.requestedYear ?? '—'}
-                      </li>
-                      <li>
-                        <strong>Coincidencia TMDb:</strong>{' '}
-                        {movie.tmdbStatus.matchedId ? (
-                          <>
-                            #{movie.tmdbStatus.matchedId} — {movie.tmdbStatus.matchedTitle}
-                            {movie.tmdbStatus.matchedOriginalTitle && (
-                              <span className="muted"> (Original: {movie.tmdbStatus.matchedOriginalTitle})</span>
-                            )}
-                          </>
-                        ) : (
-                          '—'
-                        )}
-                      </li>
-                      {movie.tmdbStatus.fetchedAt && (
-                        <li>
-                          <strong>Última consulta:</strong>{' '}
-                          {new Date(movie.tmdbStatus.fetchedAt).toLocaleString('es-ES')}
-                        </li>
-                      )}
-                      {movie.tmdbStatus.error && (
-                        <li className="status-accordion__error">
-                          <strong>Error:</strong> {movie.tmdbStatus.error}
-                        </li>
-                      )}
-                    </ul>
-                  ) : (
-                    <p className="muted">Sin estado TMDb registrado.</p>
-                  )}
-                </div>
-              </details>
-            </div>
-          </div>
-          <button className="movie-detail__close" onClick={onClose}>
-            Close
-          </button>
+        <div className="detail-sheet__scroll" ref={scrollRef} onScroll={handleScroll}>
+          <TopBar
+            title={movie.title}
+            showTitle={showCompactTitle}
+            onClose={requestClose}
+            tmdbUrl={tmdbUrl}
+            onToggleSeen={handleToggleSeen}
+            seen={movie.seen}
+            closeButtonRef={closeButtonRef}
+          />
+          <Hero
+            movie={movie}
+            directors={directors}
+            loadingDirectors={loadingDirectors}
+            fallbackDirectors={fallbackDirectors}
+            funcionaLabel={funcionaLabel}
+            tmdbUrl={tmdbUrl}
+            onResolveTmdb={handleResolveTmdb}
+            isAdmin={Boolean(adminSession)}
+            isAdminBusy={adminBusy}
+          />
+          <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
         </div>
       </div>
     </div>
   );
 };
+
+export const MovieDetail: React.FC<Props> = (props) => <MovieDetailSheet {...props} />;
