@@ -16,7 +16,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
-  const [doubleFeature, setDoubleFeature] = useState<{ first: MovieRecord; second: MovieRecord; link: string } | null>(null);
+  const [doubleFeature, setDoubleFeature] = useState<{
+    active: MovieRecord;
+    secondary: MovieRecord;
+    position: 'left' | 'right';
+    link: string;
+  } | null>(null);
   const [isSummoning, setIsSummoning] = useState(false);
   const [statusInputs, setStatusInputs] = useState<
     Record<string, { seen: boolean; ratingGloria: string; ratingRodrigo: string; busy?: boolean; error?: string }>
@@ -126,7 +131,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       }
 
       setChosen(null);
-      setDoubleFeature({ first: primary, second: secondaryResult.movie, link: secondaryResult.link });
+      setDoubleFeature({
+        active: primary,
+        secondary: secondaryResult.movie,
+        position: 'right',
+        link: secondaryResult.link
+      });
       setIsSummoning(false);
     }, 1200);
   };
@@ -135,8 +145,9 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     setDoubleFeature((current) => {
       if (!current) return current;
       return {
-        first: current.second,
-        second: current.first,
+        active: current.secondary,
+        secondary: current.active,
+        position: current.position === 'right' ? 'left' : 'right',
         link: current.link
       };
     });
@@ -169,7 +180,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
   }, [chosen, doubleFeature]);
 
   useEffect(() => {
-    const targets = [chosen, doubleFeature?.first, doubleFeature?.second].filter(Boolean) as MovieRecord[];
+    const targets = [chosen, doubleFeature?.active, doubleFeature?.secondary].filter(Boolean) as MovieRecord[];
     if (targets.length === 0) return;
     setStatusInputs((prev) => {
       const next = { ...prev };
@@ -353,13 +364,22 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             className="detail-sheet surprise-detail"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="detail-sheet__inner surprise-detail__inner">
+            <div className={`detail-sheet__inner surprise-detail__inner ${doubleFeature ? 'surprise-detail__inner--double' : ''}`}>
+              {doubleFeature && (
+                <div
+                  className="detail-sheet__hero-backdrop surprise-detail__backdrop"
+                  style={{
+                    backgroundImage: `url(${doubleFeature.active.posterUrl ?? ''})`
+                  }}
+                  aria-hidden
+                />
+              )}
               <header className="surprise-detail__hero">
-                {(chosen || doubleFeature) && (
+                {chosen && (
                   <div
                     className="detail-sheet__hero-backdrop"
                     style={{
-                      backgroundImage: `url(${(doubleFeature?.first ?? chosen)?.posterUrl ?? ''})`
+                      backgroundImage: `url(${chosen.posterUrl ?? ''})`
                     }}
                     aria-hidden
                   />
@@ -372,7 +392,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                   <div className="surprise-detail__actions">
                     {chosen && <button onClick={() => onSelect(chosen)}>Abrir detalles</button>}
                     {doubleFeature && (
-                      <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles</button>
+                      <button onClick={() => onSelect(doubleFeature.active)}>Abrir detalles</button>
                     )}
                     <button onClick={doubleFeature ? summonDoubleFeature : summon}>Volver a invocar</button>
                     <button
@@ -396,20 +416,22 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                   </>
                 )}
                 {doubleFeature && (
-                  <div className="surprise-detail__double">
+                  <div className={`surprise-detail__double surprise-detail__double--${doubleFeature.position}`}>
                     <div className="surprise-detail__primary">
-                      {renderPoster(doubleFeature.first, 'surprise-detail__poster surprise-detail__poster--primary')}
-                      <strong className="surprise-detail__title">{doubleFeature.first.title}</strong>
-                      {renderAdminControls(doubleFeature.first)}
+                      {renderPoster(doubleFeature.active, 'surprise-detail__poster surprise-detail__poster--primary')}
+                      <strong className="surprise-detail__title">{doubleFeature.active.title}</strong>
+                      {renderAdminControls(doubleFeature.active)}
                     </div>
                     <button
                       className="surprise-detail__secondary"
                       type="button"
                       onClick={swapDoubleFeature}
                     >
-                      <span className="surprise-detail__secondary-label">A continuación</span>
-                      {renderPoster(doubleFeature.second, 'surprise-detail__poster surprise-detail__poster--secondary')}
-                      <strong>{doubleFeature.second.title}</strong>
+                      <span className="surprise-detail__secondary-label">
+                        {doubleFeature.position === 'right' ? 'A continuación' : 'Anteriormente'}
+                      </span>
+                      {renderPoster(doubleFeature.secondary, 'surprise-detail__poster surprise-detail__poster--secondary')}
+                      <strong>{doubleFeature.secondary.title}</strong>
                     </button>
                   </div>
                 )}
