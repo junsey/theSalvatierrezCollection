@@ -354,12 +354,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             </div>
 
             {chosen && (
-              <div className="summon-result minimal">
-                <div className="feature-simple">
-                  {renderPoster(chosen)}
-                  <strong>{chosen.title}</strong>
-                </div>
-                <div className="result-actions tight">
+              <div className="ritual-reveal">
+                {renderPoster(chosen)}
+                <strong className="ritual-reveal__title">{chosen.title}</strong>
+                <div className="ritual-reveal__actions">
                   <button onClick={() => onSelect(chosen)}>Abrir detalles</button>
                   <button onClick={summon}>Volver a invocar</button>
                 </div>
@@ -368,26 +366,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
             )}
 
             {doubleFeature && (
-              <div className="double-feature minimal">
-                <div className="double-heading">
-                  <p className="link-reason">Enlace: {doubleFeature.link}</p>
-                </div>
-                <div className="feature-duo">
+              <div className="ritual-duo">
+                <p className="link-reason">Enlace: {doubleFeature.link}</p>
+                <div className="ritual-duo__grid">
                   {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
-                    <div key={item.id} className="feature-card simple">
-                      <div className="feature-meta">
-                        <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
-                        {renderPoster(item)}
-                        <strong>{item.title}</strong>
-                      </div>
-                      <div className="result-actions tight">
-                        <button onClick={() => onSelect(item)}>Abrir detalles</button>
-                      </div>
+                    <div key={item.id} className="ritual-duo__item">
+                      <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
+                      {renderPoster(item)}
+                      <strong className="ritual-duo__title">{item.title}</strong>
+                      <button onClick={() => onSelect(item)}>Abrir detalles</button>
                       {renderAdminControls(item)}
                     </div>
                   ))}
                 </div>
-                <div className="result-actions tight">
+                <div className="ritual-reveal__actions">
                   <button onClick={summonDoubleFeature}>Volver a invocar</button>
                 </div>
               </div>
