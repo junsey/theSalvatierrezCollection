@@ -1681,14 +1681,6 @@ a.ghost {
   font-weight: 700;
 }
 
-.detail-sheet__rating-scale {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  text-align: center;
-}
-
 .detail-sheet__rating-users {
   display: grid;
   gap: 12px;

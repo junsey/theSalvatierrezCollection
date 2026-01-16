@@ -245,7 +245,6 @@ const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
           <strong className="detail-sheet__rating-value">{avgRating != null ? avgRating.toFixed(1) : '—'}</strong>
         </div>
       </div>
-      <div className="detail-sheet__rating-scale">Escala 0–10</div>
       <div className="detail-sheet__rating-users">
         {userRatings.map((user) => {
           const filledCount = user.value != null ? Math.round(user.value) : 0;
