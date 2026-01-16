@@ -1245,13 +1245,6 @@ a.ghost {
   margin-top: 14px;
 }
 
-.surprise-detail__posters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-
 .surprise-detail__content {
   display: grid;
   gap: 14px;
@@ -1262,15 +1255,44 @@ a.ghost {
   font-size: 1.2rem;
 }
 
-.surprise-detail__duo {
+.surprise-detail__double {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+  gap: 18px;
+  align-items: start;
 }
 
-.surprise-detail__duo-item {
+.surprise-detail__primary {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.surprise-detail__secondary {
   display: grid;
   gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.surprise-detail__secondary-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.surprise-detail__poster--primary {
+  max-width: 320px;
+}
+
+.surprise-detail__poster--secondary {
+  max-width: 200px;
 }
 
 .ritual-admin {

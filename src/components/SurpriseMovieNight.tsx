@@ -131,6 +131,17 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     }, 1200);
   };
 
+  const swapDoubleFeature = () => {
+    setDoubleFeature((current) => {
+      if (!current) return current;
+      return {
+        first: current.second,
+        second: current.first,
+        link: current.link
+      };
+    });
+  };
+
   useEffect(() => {
     const hasResult = Boolean(chosen || doubleFeature);
     const shouldLock = isSummoning || hasResult;
@@ -344,11 +355,11 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           >
             <div className="detail-sheet__inner surprise-detail__inner">
               <header className="surprise-detail__hero">
-                {chosen && (
+                {(chosen || doubleFeature) && (
                   <div
                     className="detail-sheet__hero-backdrop"
                     style={{
-                      backgroundImage: `url(${chosen.posterUrl ?? ''})`
+                      backgroundImage: `url(${(doubleFeature?.first ?? chosen)?.posterUrl ?? ''})`
                     }}
                     aria-hidden
                   />
@@ -356,15 +367,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                 <div className="surprise-detail__hero-content">
                   <div className="surprise-detail__titles">
                     <p className="eyebrow">Surprise Movie Night</p>
-                    <h2>{doubleFeature ? 'Revelación doble' : 'Revelación'}</h2>
+                    <h2>{doubleFeature ? 'REVELACIÓN DOBLE' : 'Revelación'}</h2>
                   </div>
                   <div className="surprise-detail__actions">
                     {chosen && <button onClick={() => onSelect(chosen)}>Abrir detalles</button>}
                     {doubleFeature && (
-                      <>
-                        <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles · Primero</button>
-                        <button onClick={() => onSelect(doubleFeature.second)}>Abrir detalles · Luego</button>
-                      </>
+                      <button onClick={() => onSelect(doubleFeature.first)}>Abrir detalles</button>
                     )}
                     <button onClick={doubleFeature ? summonDoubleFeature : summon}>Volver a invocar</button>
                     <button
@@ -388,15 +396,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                   </>
                 )}
                 {doubleFeature && (
-                  <div className="surprise-detail__duo">
-                    {[doubleFeature.first, doubleFeature.second].map((item, idx) => (
-                      <div key={item.id} className="surprise-detail__duo-item">
-                        <span className="feature-pill">{idx === 0 ? 'Primero…' : 'Luego…'}</span>
-                        {renderPoster(item, 'surprise-detail__poster')}
-                        <strong>{item.title}</strong>
-                        {renderAdminControls(item)}
-                      </div>
-                    ))}
+                  <div className="surprise-detail__double">
+                    <div className="surprise-detail__primary">
+                      {renderPoster(doubleFeature.first, 'surprise-detail__poster surprise-detail__poster--primary')}
+                      <strong className="surprise-detail__title">{doubleFeature.first.title}</strong>
+                      {renderAdminControls(doubleFeature.first)}
+                    </div>
+                    <button
+                      className="surprise-detail__secondary"
+                      type="button"
+                      onClick={swapDoubleFeature}
+                    >
+                      <span className="surprise-detail__secondary-label">A continuación</span>
+                      {renderPoster(doubleFeature.second, 'surprise-detail__poster surprise-detail__poster--secondary')}
+                      <strong>{doubleFeature.second.title}</strong>
+                    </button>
                   </div>
                 )}
               </div>
