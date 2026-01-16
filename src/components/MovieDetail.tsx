@@ -275,9 +275,15 @@ const AdminPanel: React.FC<{
   adminSeason: string;
   adminTmdbId: string;
   adminTmdbType: 'movie' | 'tv';
+  inventoryBusy: boolean;
+  inventoryMessage: string | null;
+  localDeposito: boolean;
+  localFuncionaStatus: MovieRecord['funcionaStatus'];
   handleAdminTmdbInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   handleFixTmdb: () => void;
   handleResolveTmdb: () => void;
+  handleToggleDeposito: () => void;
+  handleToggleFunciona: () => void;
   movie: MovieRecord;
   setAdminSeason: (value: string) => void;
   setAdminTmdbType: (value: 'movie' | 'tv') => void;
@@ -287,15 +293,34 @@ const AdminPanel: React.FC<{
   adminSeason,
   adminTmdbId,
   adminTmdbType,
+  inventoryBusy,
+  inventoryMessage,
+  localDeposito,
+  localFuncionaStatus,
   handleAdminTmdbInputChange,
   handleFixTmdb,
   handleResolveTmdb,
+  handleToggleDeposito,
+  handleToggleFunciona,
   movie,
   setAdminSeason,
   setAdminTmdbType
 }) => {
   return (
     <div className="detail-sheet__admin">
+      <div className="detail-sheet__admin-toolbox">
+        <div className="detail-sheet__admin-label">Inventario</div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={handleToggleDeposito} disabled={inventoryBusy} type="button">
+            {localDeposito ? 'Traer a la coleccion' : 'Mover al deposito'}
+          </button>
+          <button className="btn" onClick={handleToggleFunciona} disabled={inventoryBusy} type="button">
+            {localFuncionaStatus === 'working' ? 'Marcar no funciona' : 'Marcar funciona'}
+          </button>
+          {inventoryMessage && <span className="muted">{inventoryMessage}</span>}
+        </div>
+      </div>
+      <hr className="detail-sheet__admin-separator" />
       <div className="detail-sheet__admin-toolbox">
         <div className="detail-sheet__admin-label">TMDb</div>
         <div className="detail-sheet__admin-grid">
@@ -856,9 +881,15 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           adminSeason={adminSeason}
           adminTmdbId={adminTmdbId}
           adminTmdbType={adminTmdbType}
+          inventoryBusy={inventoryBusy}
+          inventoryMessage={inventoryMessage}
+          localDeposito={localDeposito}
+          localFuncionaStatus={localFuncionaStatus}
           handleAdminTmdbInputChange={handleAdminTmdbInputChange}
           handleFixTmdb={handleFixTmdb}
           handleResolveTmdb={handleResolveTmdb}
+          handleToggleDeposito={handleToggleDeposito}
+          handleToggleFunciona={handleToggleFunciona}
           movie={movie}
           setAdminSeason={setAdminSeason}
           setAdminTmdbType={setAdminTmdbType}
@@ -900,20 +931,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             fallbackDirectors={fallbackDirectors}
             funcionaLabel={funcionaLabel}
           />
-          {adminSession && (
-            <div
-              className="detail-sheet__admin-actions"
-              style={{ display: 'flex', gap: 12, flexWrap: 'wrap', padding: '0 24px' }}
-            >
-              <button className="btn" onClick={handleToggleDeposito} disabled={inventoryBusy} type="button">
-                {localDeposito ? 'Traer a la coleccion' : 'Mover al deposito'}
-              </button>
-              <button className="btn" onClick={handleToggleFunciona} disabled={inventoryBusy} type="button">
-                {localFuncionaStatus === 'working' ? 'Marcar no funciona' : 'Marcar funciona'}
-              </button>
-              {inventoryMessage && <span className="muted">{inventoryMessage}</span>}
-            </div>
-          )}
           <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
         </div>
       </div>

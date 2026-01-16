@@ -24,7 +24,7 @@ export const AllMoviesPage: React.FC = () => {
   const [filters, setFilters] = useState<MovieFilters>({ ...defaultFilters, ...getStoredFilters() });
   const [activeMovie, setActiveMovie] = useState<MovieRecord | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const [pageSize, setPageSize] = useState(102);
   const location = useLocation();
 
   const handleChange = (patch: Partial<MovieFilters>) => {
@@ -110,6 +110,10 @@ export const AllMoviesPage: React.FC = () => {
   }, [page, totalPages]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [page]);
+
+  useEffect(() => {
     if (!visibleMovies.length) return;
     const params = new URLSearchParams(location.search);
     const tmdbId = params.get('tmdbId');
@@ -131,48 +135,62 @@ export const AllMoviesPage: React.FC = () => {
     }
   }, [location.search, visibleMovies]);
 
+  const renderPagination = (position: 'top' | 'bottom') => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+        paddingBottom: position === 'top' ? 16 : 0,
+        paddingTop: position === 'bottom' ? 16 : 0
+      }}
+    >
+      <span className="muted">
+        Mostrando {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}-
+        {Math.min(page * pageSize, filtered.length)} de {filtered.length}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className="muted">Por pagina</span>
+          <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+            <option value={15}>15</option>
+            <option value={102}>102</option>
+          </select>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button className="ghost" onClick={() => setPage(1)} disabled={page === 1}>
+            Prim.
+          </button>
+          <button className="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+            Anterior
+          </button>
+          <span className="muted">
+            Pag {page} de {totalPages}
+          </span>
+          <button
+            className="ghost"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Siguiente
+          </button>
+          <button className="ghost" onClick={() => setPage(totalPages)} disabled={page === totalPages}>
+            Ult.
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <section>
       <h1>Archive of All Films</h1>
       {loading && <p>Summoning data from the crypt...</p>}
       {error && <p>Error: {error}</p>}
       <FiltersBar filters={filters} onChange={handleChange} movies={visibleMovies} onReset={handleReset} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span className="muted">
-          Mostrando {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}-
-          {Math.min(page * pageSize, filtered.length)} de {filtered.length}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span className="muted">Por pagina</span>
-            <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-              <option value={15}>15</option>
-              <option value={100}>100</option>
-            </select>
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button className="ghost" onClick={() => setPage(1)} disabled={page === 1}>
-              Prim.
-            </button>
-            <button className="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-              Anterior
-            </button>
-            <span className="muted">
-              Pag {page} de {totalPages}
-            </span>
-            <button
-              className="ghost"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              Siguiente
-            </button>
-            <button className="ghost" onClick={() => setPage(totalPages)} disabled={page === totalPages}>
-              Ult.
-            </button>
-          </div>
-        </div>
-      </div>
+      {renderPagination('top')}
       {filters.view === 'grid' ? (
         <div className="movie-grid movie-grid--six">
           {pagedMovies.map((movie) => (
@@ -182,6 +200,7 @@ export const AllMoviesPage: React.FC = () => {
       ) : (
         <MovieTable movies={pagedMovies} onSelect={(m) => setActiveMovie(m)} />
       )}
+      {renderPagination('bottom')}
       {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>
   );
