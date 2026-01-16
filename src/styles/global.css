@@ -1320,7 +1320,7 @@ a.ghost {
   inset: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(6, 8, 12, 0.78);
+  background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(8px);
   z-index: 30;
   border-radius: 0;

@@ -417,6 +417,15 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   }, []);
 
   useEffect(() => {
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    body.style.overflow = 'hidden';
+    return () => {
+      body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
     let active = true;
     async function fetchDirectors() {
       if (!movie.tmdbId || !tmdbEnrichmentEnabled) {
