@@ -358,10 +358,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           </div>
         </div>
         <div className="random-actions ritual-actions">
-          <button onClick={summon} className="action-large">
+          <button onClick={() => summon()} className="action-large">
             Summon
           </button>
-          <button onClick={summonDoubleFeature} className="action-large secondary">
+          <button onClick={() => summonDoubleFeature()} className="action-large secondary">
             Double Summon
           </button>
         </div>
