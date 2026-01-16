@@ -13,6 +13,7 @@ const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)))
 
 export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeSeenDefault = true }) => {
   const { adminSession, applyMovieStatusUpdate } = useMovies();
+  const MAX_REROLLS = 3;
   const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [excludeSeen, setExcludeSeen] = useState(excludeSeenDefault);
   const [chosen, setChosen] = useState<MovieRecord | null>(null);
@@ -23,6 +24,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     link: string;
   } | null>(null);
   const [isSummoning, setIsSummoning] = useState(false);
+  const [rerollsLeft, setRerollsLeft] = useState(MAX_REROLLS);
   const [statusInputs, setStatusInputs] = useState<
     Record<string, { seen: boolean; ratingGloria: string; ratingRodrigo: string; busy?: boolean; error?: string }>
   >({});
@@ -52,11 +54,14 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     setSelectedSections((prev) => (prev.length === sections.length ? [] : sections));
   };
 
-  const summon = () => {
+  const summon = (isReroll = false) => {
     if (filtered.length === 0) {
       setChosen(null);
       setDoubleFeature(null);
       return;
+    }
+    if (!isReroll) {
+      setRerollsLeft(MAX_REROLLS);
     }
     setIsSummoning(true);
     setTimeout(() => {
@@ -111,13 +116,16 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
     };
   };
 
-  const summonDoubleFeature = () => {
+  const summonDoubleFeature = (isReroll = false) => {
     if (filtered.length === 0) {
       setChosen(null);
       setDoubleFeature(null);
       return;
     }
 
+    if (!isReroll) {
+      setRerollsLeft(MAX_REROLLS);
+    }
     setIsSummoning(true);
     setTimeout(() => {
       const primary = filtered[Math.floor(Math.random() * filtered.length)];
@@ -171,6 +179,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
       if (chosen || doubleFeature) {
         setChosen(null);
         setDoubleFeature(null);
+        setRerollsLeft(MAX_REROLLS);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -233,6 +242,22 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
         ...prev,
         [movie.id]: { ...input, busy: false, error: 'No se pudo guardar.' }
       }));
+    }
+  };
+
+  const handleCloseResults = () => {
+    setChosen(null);
+    setDoubleFeature(null);
+    setRerollsLeft(MAX_REROLLS);
+  };
+
+  const handleReroll = () => {
+    if (isSummoning || rerollsLeft <= 0) return;
+    setRerollsLeft((prev) => Math.max(0, prev - 1));
+    if (doubleFeature) {
+      summonDoubleFeature(true);
+    } else {
+      summon(true);
     }
   };
 
@@ -355,10 +380,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
           className="detail-sheet__overlay surprise-detail__overlay"
           role="dialog"
           aria-label="Resultados de Surprise Night"
-          onClick={() => {
-            setChosen(null);
-            setDoubleFeature(null);
-          }}
+          onClick={handleCloseResults}
         >
           <div
             className="detail-sheet surprise-detail"
@@ -394,13 +416,30 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect, excludeS
                     {doubleFeature && (
                       <button onClick={() => onSelect(doubleFeature.active)}>Abrir detalles</button>
                     )}
-                    <button onClick={doubleFeature ? summonDoubleFeature : summon}>Volver a invocar</button>
+                    <button onClick={handleReroll} disabled={isSummoning || rerollsLeft <= 0}>
+                      Reroll Summon{' '}
+                      <span
+                        aria-label={`Intentos restantes: ${rerollsLeft}`}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: 22,
+                          height: 22,
+                          marginLeft: 8,
+                          borderRadius: 6,
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(0,0,0,0.35)',
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}
+                      >
+                        {rerollsLeft}
+                      </span>
+                    </button>
                     <button
                       className="ghost"
-                      onClick={() => {
-                        setChosen(null);
-                        setDoubleFeature(null);
-                      }}
+                      onClick={handleCloseResults}
                     >
                       Cerrar
                     </button>
