@@ -202,21 +202,48 @@ export const EditMoviePage: React.FC = () => {
         </div>
       </header>
 
+      <div className="edit-hero">
+        <div className="edit-hero__poster">
+          <img
+            src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
+            alt={movie.title}
+            loading="lazy"
+          />
+        </div>
+        <div className="edit-hero__meta">
+          <p className="eyebrow">Editando</p>
+          <h2>{movie.title}</h2>
+          <p className="muted">
+            {movie.tmdbYear ?? movie.year ?? 'Year ?'} - {movie.seccion}
+          </p>
+          {movie.originalTitle && movie.originalTitle !== movie.title && (
+            <p className="muted">Titulo original: {movie.originalTitle}</p>
+          )}
+          <div className="edit-hero__chips">
+            {movie.seen && <span className="detail-sheet__chip detail-sheet__chip--accent">Vista</span>}
+            {movie.enDeposito && <span className="detail-sheet__chip">En deposito</span>}
+            <span className="detail-sheet__chip">
+              {movie.series ? 'Serie' : 'Pelicula'}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="edit-form">
         <div className="edit-form__grid">
           <label>
             <strong>Seccion</strong>
-            <input
-              type="text"
+            <select
               value={form.seccion}
               onChange={(event) => handleChange({ seccion: event.target.value })}
-              list="section-options"
-            />
-            <datalist id="section-options">
+            >
+              <option value="">Selecciona seccion</option>
               {sectionOptions.map((section) => (
-                <option key={section} value={section} />
+                <option key={section} value={section}>
+                  {section}
+                </option>
               ))}
-            </datalist>
+            </select>
           </label>
           <label>
             <strong>Titulo</strong>

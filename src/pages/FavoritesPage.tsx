@@ -75,36 +75,42 @@ export const FavoritesPage: React.FC = () => {
       ) : ranked.length === 0 ? (
         <p className="muted">No hay peliculas con puntuaciones completas aun.</p>
       ) : (
-        <div className="ranking-list">
+        <div className="favorites-grid">
           {ranked.map(({ movie, score }, index) => {
             const medalClass =
-              index === 0 ? 'ranking-card--gold' : index === 1 ? 'ranking-card--silver' : index === 2 ? 'ranking-card--bronze' : '';
+              index === 0
+                ? 'favorite-card--gold'
+                : index === 1
+                ? 'favorite-card--silver'
+                : index === 2
+                ? 'favorite-card--bronze'
+                : '';
             return (
               <button
                 key={movie.id}
-                className={`ranking-card ${medalClass}`}
+                className={`favorite-card ${medalClass}`}
                 type="button"
                 onClick={() => setActiveMovie(movie)}
               >
-                <div className="ranking-card__badge">#{index + 1}</div>
-                <div className="ranking-card__poster">
+                <div className="favorite-card__badge">#{index + 1}</div>
+                <div className="favorite-card__poster">
                   <img
                     src={movie.posterUrl ?? 'https://via.placeholder.com/240x360/0b0f17/ffffff?text=No+Poster'}
                     alt={movie.title}
                     loading="lazy"
                   />
                 </div>
-                <div className="ranking-card__info">
+                <div className="favorite-card__body">
                   <strong>{movie.title}</strong>
-                  <span className="muted">
+                  <small className="muted">
                     {movie.tmdbYear ?? movie.year ?? 'Year ?'} - {movie.seccion}
-                  </span>
-                  <div className="ranking-card__scores">
+                  </small>
+                  <div className="favorite-card__ratings">
                     <div>
-                      <span className="ranking-card__label">Score</span>
+                      <span className="favorite-card__label">Score</span>
                       <PawRating value={score} size="small" />
                     </div>
-                    <div className="ranking-card__split">
+                    <div className="favorite-card__split">
                       <span>G: {movie.ratingGloria?.toFixed(1)}</span>
                       <span>R: {movie.ratingRodrigo?.toFixed(1)}</span>
                     </div>

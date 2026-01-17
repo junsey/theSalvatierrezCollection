@@ -51,7 +51,7 @@ export default async function handler(req: any, res: any) {
       Director: toText(body.director),
       Grupo: toText(body.group),
       Vista: toBoolOrNull(body.seen),
-      Doblaje: toText(body.dubbing),
+      Doblaje: toNullIfEmpty(body.dubbing),
       Formato: toText(body.format),
       'Puntuacion Rodrigo': toNumberOrNull(body.ratingRodrigo),
       'Puntuacion Gloria': toNumberOrNull(body.ratingGloria),
@@ -91,6 +91,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ movie: rows?.[0] ?? null });
   } catch (error) {
     console.error('Update movie failed', error);
-    return reject(res, 500, 'No se pudo actualizar la pelicula.');
+    const message = error instanceof Error ? error.message : 'No se pudo actualizar la pelicula.';
+    return reject(res, 500, message);
   }
 }
