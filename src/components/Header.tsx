@@ -7,6 +7,7 @@ const navItems = [
   { to: '/directors', label: 'Directores' },
   { to: '/sections', label: 'Sections' },
   { to: '/surprise', label: 'Surprise Night' },
+  { to: '/favorites', label: 'Favoritos' },
   { to: '/settings', label: 'Configuración' }
 ];
 
@@ -47,3 +48,4 @@ export const Header: React.FC = () => {
     </header>
   );
 };
+

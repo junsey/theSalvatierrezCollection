@@ -11,6 +11,8 @@ import { DirectorsHub } from './pages/DirectorsHub';
 import { SectionsHub } from './pages/SectionsHub';
 import { SettingsPage } from './pages/SettingsPage';
 import { DamagedMoviesPage } from './pages/DamagedMoviesPage';
+import { FavoritesPage } from './pages/FavoritesPage';
+import { EditMoviePage } from './pages/EditMoviePage';
 
 const App: React.FC = () => {
   return (
@@ -25,8 +27,10 @@ const App: React.FC = () => {
           <Route path="/sections" element={<SectionsHub />} />
           <Route path="/sections/:name" element={<SectionPage />} />
           <Route path="/surprise" element={<SurpriseMovieNightPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/damaged" element={<DamagedMoviesPage />} />
+          <Route path="/admin/movies/:id/edit" element={<EditMoviePage />} />
         </Routes>
       </div>
     </MovieProvider>

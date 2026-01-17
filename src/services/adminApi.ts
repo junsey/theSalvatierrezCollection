@@ -89,6 +89,32 @@ export async function fixMovieTmdb(payload: {
   });
 }
 
+export async function updateMovie(payload: {
+  collectionId: string;
+  seccion?: string;
+  title?: string;
+  year?: number | null;
+  saga?: string;
+  originalTitle?: string;
+  genreRaw?: string;
+  director?: string;
+  group?: string;
+  series?: boolean | null;
+  season?: number | null;
+  seen?: boolean | null;
+  ratingGloria?: number | null;
+  ratingRodrigo?: number | null;
+  dubbing?: string;
+  format?: string;
+  enDeposito?: boolean | null;
+  funcionaStatus?: 'working' | 'damaged' | 'untested';
+}) {
+  return adminFetch('/api/movies/update', {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function refreshDirectorTmdb(payload: { name: string; tmdbId?: number | null }) {
   return adminFetch('/api/directors/refresh', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { fixMovieTmdb, resolveMovieTmdb, updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
@@ -287,6 +287,7 @@ const AdminPanel: React.FC<{
   handleToggleDeposito: () => void;
   handleToggleFunciona: () => void;
   movie: MovieRecord;
+  onEdit: () => void;
   setAdminSeason: (value: string) => void;
   setAdminTmdbType: (value: 'movie' | 'tv') => void;
 }> = ({
@@ -305,11 +306,21 @@ const AdminPanel: React.FC<{
   handleToggleDeposito,
   handleToggleFunciona,
   movie,
+  onEdit,
   setAdminSeason,
   setAdminTmdbType
 }) => {
   return (
     <div className="detail-sheet__admin">
+      <div className="detail-sheet__admin-toolbox">
+        <div className="detail-sheet__admin-label">Edicion</div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={onEdit} type="button">
+            Editar pelicula
+          </button>
+        </div>
+      </div>
+      <hr className="detail-sheet__admin-separator" />
       <div className="detail-sheet__admin-toolbox">
         <div className="detail-sheet__admin-label">Inventario</div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -423,6 +434,7 @@ const AdminPanel: React.FC<{
 
 export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, updateSeen, applyMovieStatusUpdate } = useMovies();
+  const navigate = useNavigate();
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [adminTmdbId, setAdminTmdbId] = useState('');
@@ -722,6 +734,11 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     updateSeen(movie.id, !movie.seen);
   };
 
+  const handleEdit = () => {
+    navigate(`/admin/movies/${movie.id}/edit`);
+    requestClose();
+  };
+
   const dubbingValue = movie.dubbing as unknown;
   const dubbingLabel =
     typeof dubbingValue === 'boolean'
@@ -893,6 +910,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           handleToggleDeposito={handleToggleDeposito}
           handleToggleFunciona={handleToggleFunciona}
           movie={movie}
+          onEdit={handleEdit}
           setAdminSeason={setAdminSeason}
           setAdminTmdbType={setAdminTmdbType}
         />
