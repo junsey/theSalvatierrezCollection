@@ -55,7 +55,7 @@ export default async function handler(req: any, res: any) {
       Formato: toText(body.format),
       'Puntuacion Rodrigo': toNumberOrNull(body.ratingRodrigo),
       'Puntuacion Gloria': toNumberOrNull(body.ratingGloria),
-      'En depA3sito': toBoolOrNull(body.enDeposito)
+      'En depósito': toBoolOrNull(body.enDeposito)
     } as Record<string, any>;
 
     if (body.funcionaStatus) {

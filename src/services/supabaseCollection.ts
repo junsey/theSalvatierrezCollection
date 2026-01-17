@@ -113,7 +113,7 @@ function mapRow(row: CollectionRow): MovieRecord {
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
     dubbing: toText(row.Doblaje),
     format: toText(row.Formato),
-    enDeposito: parseEnDeposito((row as any)['En depA3sito']),
+    enDeposito: parseEnDeposito((row as any)['En depósito']),
     funcionaStatus: parseFunciona(row.Funciona ?? '')
   };
 }
