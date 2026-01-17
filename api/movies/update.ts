@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
 
     const payload = {
       Seccion: toNullIfEmpty(body.seccion),
-      'AAño': toNumberOrNull(body.year),
+      'Año': toNumberOrNull(body.year),
       Serie: toBoolOrNull(body.series),
       Temporada: toNumberOrNull(body.season),
       Saga: toText(body.saga),

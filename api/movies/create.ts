@@ -69,3 +69,4 @@ export default async function handler(req: any, res: any) {
     return reject(res, 500, 'No se pudo crear la pelicula.');
   }
 }
+
