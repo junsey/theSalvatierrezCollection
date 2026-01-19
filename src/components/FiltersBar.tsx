@@ -19,7 +19,7 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
       <div className="filters-row filters-row--primary">
         <input
           className="filter-control filter-control--search"
-          placeholder="Buscar título"
+          placeholder="Buscar titulo u original"
           value={filters.query}
           onChange={(e) => onChange({ query: e.target.value })}
         />
@@ -74,6 +74,7 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
         >
           <option value="title-asc">Título A-Z</option>
           <option value="title-desc">Título Z-A</option>
+          <option value="shelf-asc">Formato estanteria</option>
           <option value="year-desc">Año ↓</option>
           <option value="year-asc">Año ↑</option>
           <option value="tmdb-desc">TMDb ↓</option>
@@ -98,3 +99,6 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
     </div>
   );
 };
+
+
+

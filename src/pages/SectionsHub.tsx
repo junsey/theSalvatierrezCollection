@@ -39,9 +39,9 @@ export const SectionsHub: React.FC = () => {
           <Link className="sections-hub__chip is-active" to="/sections">
             Todas
           </Link>
-          <Link className="sections-hub__chip" to="/genres">
-            Géneros
-          </Link>
+          <button className="sections-hub__chip" type="button" disabled>
+            Generos
+          </button>
           <Link className="sections-hub__chip" to="/directors">
             Directores
           </Link>
@@ -62,3 +62,4 @@ export const SectionsHub: React.FC = () => {
     </section>
   );
 };
+

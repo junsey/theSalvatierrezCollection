@@ -4,7 +4,6 @@ import { Link, NavLink } from 'react-router-dom';
 const navItems = [
   { to: '/', label: 'Home' },
   { to: '/movies', label: 'All Movies' },
-  { to: '/directors', label: 'Directores' },
   { to: '/sections', label: 'Sections' },
   { to: '/surprise', label: 'Surprise Night' },
   { to: '/favorites', label: 'Favoritos' },
@@ -48,4 +47,5 @@ export const Header: React.FC = () => {
     </header>
   );
 };
+
 

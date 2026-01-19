@@ -6,6 +6,7 @@ import { MovieDetail } from '../components/MovieDetail';
 import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
 import { setStoredFilters, getStoredFilters } from '../services/localStorage';
+import { compareShelfSort } from '../services/movieSort';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const defaultFilters: MovieFilters = {
@@ -75,6 +76,8 @@ export const AllMoviesPage: React.FC = () => {
         switch (filters.sort) {
           case 'title-desc':
             return b.title.localeCompare(a.title);
+          case 'shelf-asc':
+            return compareShelfSort(a, b);
           case 'year-asc':
             return (a.year ?? 0) - (b.year ?? 0);
           case 'year-desc':

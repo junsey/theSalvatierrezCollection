@@ -5,6 +5,7 @@ import { MovieCard } from '../components/MovieCard';
 import { MovieDetail } from '../components/MovieDetail';
 import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
+import { compareShelfSort } from '../services/movieSort';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const baseFilters: MovieFilters = {
@@ -38,8 +39,18 @@ export const GenrePage: React.FC = () => {
   const genreMovies = useMemo(() => movies.filter((m) => hasGenre(m, genreName)), [movies, genreName]);
 
   const filtered = useMemo(() => {
+    const query = filters.query.trim().toLowerCase();
+
+    const matchesTitle = (movie: MovieRecord) => {
+      if (!query) return true;
+      const candidates = [movie.title, movie.originalTitle, movie.tmdbTitle, movie.tmdbOriginalTitle]
+        .filter((title): title is string => Boolean(title))
+        .map((title) => title.toLowerCase());
+      return candidates.some((title) => title.includes(query));
+    };
+
     return genreMovies
-      .filter((m) => m.title.toLowerCase().includes(filters.query.toLowerCase()))
+      .filter((m) => matchesTitle(m))
       .filter((m) => (filters.seccion ? m.seccion === filters.seccion : true))
       .filter((m) => {
         if (filters.series === 'series') return Boolean(m.series);
@@ -57,6 +68,8 @@ export const GenrePage: React.FC = () => {
         switch (filters.sort) {
           case 'title-desc':
             return b.title.localeCompare(a.title);
+          case 'shelf-asc':
+            return compareShelfSort(a, b);
           case 'year-asc':
             return (a.year ?? 0) - (b.year ?? 0);
           case 'year-desc':

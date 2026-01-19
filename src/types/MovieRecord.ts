@@ -64,6 +64,7 @@ export type MovieFilters = {
   sort:
     | 'title-asc'
     | 'title-desc'
+    | 'shelf-asc'
     | 'year-asc'
     | 'year-desc'
     | 'tmdb-desc'
