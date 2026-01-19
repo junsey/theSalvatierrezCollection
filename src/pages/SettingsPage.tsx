@@ -997,154 +997,106 @@ export const SettingsPage: React.FC = () => {
           <div className="movie-grid movie-grid--six">
             {whereWindow.map((movie, idx) => {
               const offset = whereStartIndex + idx - (whereIndex ?? 0);
-              const label = offset == 0 ? 'Buscada' : offset < 0 ? `Antes ${Math.abs(offset)}` : `Despues ${offset}`;
-              const isTarget = offset == 0;
+              const label = offset === 0 ? 'Buscada' : offset < 0 ? `Antes ${Math.abs(offset)}` : `Despues ${offset}`;
+              const isTarget = offset === 0;
               return (
-
-    <div className="page panel">
-
-      <div className="panel" style={{ marginBottom: 16 }}>
-
-        <h1>Configuracion</h1>
-
-        <p>
-
-          Supabase es la fuente principal y guardamos una copia local para evitar cortes. Las herramientas legacy (Excel/TMDb) quedan
-
-          abajo para uso manual.
-
-        </p>
-
-      </div>
-
-      <div className="panel" style={{ marginBottom: 16 }}>
-
-        <h2>Admin</h2>
-
-        {!adminSession ? (
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
-
-              Inicia sesion para habilitar acciones de escritura en Supabase.
-
-            </p>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-
-              <strong>Usuario</strong>
-
-              <input
-
-                type="text"
-
-                value={adminUser}
-
-                onChange={(event) => setAdminUser(event.target.value)}
-
-                autoComplete="username"
-
-              />
-
-            </label>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-
-              <strong>Contrasena</strong>
-
-              <input
-
-                type="password"
-
-                value={adminPass}
-
-                onChange={(event) => setAdminPass(event.target.value)}
-
-                autoComplete="current-password"
-
-              />
-
-            </label>
-
-            <button className="btn" onClick={handleAdminLogin} disabled={adminBusy}>
-
-              {adminBusy ? 'Validando...' : 'Iniciar sesion'}
-
-            </button>
-
-            {adminMessage && <p className="muted">{adminMessage}</p>}
-
-            {adminError && <p style={{ color: 'var(--accent)' }}>{adminError}</p>}
-
+                <div key={movie.id} style={{ display: 'grid', gap: 8 }}>
+                  <span style={{ fontSize: 12, color: isTarget ? 'var(--accent-2)' : 'var(--text-muted)' }}>
+                    {label}
+                  </span>
+                  <div style={{ border: isTarget ? '2px solid var(--accent-2)' : '1px solid transparent', borderRadius: 16 }}>
+                    <MovieCard movie={movie} onClick={() => setActiveMovie(movie)} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-        ) : (
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
-
-              Sesion activa para <strong>{adminSession.user}</strong>.
-
-            </p>
-
-            <button className="btn" onClick={handleAdminLogout}>
-
-              Cerrar sesion
-
-            </button>
-
-          </div>
-
-        )}
-
-      </div>
-
-      <div className="stat-grid" style={{ marginBottom: 16 }}>
-
-        <div className="stat-card">
-
-          <strong>Ultima sincronizacion</strong>
-
-          <div>{lastUpdated}</div>
-
         </div>
-
-        <div className="stat-card">
-
-          <strong>Origen actual</strong>
-
-          <div>{sourceLabel}</div>
-
-        </div>
-
-        <div className="stat-card">
-
-          <strong>Estado Supabase</strong>
-
-          <div>{sheetMeta?.source === 'supabase' ? 'Conectado' : 'No conectado'}</div>
-
-        </div>
-
-        <div className="stat-card">
-
-          <strong>Hoja remota</strong>
-
-          <div className="clamped" style={{ fontSize: 12 }}>{sheetMeta?.source === 'supabase' ? 'Supabase' : getSheetUrl()}</div>
-
-        </div>
-
-      </div>
-
-      <SettingsTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
-
-      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
-
+      )}
     </div>
+  );
 
+  const tabs: SettingsTabItem[] = [
+    { id: 'new-movie', label: 'Nueva pelicula', content: newMovieContent },
+    { id: 'legacy', label: 'Legacy (Excel + TMDb)', content: legacyContent },
+    { id: 'other', label: 'Otros', content: otherContent },
+    { id: 'where', label: 'Donde va?', content: whereContent }
+  ];
+
+  return (
+    <div className="page panel">
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h1>Configuracion</h1>
+        <p>
+          Supabase es la fuente principal y guardamos una copia local para evitar cortes. Las herramientas legacy (Excel/TMDb) quedan
+          abajo para uso manual.
+        </p>
+      </div>
+      <div className="panel" style={{ marginBottom: 16 }}>
+        <h2>Admin</h2>
+        {!adminSession ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              Inicia sesion para habilitar acciones de escritura en Supabase.
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Usuario</strong>
+              <input
+                type="text"
+                value={adminUser}
+                onChange={(event) => setAdminUser(event.target.value)}
+                autoComplete="username"
+              />
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <strong>Contrasena</strong>
+              <input
+                type="password"
+                value={adminPass}
+                onChange={(event) => setAdminPass(event.target.value)}
+                autoComplete="current-password"
+              />
+            </label>
+            <button className="btn" onClick={handleAdminLogin} disabled={adminBusy}>
+              {adminBusy ? 'Validando...' : 'Iniciar sesion'}
+            </button>
+            {adminMessage && <p className="muted">{adminMessage}</p>}
+            {adminError && <p style={{ color: 'var(--accent)' }}>{adminError}</p>}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <p style={{ fontSize: '0.9em', color: 'var(--text-muted)' }}>
+              Sesion activa para <strong>{adminSession.user}</strong>.
+            </p>
+            <button className="btn" onClick={handleAdminLogout}>
+              Cerrar sesion
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="stat-card">
+          <strong>Ultima sincronizacion</strong>
+          <div>{lastUpdated}</div>
+        </div>
+        <div className="stat-card">
+          <strong>Origen actual</strong>
+          <div>{sourceLabel}</div>
+        </div>
+        <div className="stat-card">
+          <strong>Estado Supabase</strong>
+          <div>{sheetMeta?.source === 'supabase' ? 'Conectado' : 'No conectado'}</div>
+        </div>
+        <div className="stat-card">
+          <strong>Hoja remota</strong>
+          <div className="clamped" style={{ fontSize: 12 }}>
+            {sheetMeta?.source === 'supabase' ? 'Supabase' : getSheetUrl()}
+          </div>
+        </div>
+      </div>
+      <SettingsTabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
+    </div>
   );
 
 };
-
-
