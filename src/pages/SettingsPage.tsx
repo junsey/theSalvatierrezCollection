@@ -218,358 +218,21 @@ export const SettingsPage: React.FC = () => {
   };
 
   const whereTarget = whereIndex != null ? shelfSortedMovies[whereIndex] : null;
+  const whereSectionMovies = useMemo(() => {
+    if (!whereTarget) return [];
+    return shelfSortedMovies.filter((movie) => movie.seccion === whereTarget.seccion);
+  }, [shelfSortedMovies, whereTarget?.seccion]);
+  const whereSectionIndex = useMemo(() => {
+    if (!whereTarget) return null;
+    const index = whereSectionMovies.findIndex((movie) => movie.id === whereTarget.id);
+    return index == -1 ? null : index;
+  }, [whereSectionMovies, whereTarget?.id]);
   const whereWindow = useMemo(() => {
-    if (whereIndex == null) return [];
-    const start = Math.max(0, whereIndex - 2);
-    const end = Math.min(shelfSortedMovies.length, whereIndex + 3);
-    return shelfSortedMovies.slice(start, end);
-  }, [whereIndex, shelfSortedMovies]);
-
-
-
-  const handleRefreshAll = async () => {
-
-    setStatus(null);
-
-    try {
-
-      await refreshAll();
-
-      setStatus('+ó-£-à Regeneraci+â-¦n completa finalizada.');
-
-    } catch (err) {
-
-      console.error(err);
-
-      setStatus('+ó-¥-î No se pudo regenerar completamente.');
-
-    }
-
-  };
-
-
-
-  const handleRefreshSupabase = async () => {
-
-    setStatus(null);
-
-    try {
-
-      await refreshSupabase();
-
-      setStatus('OK. Datos cargados desde Supabase.');
-
-    } catch (err) {
-
-      console.error(err);
-
-      setStatus('ERROR. No se pudo cargar Supabase.');
-
-    }
-
-  };
-
-
-
-  const handleRefreshSheet = async () => {
-
-    setStatus(null);
-
-    try {
-
-      await refreshSheet();
-
-      setStatus('+ó-£-à Excel recargado correctamente.');
-
-    } catch (err) {
-
-      console.error(err);
-
-      setStatus('+ó-¥-î No se pudo recargar el Excel.');
-
-    }
-
-  };
-
-
-
-  const handleRefreshMissing = async () => {
-
-    setStatus(null);
-
-    try {
-
-      await refreshMissing();
-
-      setStatus('+ó-£-à Pel+â-¡culas sin cach+â-¬ actualizadas.');
-
-    } catch (err) {
-
-      console.error(err);
-
-      setStatus('+ó-¥-î No se pudieron actualizar las pel+â-¡culas faltantes.');
-
-    }
-
-  };
-
-
-
-  const handleRefreshDirectors = async () => {
-
-    setStatus(null);
-
-    setDirectorProgress({ current: 0, total: directorNames.length });
-
-    setRegeneratingDirectors(true);
-
-    try {
-
-      clearPeopleCaches();
-
-      await buildDirectorProfiles(directorNames, {
-
-        forceRefresh: true,
-
-        overrides: directorOverrides,
-
-        onProgress: (current, total) => setDirectorProgress({ current, total })
-
-      });
-
-      setStatus('+ó-£-à Directores regenerados correctamente.');
-
-    } catch (err) {
-
-      console.error(err);
-
-      setStatus('+ó-¥-î No se pudieron regenerar los directores.');
-
-    } finally {
-
-      setRegeneratingDirectors(false);
-
-      setDirectorProgress(null);
-
-    }
-
-  };
-
-
-
-  const handleAdminLogin = async () => {
-
-    setAdminBusy(true);
-
-    setAdminError(null);
-
-    setAdminMessage(null);
-
-    try {
-
-      const ok = await verifyAdminCredentials(adminUser.trim(), adminPass.trim());
-
-      if (!ok) {
-
-        setAdminError('Credenciales incorrectas.');
-
-        return;
-
-      }
-
-      const session = saveAdminSession(adminUser.trim(), adminPass.trim());
-
-      setAdminSession(session);
-
-      setAdminMessage('Sesi+â-¦n admin iniciada.');
-
-    } catch (error) {
-
-      console.error(error);
-
-      setAdminError('No se pudo validar la sesi+â-¦n admin.');
-
-    } finally {
-
-      setAdminBusy(false);
-
-    }
-
-  };
-
-
-
-  const handleAdminLogout = () => {
-
-    clearAdminSession();
-
-    setAdminSession(null);
-
-    setAdminMessage('Sesi+â-¦n admin cerrada.');
-
-  };
-
-
-
-  const handleCreateMovie = async () => {
-
-    setNewMovieBusy(true);
-
-    setNewMovieStatus(null);
-
-    const seasonValue =
-      newMovieType === 'series' && newMovie.season
-        ? Number(newMovie.season)
-        : null;
-    const season = Number.isFinite(seasonValue) ? seasonValue : null;
-
-    try {
-
-      const payload = {
-
-        seccion: newMovie.seccion.trim(),
-
-        title: newMovie.title.trim(),
-
-        year: newMovie.year ? Number(newMovie.year) : null,
-
-        series: newMovieType === 'series',
-
-        season: newMovieType === 'series' ? season : null,
-
-        saga: newMovie.saga.trim(),
-
-        originalTitle: newMovie.originalTitle.trim(),
-
-        genreRaw: newMovie.genreRaw.trim(),
-
-        director: newMovie.director.trim(),
-
-        group: newMovie.group.trim(),
-
-        seen: newMovie.seen,
-
-        ratingGloria: newMovie.ratingGloria ? Number(newMovie.ratingGloria) : null,
-
-        ratingRodrigo: newMovie.ratingRodrigo ? Number(newMovie.ratingRodrigo) : null,
-
-        dubbing: newMovie.dubbing.trim(),
-
-        format: newMovie.format.trim()
-
-      };
-
-      if (!payload.seccion || !payload.title) {
-
-        setNewMovieStatus('Secci+â-¦n y t+â-¡tulo son obligatorios.');
-
-        return;
-
-      }
-
-      await createMovie(payload);
-
-      await refreshSupabase();
-
-      setNewMovieStatus('Pel+â-¡cula creada y sincronizada con Supabase.');
-
-      setNewMovie({
-
-        seccion: '',
-
-        title: '',
-
-        year: '',
-
-        saga: '',
-
-        originalTitle: '',
-
-        genreRaw: '',
-
-        director: '',
-
-        season: '',
-
-        group: '',
-
-        seen: false,
-
-        ratingGloria: '',
-
-        ratingRodrigo: '',
-
-        dubbing: '',
-
-        format: ''
-
-      });
-
-      setNewMovieType('movie');
-
-    } catch (error) {
-
-      console.error(error);
-
-      setNewMovieStatus('No se pudo crear la pel+â-¡cula.');
-
-    } finally {
-
-      setNewMovieBusy(false);
-
-    }
-
-  };
-
-
-
-  const lastUpdated = sheetMeta?.fetchedAt
-
-    ? new Date(sheetMeta.fetchedAt).toLocaleString()
-
-    : 'Sincronizaci+â-¦n pendiente';
-
-
-
-  const sheetSourceLabel: Record<string, string> = {
-
-    'network': 'En l+â-¡nea (+â-¦ltimo fetch)',
-
-    'cache-fresh': 'Copia local fresca',
-
-    'cache-stale': 'Copia local (stale, pero segura)',
-
-    'embedded': 'Copia embebida en la app',
-
-    'demo': 'Datos demo',
-
-    'supabase': 'Supabase (BD)'
-
-  };
-
-
-
-  const sourceLabel = sheetMeta ? sheetSourceLabel[sheetMeta.source] : 'N/D';
-
-
-
-  // Identificar pel+â-¡culas problem+â-íticas
-
-  const problematicMovies = movies.filter(
-
-    (movie) =>
-
-      !movie.tmdbStatus ||
-
-      movie.tmdbStatus.source === 'none' ||
-
-      movie.tmdbStatus.source === 'error' ||
-
-      movie.tmdbStatus.source === 'not-found' ||
-
-      (!movie.tmdbId && !movie.posterUrl && !movie.plot)
-
-  );
+    if (whereSectionIndex == null) return [];
+    const start = Math.max(0, whereSectionIndex - 2);
+    const end = Math.min(whereSectionMovies.length, whereSectionIndex + 3);
+    return whereSectionMovies.slice(start, end);
+  }, [whereSectionIndex, whereSectionMovies]);
 
   const newMovieContent = adminSession ? (
     <div style={{ display: 'grid', gap: 16 }}>
@@ -958,7 +621,7 @@ export const SettingsPage: React.FC = () => {
     </div>
   );
 
-  const whereStartIndex = whereIndex != null ? Math.max(0, whereIndex - 2) : 0;
+  const whereStartIndex = whereSectionIndex != null ? Math.max(0, whereSectionIndex - 2) : 0;
   const whereContent = (
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="panel">
@@ -987,16 +650,14 @@ export const SettingsPage: React.FC = () => {
       {whereTarget && (
         <div className="panel">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-            <div>
-              <strong>Seccion:</strong> {whereTarget.seccion}
-            </div>
+            <div className="where-section-title">Seccion: {whereTarget.seccion}</div>
             <div className="muted">
-              {whereIndex != null ? `${whereIndex + 1} de ${shelfSortedMovies.length}` : null}
+              {whereSectionIndex != null ? `${whereSectionIndex + 1} de ${whereSectionMovies.length}` : null}
             </div>
           </div>
-          <div className="movie-grid movie-grid--six">
+          <div className="movie-grid where-grid">
             {whereWindow.map((movie, idx) => {
-              const offset = whereStartIndex + idx - (whereIndex ?? 0);
+              const offset = whereStartIndex + idx - (whereSectionIndex ?? 0);
               const label = offset === 0 ? 'Buscada' : offset < 0 ? `Antes ${Math.abs(offset)}` : `Despues ${offset}`;
               const isTarget = offset === 0;
               return (

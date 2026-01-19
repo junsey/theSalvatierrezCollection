@@ -1412,6 +1412,19 @@ a.ghost {
   gap: 16px;
 }
 
+.where-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: 1320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.where-section-title {
+  color: var(--accent-2);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
 .movie-grid--seven {
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
@@ -1443,6 +1456,12 @@ a.ghost {
 @media (max-width: 640px) {
   .movie-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .where-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 }
 
