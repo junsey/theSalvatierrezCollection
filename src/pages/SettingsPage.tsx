@@ -9,6 +9,7 @@ import { useMovies } from '../context/MovieContext';
 import { getSheetUrl } from '../services/googleSheets';
 
 import { compareShelfSort } from '../services/movieSort';
+import { normalizeText } from '../services/textNormalize';
 import { buildDirectorProfiles, clearPeopleCaches } from '../services/tmdbPeopleService';
 
 import { buildDirectorOverrideMap, splitDirectors } from '../services/directors';
@@ -192,11 +193,11 @@ export const SettingsPage: React.FC = () => {
   const shelfSortedMovies = useMemo(() => [...movies].sort(compareShelfSort), [movies]);
 
   const matchesWhereQuery = (movie: MovieRecord, query: string) => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = normalizeText(query);
     if (!normalized) return false;
     const candidates = [movie.title, movie.originalTitle, movie.tmdbTitle, movie.tmdbOriginalTitle]
       .filter((title): title is string => Boolean(title))
-      .map((title) => title.toLowerCase());
+      .map((title) => normalizeText(title));
     return candidates.some((title) => title.includes(normalized));
   };
 

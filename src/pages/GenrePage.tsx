@@ -6,6 +6,7 @@ import { MovieDetail } from '../components/MovieDetail';
 import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
 import { compareShelfSort } from '../services/movieSort';
+import { normalizeText } from '../services/textNormalize';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const baseFilters: MovieFilters = {
@@ -39,13 +40,13 @@ export const GenrePage: React.FC = () => {
   const genreMovies = useMemo(() => movies.filter((m) => hasGenre(m, genreName)), [movies, genreName]);
 
   const filtered = useMemo(() => {
-    const query = filters.query.trim().toLowerCase();
+    const query = normalizeText(filters.query);
 
     const matchesTitle = (movie: MovieRecord) => {
       if (!query) return true;
       const candidates = [movie.title, movie.originalTitle, movie.tmdbTitle, movie.tmdbOriginalTitle]
         .filter((title): title is string => Boolean(title))
-        .map((title) => title.toLowerCase());
+        .map((title) => normalizeText(title));
       return candidates.some((title) => title.includes(query));
     };
 
