@@ -131,8 +131,8 @@ export const AllMoviesPage: React.FC = () => {
 
     if (saga !== null) {
       setFilters((prev) => {
-        if (prev.saga === saga) return prev;
-        const next = { ...prev, saga: saga || null };
+        if (prev.saga === saga && prev.sort === 'year-asc') return prev;
+        const next = { ...prev, saga: saga || null, sort: 'year-asc' };
         setStoredFilters(next);
         return next;
       });
