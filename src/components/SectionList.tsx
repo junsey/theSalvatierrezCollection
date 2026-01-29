@@ -4,29 +4,60 @@ import { SectionCard } from './SectionCard';
 
 type OrderBy = 'pending' | 'largest' | 'alpha';
 
+const getMovieRating = (movie: MovieRecord) => {
+  const values = [movie.ratingGloria, movie.ratingRodrigo, movie.rating].filter(
+    (value): value is number => value != null
+  );
+  if (values.length === 0) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const pickSectionBackground = (movies: MovieRecord[]) => {
+  const rated = movies
+    .map((movie) => ({ movie, rating: getMovieRating(movie) }))
+    .filter((entry): entry is { movie: MovieRecord; rating: number } => entry.rating != null)
+    .filter((entry) => Boolean(entry.movie.posterUrl));
+
+  if (rated.length > 0) {
+    rated.sort((a, b) => b.rating - a.rating);
+    return rated[0].movie.posterUrl ?? null;
+  }
+
+  const withPoster = movies.filter((movie) => Boolean(movie.posterUrl));
+  if (withPoster.length === 0) return null;
+  const pick = withPoster[Math.floor(Math.random() * withPoster.length)];
+  return pick.posterUrl ?? null;
+};
+
 export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy }> = ({ movies, orderBy }) => {
-  const sections = Array.from(new Set(movies.map((m) => m.seccion))).sort();
-  const sectionStats = movies.reduce<Record<string, { total: number; seen: number }>>((acc, movie) => {
-    if (!acc[movie.seccion]) {
-      acc[movie.seccion] = { total: 0, seen: 0 };
-    }
-    acc[movie.seccion].total += 1;
-    if (movie.seen) acc[movie.seccion].seen += 1;
-    return acc;
-  }, {});
+  const sectionGroups = useMemo(() => {
+    const map = new Map<string, MovieRecord[]>();
+    movies.forEach((movie) => {
+      const key = movie.seccion;
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
+      map.get(key)!.push(movie);
+    });
+    return map;
+  }, [movies]);
 
   const sectionItems = useMemo(() => {
-    return sections.map((section) => {
-      const stats = sectionStats[section] ?? { total: 0, seen: 0 };
-      const pending = Math.max(stats.total - stats.seen, 0);
-      return {
-        name: section,
-        total: stats.total,
-        seen: stats.seen,
-        pending
-      };
-    });
-  }, [sections, sectionStats]);
+    return Array.from(sectionGroups.entries())
+      .map(([section, items]) => {
+        const total = items.length;
+        const seen = items.filter((movie) => movie.seen).length;
+        const pending = Math.max(total - seen, 0);
+        return {
+          name: section,
+          total,
+          seen,
+          pending,
+          backgroundUrl: pickSectionBackground(items)
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sectionGroups]);
 
   const sortedItems = useMemo(() => {
     const items = [...sectionItems];
@@ -54,14 +85,27 @@ export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy }> 
           </div>
           <div className="section-featured__grid">
             {featured.map((section) => (
-              <SectionCard key={section.name} name={section.name} total={section.total} seen={section.seen} featured />
+              <SectionCard
+                key={section.name}
+                name={section.name}
+                total={section.total}
+                seen={section.seen}
+                backgroundUrl={section.backgroundUrl}
+                featured
+              />
             ))}
           </div>
         </div>
       )}
       <div className="section-grid">
         {rest.map((section) => (
-          <SectionCard key={section.name} name={section.name} total={section.total} seen={section.seen} />
+          <SectionCard
+            key={section.name}
+            name={section.name}
+            total={section.total}
+            seen={section.seen}
+            backgroundUrl={section.backgroundUrl}
+          />
         ))}
       </div>
     </>
