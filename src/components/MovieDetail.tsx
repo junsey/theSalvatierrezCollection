@@ -493,26 +493,30 @@ const AdminPanel: React.FC<{
 };
 
 export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
-  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, applyMovieStatusUpdate } = useMovies();
+  const { movies, adminSession, refreshSupabase, tmdbEnrichmentEnabled, applyMovieStatusUpdate } = useMovies();
   const navigate = useNavigate();
+  const currentMovie = useMemo(
+    () => movies.find((entry) => entry.id === movie.id) ?? movie,
+    [movies, movie]
+  );
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
   const [adminTmdbId, setAdminTmdbId] = useState('');
   const [adminTmdbType, setAdminTmdbType] = useState<'movie' | 'tv'>(
-    movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'
+    currentMovie.tmdbType === 'tv' || currentMovie.series ? 'tv' : 'movie'
   );
   const [adminSeason, setAdminSeason] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [inventoryBusy, setInventoryBusy] = useState(false);
   const [inventoryMessage, setInventoryMessage] = useState<string | null>(null);
-  const [localDeposito, setLocalDeposito] = useState(movie.enDeposito ?? false);
-  const [localFuncionaStatus, setLocalFuncionaStatus] = useState(movie.funcionaStatus);
+  const [localDeposito, setLocalDeposito] = useState(currentMovie.enDeposito ?? false);
+  const [localFuncionaStatus, setLocalFuncionaStatus] = useState(currentMovie.funcionaStatus);
   const [showWatchedForm, setShowWatchedForm] = useState(false);
   const [watchedInput, setWatchedInput] = useState({
     seen: true,
-    ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
-    ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+    ratingGloria: currentMovie.ratingGloria != null ? String(currentMovie.ratingGloria) : '',
+    ratingRodrigo: currentMovie.ratingRodrigo != null ? String(currentMovie.ratingRodrigo) : '',
     busy: false,
     error: undefined as string | undefined
   });
@@ -527,8 +531,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const closeTimeoutRef = useRef<number | null>(null);
 
-  const fallbackDirectors = movie.director
-    ? movie.director
+  const fallbackDirectors = currentMovie.director
+    ? currentMovie.director
         .split(/[,;/&]/g)
         .map((d) => d.trim())
         .filter(Boolean)
@@ -546,24 +550,24 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   })();
 
   const displayMovie = useMemo(
-    () => ({ ...movie, enDeposito: localDeposito, funcionaStatus: localFuncionaStatus }),
-    [movie, localDeposito, localFuncionaStatus]
+    () => ({ ...currentMovie, enDeposito: localDeposito, funcionaStatus: localFuncionaStatus }),
+    [currentMovie, localDeposito, localFuncionaStatus]
   );
 
-  const tmdbUrl = movie.tmdbId
-    ? `https://www.themoviedb.org/${movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie'}/${movie.tmdbId}`
+  const tmdbUrl = currentMovie.tmdbId
+    ? `https://www.themoviedb.org/${currentMovie.tmdbType === 'tv' || currentMovie.series ? 'tv' : 'movie'}/${currentMovie.tmdbId}`
     : null;
 
   useEffect(() => {
     setAdminMessage(null);
     setInventoryMessage(null);
     setInventoryBusy(false);
-    setLocalDeposito(movie.enDeposito ?? false);
-    setLocalFuncionaStatus(movie.funcionaStatus);
+    setLocalDeposito(currentMovie.enDeposito ?? false);
+    setLocalFuncionaStatus(currentMovie.funcionaStatus);
     setAdminTmdbId('');
-    setAdminTmdbType(movie.tmdbType === 'tv' || movie.series ? 'tv' : 'movie');
+    setAdminTmdbType(currentMovie.tmdbType === 'tv' || currentMovie.series ? 'tv' : 'movie');
     setAdminBusy(false);
-    setAdminSeason(movie.season != null ? String(movie.season) : '');
+    setAdminSeason(currentMovie.season != null ? String(currentMovie.season) : '');
     setSeasonOverrides(null);
     setActiveTab('summary');
     setPlotExpanded(false);
@@ -571,8 +575,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setShowWatchedForm(false);
     setWatchedInput({
       seen: true,
-      ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
-      ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+      ratingGloria: currentMovie.ratingGloria != null ? String(currentMovie.ratingGloria) : '',
+      ratingRodrigo: currentMovie.ratingRodrigo != null ? String(currentMovie.ratingRodrigo) : '',
       busy: false,
       error: undefined
     });
@@ -594,12 +598,12 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   useEffect(() => {
     let active = true;
     async function fetchDirectors() {
-      if (!movie.tmdbId || !tmdbEnrichmentEnabled) {
+      if (!currentMovie.tmdbId || !tmdbEnrichmentEnabled) {
         setDirectors([]);
         return;
       }
       setLoadingDirectors(true);
-      const found = await getDirectorFromMovie(movie.tmdbId);
+      const found = await getDirectorFromMovie(currentMovie.tmdbId);
       if (!active) return;
       const names = Array.from(new Set(found.map((entry) => entry.name)));
       setDirectors(names);
@@ -609,22 +613,22 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       active = false;
     };
-  }, [movie.tmdbId, tmdbEnrichmentEnabled]);
+  }, [currentMovie.tmdbId, tmdbEnrichmentEnabled]);
 
   useEffect(() => {
     let active = true;
     async function fetchSeasons() {
-      if (!tmdbEnrichmentEnabled || movie.tmdbType !== 'tv' || !movie.tmdbId) {
+      if (!tmdbEnrichmentEnabled || currentMovie.tmdbType !== 'tv' || !currentMovie.tmdbId) {
         setSeasonOverrides(null);
         return;
       }
-      const hasPoster = movie.tmdbSeasons?.some((season) => season.posterUrl || season.posterPath);
+      const hasPoster = currentMovie.tmdbSeasons?.some((season) => season.posterUrl || season.posterPath);
       if (hasPoster) {
         setSeasonOverrides(null);
         return;
       }
       try {
-        const seasons = await fetchTvSeasons(movie.tmdbId);
+        const seasons = await fetchTvSeasons(currentMovie.tmdbId);
         if (active) {
           setSeasonOverrides(seasons);
         }
@@ -636,12 +640,16 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       active = false;
     };
-  }, [movie.tmdbId, movie.tmdbType, movie.tmdbSeasons, tmdbEnrichmentEnabled]);
+  }, [currentMovie.tmdbId, currentMovie.tmdbType, currentMovie.tmdbSeasons, tmdbEnrichmentEnabled]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (showWatchedForm) {
+          setShowWatchedForm(false);
+          return;
+        }
         requestClose();
         return;
       }
@@ -663,7 +671,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [showWatchedForm]);
 
   const parseTmdbInput = (value: string, fallbackType: 'movie' | 'tv') => {
     const trimmed = value.trim();
@@ -818,14 +826,14 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   };
 
   const displaySeasons = useMemo(() => {
-    const base = movie.tmdbSeasons ?? [];
+    const base = currentMovie.tmdbSeasons ?? [];
     const overrides = seasonOverrides ?? [];
     if (overrides.length === 0) return base;
     const map = new Map(overrides.map((season) => [season.seasonNumber, season]));
     return base.length > 0
       ? base.map((season) => ({ ...season, ...map.get(season.seasonNumber) }))
       : overrides;
-  }, [movie.tmdbSeasons, seasonOverrides]);
+  }, [currentMovie.tmdbSeasons, seasonOverrides]);
 
   const requestClose = () => {
     if (closeTimeoutRef.current != null) return;
@@ -849,7 +857,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   };
 
   const handleToggleSeen = () => {
-    if (movie.seen) {
+    if (currentMovie.seen) {
       void handleUnsetWatched();
       return;
     }
@@ -857,25 +865,25 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setWatchedInput((prev) => ({
       ...prev,
       seen: true,
-      ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
-      ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+      ratingGloria: currentMovie.ratingGloria != null ? String(currentMovie.ratingGloria) : '',
+      ratingRodrigo: currentMovie.ratingRodrigo != null ? String(currentMovie.ratingRodrigo) : '',
       error: undefined
     }));
   };
 
   const handleEdit = () => {
-    navigate(`/admin/movies/${movie.id}/edit`);
+    navigate(`/admin/movies/${currentMovie.id}/edit`);
     requestClose();
   };
 
-  const dubbingValue = movie.dubbing as unknown;
+  const dubbingValue = currentMovie.dubbing as unknown;
   const dubbingLabel =
     typeof dubbingValue === 'boolean'
       ? dubbingValue
         ? 'Sí'
         : 'No'
-      : movie.dubbing
-      ? movie.dubbing
+      : currentMovie.dubbing
+      ? currentMovie.dubbing
       : 'No especificado';
 
   const summaryContent = (
@@ -884,9 +892,9 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         <div className="detail-sheet__section">
           <h3>Sinopsis</h3>
           <p className={`detail-sheet__plot ${plotExpanded ? 'is-expanded' : ''}`}>
-            {movie.plot ?? 'No plot available.'}
+            {currentcurrentMovie.plot ?? 'No plot available.'}
           </p>
-          {movie.plot && movie.plot.length > 180 && (
+          {currentcurrentMovie.plot && currentcurrentMovie.plot.length > 180 && (
             <button className="ghost" onClick={() => setPlotExpanded((prev) => !prev)} type="button">
               {plotExpanded ? 'Ver menos' : 'Ver más'}
             </button>
@@ -897,33 +905,35 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           <div className="detail-sheet__info-grid">
             <div>
               <strong>Doblaje / Formato</strong>
-              <p>{dubbingLabel} / {movie.format}</p>
+              <p>{dubbingLabel} / {currentcurrentMovie.format}</p>
             </div>
             <div>
               <strong>Estado físico</strong>
               <p>{funcionaLabel}</p>
             </div>
-            {movie.group && (
+            {currentcurrentMovie.group && (
               <div>
                 <strong>Group</strong>
-                <p>{movie.group}</p>
+                <p>{currentcurrentMovie.group}</p>
               </div>
             )}
-            {movie.saga && (
+            {currentcurrentMovie.saga && (
               <div>
                 <strong>Saga</strong>
                 <p>
-                  <Link to={`/movies?saga=${encodeURIComponent(movie.saga)}`}>{movie.saga}</Link>
+                  <Link to={`/movies?saga=${encodeURIComponent(currentcurrentMovie.saga)}`}>{currentcurrentMovie.saga}</Link>
                 </p>
               </div>
             )}
           </div>
         </div>
-        {movie.tmdbType === 'tv' && (
+        {currentcurrentMovie.tmdbType === 'tv' && (
           <div className="detail-sheet__section">
             <div className="director-section__heading">
               <strong>Temporadas</strong>
-              {movie.season != null && <small className="muted"> Temporada solicitada: {movie.season}</small>}
+              {currentcurrentMovie.season != null && (
+                <small className="muted"> Temporada solicitada: {currentcurrentMovie.season}</small>
+              )}
             </div>
             {displaySeasons && displaySeasons.length > 0 ? (
               <ul className="detail-sheet__season-list">
@@ -932,7 +942,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                     <div>
                       T{season.seasonNumber}{' '}
                       {season.name && <em className="muted">({season.name})</em>}
-                      {movie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+                      {currentcurrentMovie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
                     </div>
                     <div className="muted">
                       Episodios: {season.episodeCount ?? 'A??'}{' '}
@@ -957,15 +967,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         )}
       </div>
       <aside className="detail-sheet__sidebar">
-        {adminSession && showWatchedForm && (
-          <WatchedForm
-            input={watchedInput}
-            onChange={updateWatchedField}
-            onSave={handleSaveWatched}
-            onCancel={() => setShowWatchedForm(false)}
-          />
-        )}
-        <RatingsCard movie={movie} />
+        <RatingsCard movie={currentMovie} />
       </aside>
     </div>
   );
@@ -978,33 +980,33 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           <div className="detail-sheet__info-grid">
             <div>
               <strong>Año</strong>
-              <p>{movie.tmdbYear ?? movie.year ?? 'Year ?'}</p>
+              <p>{currentMovie.tmdbYear ?? currentMovie.year ?? 'Year ?'}</p>
             </div>
             <div>
               <strong>Sección</strong>
-              <p>{movie.seccion}</p>
+              <p>{currentMovie.seccion}</p>
             </div>
             <div>
               <strong>Género</strong>
-              <p>{movie.genreRaw}</p>
-              {movie.tmdbGenres && movie.tmdbGenres.length > 0 && (
-                <small className="muted">TMDb: {movie.tmdbGenres.join(', ')}</small>
+              <p>{currentMovie.genreRaw}</p>
+              {currentMovie.tmdbGenres && currentMovie.tmdbGenres.length > 0 && (
+                <small className="muted">TMDb: {currentMovie.tmdbGenres.join(', ')}</small>
               )}
             </div>
             <div>
               <strong>Tipo</strong>
-              <p>{movie.tmdbType === 'tv' || movie.series ? 'Serie' : 'Película'}</p>
+              <p>{currentMovie.tmdbType === 'tv' || currentMovie.series ? 'Serie' : 'Película'}</p>
             </div>
-            {movie.originalTitle && (
+            {currentMovie.originalTitle && (
               <div>
                 <strong>Título original</strong>
-                <p>{movie.originalTitle}</p>
+                <p>{currentMovie.originalTitle}</p>
               </div>
             )}
-            {movie.tmdbOriginalTitle && movie.tmdbOriginalTitle !== movie.originalTitle && (
+            {currentMovie.tmdbOriginalTitle && currentMovie.tmdbOriginalTitle !== currentMovie.originalTitle && (
               <div>
                 <strong>TMDb original</strong>
-                <p>{movie.tmdbOriginalTitle}</p>
+                <p>{currentMovie.tmdbOriginalTitle}</p>
               </div>
             )}
           </div>
@@ -1046,7 +1048,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           handleResolveTmdb={handleResolveTmdb}
           handleToggleDeposito={handleToggleDeposito}
           handleToggleFunciona={handleToggleFunciona}
-          movie={movie}
+          movie={currentMovie}
           onEdit={handleEdit}
           setAdminSeason={setAdminSeason}
           setAdminTmdbType={setAdminTmdbType}
@@ -1066,18 +1068,18 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         className={`detail-sheet ${isClosing ? 'is-closing' : 'is-open'}`}
         role="dialog"
         aria-modal="true"
-        aria-label={`Detalles de ${movie.title}`}
+        aria-label={`Detalles de ${currentMovie.title}`}
         onClick={(event) => event.stopPropagation()}
         ref={dialogRef}
       >
         <div className="detail-sheet__inner">
           <TopBar
-            title={movie.title}
+            title={currentMovie.title}
             showTitle={showCompactTitle}
             onClose={requestClose}
             tmdbUrl={tmdbUrl}
             onToggleSeen={handleToggleSeen}
-            seen={movie.seen}
+            seen={currentMovie.seen}
             showWatchedToggle={Boolean(adminSession)}
             closeButtonRef={closeButtonRef}
           />
@@ -1091,6 +1093,25 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           <Tabs tabs={tabs} activeId={activeTab} onChange={setActiveTab} />
         </div>
       </div>
+      {adminSession && showWatchedForm && (
+        <div
+          className="modal-backdrop"
+          style={{ zIndex: 45 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowWatchedForm(false);
+          }}
+        >
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <WatchedForm
+              input={watchedInput}
+              onChange={updateWatchedField}
+              onSave={handleSaveWatched}
+              onCancel={() => setShowWatchedForm(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
