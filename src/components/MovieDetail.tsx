@@ -89,7 +89,7 @@ const TopBar: React.FC<{
       <div className="detail-sheet__topbar-actions">
         {showWatchedToggle && (
           <button className="ghost" onClick={onToggleSeen} type="button">
-            {seen ? 'Quitar vista' : 'Mark as Watched'}
+            {seen ? 'Quitar vista' : 'Marcar como vista'}
           </button>
         )}
         {tmdbUrl && (
@@ -271,6 +271,66 @@ const RatingsCard: React.FC<{ movie: MovieRecord }> = ({ movie }) => {
   );
 };
 
+const WatchedForm: React.FC<{
+  input: {
+    seen: boolean;
+    ratingGloria: string;
+    ratingRodrigo: string;
+    busy?: boolean;
+    error?: string;
+  };
+  onChange: (field: 'seen' | 'ratingGloria' | 'ratingRodrigo', value: string | boolean) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}> = ({ input, onChange, onSave, onCancel }) => {
+  return (
+    <div className="detail-sheet__card">
+      <div className="detail-sheet__card-header">
+        <h3>Marcar como vista</h3>
+      </div>
+      <div className="ritual-admin__body">
+        <label className="ritual-admin__check">
+          <input
+            type="checkbox"
+            checked={input.seen}
+            onChange={(event) => onChange('seen', event.target.checked)}
+          />
+          <span>Vista</span>
+        </label>
+        <div className="ritual-admin__ratings">
+          <label>
+            <span>Gloria</span>
+            <input
+              type="number"
+              step="0.5"
+              value={input.ratingGloria}
+              onChange={(event) => onChange('ratingGloria', event.target.value)}
+            />
+          </label>
+          <label>
+            <span>Rodrigo</span>
+            <input
+              type="number"
+              step="0.5"
+              value={input.ratingRodrigo}
+              onChange={(event) => onChange('ratingRodrigo', event.target.value)}
+            />
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button className="btn" onClick={onSave} disabled={input.busy} type="button">
+            {input.busy ? 'Guardando...' : 'Guardar'}
+          </button>
+          <button className="ghost" onClick={onCancel} type="button" disabled={input.busy}>
+            Cancelar
+          </button>
+        </div>
+        {input.error && <p className="ritual-admin__error">{input.error}</p>}
+      </div>
+    </div>
+  );
+};
+
 const AdminPanel: React.FC<{
   adminBusy: boolean;
   adminMessage: string | null;
@@ -433,7 +493,7 @@ const AdminPanel: React.FC<{
 };
 
 export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
-  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, updateSeen, applyMovieStatusUpdate } = useMovies();
+  const { adminSession, refreshSupabase, tmdbEnrichmentEnabled, applyMovieStatusUpdate } = useMovies();
   const navigate = useNavigate();
   const [directors, setDirectors] = useState<string[]>([]);
   const [loadingDirectors, setLoadingDirectors] = useState(false);
@@ -448,6 +508,14 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const [inventoryMessage, setInventoryMessage] = useState<string | null>(null);
   const [localDeposito, setLocalDeposito] = useState(movie.enDeposito ?? false);
   const [localFuncionaStatus, setLocalFuncionaStatus] = useState(movie.funcionaStatus);
+  const [showWatchedForm, setShowWatchedForm] = useState(false);
+  const [watchedInput, setWatchedInput] = useState({
+    seen: true,
+    ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
+    ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+    busy: false,
+    error: undefined as string | undefined
+  });
   const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
   const [plotExpanded, setPlotExpanded] = useState(false);
@@ -500,6 +568,14 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setActiveTab('summary');
     setPlotExpanded(false);
     setShowCompactTitle(false);
+    setShowWatchedForm(false);
+    setWatchedInput({
+      seen: true,
+      ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
+      ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+      busy: false,
+      error: undefined
+    });
   }, [movie.id]);
 
   useEffect(() => {
@@ -699,6 +775,48 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     }
   };
 
+  const updateWatchedField = (field: 'seen' | 'ratingGloria' | 'ratingRodrigo', value: string | boolean) => {
+    setWatchedInput((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveWatched = async () => {
+    if (!adminSession) return;
+    setWatchedInput((prev) => ({ ...prev, busy: true, error: undefined }));
+    try {
+      const ratingGloria = watchedInput.ratingGloria ? Number(watchedInput.ratingGloria) : null;
+      const ratingRodrigo = watchedInput.ratingRodrigo ? Number(watchedInput.ratingRodrigo) : null;
+      await updateMovieStatus({
+        collectionId: movie.id,
+        seen: watchedInput.seen,
+        ratingGloria,
+        ratingRodrigo
+      });
+      applyMovieStatusUpdate(movie.id, { seen: watchedInput.seen, ratingGloria, ratingRodrigo });
+      setShowWatchedForm(false);
+      setWatchedInput((prev) => ({ ...prev, busy: false, error: undefined }));
+    } catch (error) {
+      console.error(error);
+      setWatchedInput((prev) => ({ ...prev, busy: false, error: 'No se pudo guardar.' }));
+    }
+  };
+
+  const handleUnsetWatched = async () => {
+    if (!adminSession) return;
+    setWatchedInput((prev) => ({ ...prev, busy: true, error: undefined }));
+    try {
+      await updateMovieStatus({ collectionId: movie.id, seen: false });
+      applyMovieStatusUpdate(movie.id, { seen: false });
+      setShowWatchedForm(false);
+      setWatchedInput((prev) => ({ ...prev, busy: false, error: undefined }));
+    } catch (error) {
+      console.error(error);
+      setWatchedInput((prev) => ({ ...prev, busy: false, error: 'No se pudo guardar.' }));
+    }
+  };
+
   const displaySeasons = useMemo(() => {
     const base = movie.tmdbSeasons ?? [];
     const overrides = seasonOverrides ?? [];
@@ -731,7 +849,18 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   };
 
   const handleToggleSeen = () => {
-    updateSeen(movie.id, !movie.seen);
+    if (movie.seen) {
+      void handleUnsetWatched();
+      return;
+    }
+    setShowWatchedForm(true);
+    setWatchedInput((prev) => ({
+      ...prev,
+      seen: true,
+      ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
+      ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
+      error: undefined
+    }));
   };
 
   const handleEdit = () => {
@@ -828,6 +957,14 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         )}
       </div>
       <aside className="detail-sheet__sidebar">
+        {adminSession && showWatchedForm && (
+          <WatchedForm
+            input={watchedInput}
+            onChange={updateWatchedField}
+            onSave={handleSaveWatched}
+            onCancel={() => setShowWatchedForm(false)}
+          />
+        )}
         <RatingsCard movie={movie} />
       </aside>
     </div>
