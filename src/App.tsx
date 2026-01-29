@@ -9,6 +9,7 @@ import { SectionPage } from './pages/SectionPage';
 import { SurpriseMovieNightPage } from './pages/SurpriseMovieNightPage';
 import { DirectorsHub } from './pages/DirectorsHub';
 import { SectionsHub } from './pages/SectionsHub';
+import { SagasHub } from './pages/SagasHub';
 import { SettingsPage } from './pages/SettingsPage';
 import { DamagedMoviesPage } from './pages/DamagedMoviesPage';
 import { FavoritesPage } from './pages/FavoritesPage';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
           <Route path="/directors/:name" element={<DirectorPage />} />
           <Route path="/sections" element={<SectionsHub />} />
           <Route path="/sections/:name" element={<SectionPage />} />
+          <Route path="/sagas" element={<SagasHub />} />
           <Route path="/surprise" element={<SurpriseMovieNightPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/settings" element={<SettingsPage />} />

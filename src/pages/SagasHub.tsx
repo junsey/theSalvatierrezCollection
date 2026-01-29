@@ -1,32 +1,41 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SectionList } from '../components/SectionList';
+import { SagaList } from '../components/SagaList';
 import { useMovies } from '../context/MovieContext';
 
-export const SectionsHub: React.FC = () => {
+export const SagasHub: React.FC = () => {
   const { visibleMovies: movies } = useMovies();
   const [orderBy, setOrderBy] = useState<'pending' | 'largest' | 'alpha'>('pending');
   const totals = useMemo(() => {
-    const total = movies.length;
-    const seen = movies.filter((movie) => movie.seen).length;
-    return { total, seen, pending: Math.max(total - seen, 0) };
+    const sagaMap = new Map<string, number>();
+    let totalMovies = 0;
+    let seen = 0;
+    movies.forEach((movie) => {
+      const saga = (movie.saga ?? '').trim();
+      if (!saga) return;
+      sagaMap.set(saga, (sagaMap.get(saga) ?? 0) + 1);
+      totalMovies += 1;
+      if (movie.seen) seen += 1;
+    });
+    const sagaCount = Array.from(sagaMap.values()).filter((count) => count > 1).length;
+    return { totalMovies, seen, pending: Math.max(totalMovies - seen, 0), sagaCount };
   }, [movies]);
 
   return (
     <section className="sections-hub">
       <header className="sections-hub__header">
         <div>
-          <h1>Sections</h1>
-          <p className="text-muted">Explora la colección por secciones y prioriza tus pendientes.</p>
+          <h1>Sagas</h1>
+          <p className="text-muted">Explora sagas con más de una película y vuelve a secciones cuando necesites.</p>
         </div>
         <div className="sections-hub__metrics">
           <div className="sections-hub__metric">
-            <span>Total</span>
-            <strong>{totals.total}</strong>
+            <span>Películas</span>
+            <strong>{totals.totalMovies}</strong>
           </div>
           <div className="sections-hub__metric">
-            <span>Vistas</span>
-            <strong>{totals.seen}</strong>
+            <span>Sagas</span>
+            <strong>{totals.sagaCount}</strong>
           </div>
           <div className="sections-hub__metric">
             <span>Pendientes</span>
@@ -36,8 +45,8 @@ export const SectionsHub: React.FC = () => {
       </header>
       <div className="sections-hub__toolbar">
         <div className="sections-hub__chips">
-          <Link className="sections-hub__chip is-active" to="/sections">
-            Todas
+          <Link className="sections-hub__chip" to="/sections">
+            Secciones
           </Link>
           <button className="sections-hub__chip" type="button" disabled>
             Generos
@@ -45,7 +54,7 @@ export const SectionsHub: React.FC = () => {
           <Link className="sections-hub__chip" to="/directors">
             Directores
           </Link>
-          <Link className="sections-hub__chip" to="/sagas">
+          <Link className="sections-hub__chip is-active" to="/sagas">
             Sagas
           </Link>
         </div>
@@ -58,8 +67,7 @@ export const SectionsHub: React.FC = () => {
           </select>
         </label>
       </div>
-      <SectionList movies={movies} orderBy={orderBy} />
+      <SagaList movies={movies} orderBy={orderBy} />
     </section>
   );
 };
-

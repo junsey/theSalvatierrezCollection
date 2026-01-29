@@ -56,9 +56,9 @@ export const DirectorsHub: React.FC = () => {
           <Link className="sections-hub__chip is-active" to="/directors">
             Directores
           </Link>
-          <button className="sections-hub__chip" type="button" disabled>
+          <Link className="sections-hub__chip" to="/sagas">
             Sagas
-          </button>
+          </Link>
         </div>
       </div>
       <DirectorList movies={movies} />
