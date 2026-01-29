@@ -1544,13 +1544,22 @@ a.ghost {
 }
 
 .modal {
-  max-width: 900px;
-  width: min(900px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+    max-width: 900px;
+    width: min(900px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+
+.watched-modal {
+  background: rgba(12, 14, 20, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
 }
 
 .detail-sheet__overlay {

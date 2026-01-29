@@ -1102,7 +1102,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             setShowWatchedForm(false);
           }}
         >
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
+          <div className="modal watched-modal" onClick={(event) => event.stopPropagation()}>
             <WatchedForm
               input={watchedInput}
               onChange={updateWatchedField}
