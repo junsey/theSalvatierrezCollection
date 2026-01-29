@@ -892,9 +892,9 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         <div className="detail-sheet__section">
           <h3>Sinopsis</h3>
           <p className={`detail-sheet__plot ${plotExpanded ? 'is-expanded' : ''}`}>
-            {currentcurrentMovie.plot ?? 'No plot available.'}
+            {currentMovie.plot ?? 'No plot available.'}
           </p>
-          {currentcurrentMovie.plot && currentcurrentMovie.plot.length > 180 && (
+          {currentMovie.plot && currentMovie.plot.length > 180 && (
             <button className="ghost" onClick={() => setPlotExpanded((prev) => !prev)} type="button">
               {plotExpanded ? 'Ver menos' : 'Ver más'}
             </button>
@@ -905,34 +905,34 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           <div className="detail-sheet__info-grid">
             <div>
               <strong>Doblaje / Formato</strong>
-              <p>{dubbingLabel} / {currentcurrentMovie.format}</p>
+              <p>{dubbingLabel} / {currentMovie.format}</p>
             </div>
             <div>
               <strong>Estado físico</strong>
               <p>{funcionaLabel}</p>
             </div>
-            {currentcurrentMovie.group && (
+            {currentMovie.group && (
               <div>
                 <strong>Group</strong>
-                <p>{currentcurrentMovie.group}</p>
+                <p>{currentMovie.group}</p>
               </div>
             )}
-            {currentcurrentMovie.saga && (
+            {currentMovie.saga && (
               <div>
                 <strong>Saga</strong>
                 <p>
-                  <Link to={`/movies?saga=${encodeURIComponent(currentcurrentMovie.saga)}`}>{currentcurrentMovie.saga}</Link>
+                  <Link to={`/movies?saga=${encodeURIComponent(currentMovie.saga)}`}>{currentMovie.saga}</Link>
                 </p>
               </div>
             )}
           </div>
         </div>
-        {currentcurrentMovie.tmdbType === 'tv' && (
+        {currentMovie.tmdbType === 'tv' && (
           <div className="detail-sheet__section">
             <div className="director-section__heading">
               <strong>Temporadas</strong>
-              {currentcurrentMovie.season != null && (
-                <small className="muted"> Temporada solicitada: {currentcurrentMovie.season}</small>
+              {currentMovie.season != null && (
+                <small className="muted"> Temporada solicitada: {currentMovie.season}</small>
               )}
             </div>
             {displaySeasons && displaySeasons.length > 0 ? (
@@ -942,7 +942,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                     <div>
                       T{season.seasonNumber}{' '}
                       {season.name && <em className="muted">({season.name})</em>}
-                      {currentcurrentMovie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+                      {currentMovie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
                     </div>
                     <div className="muted">
                       Episodios: {season.episodeCount ?? 'A??'}{' '}
