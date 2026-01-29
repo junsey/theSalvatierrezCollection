@@ -6,7 +6,7 @@ import { refreshDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
-import { CACHE_VERSION, clearDirectorCache, loadDirectorCache, saveDirectorCache } from '../lib/directorCache';
+import { CACHE_VERSION, loadDirectorCache, saveDirectorCache } from '../lib/directorCache';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -233,12 +233,17 @@ export const DirectorPage: React.FC = () => {
     setRefreshMessage(null);
     try {
       const response = await refreshDirectorTmdb({ name: directorName, tmdbId: parsedId ?? tmdbPersonId ?? null });
+      let nextName = personName || directorName;
+      let nextProfileUrl = profileUrl;
+      let nextTmdbId = tmdbPersonId;
       if (response?.name) {
         setPersonName(response.name);
+        nextName = response.name;
       }
       if (response?.profilePath) {
         const url = await buildDirectorProfileUrl(response.profilePath);
         setProfileUrl(url);
+        nextProfileUrl = url;
       }
       setBiography(response?.biography ?? null);
       if (response?.tmdbId) {
@@ -246,8 +251,9 @@ export const DirectorPage: React.FC = () => {
         setKnownFor(filmography);
         setTmdbPersonId(response.tmdbId);
         setAdminTmdbId(String(response.tmdbId));
+        nextTmdbId = response.tmdbId;
       }
-      clearDirectorCache();
+      updateDirectorCache(nextName, nextTmdbId ?? null, nextProfileUrl);
       setRefreshMessage('TMDb actualizado para este director.');
     } catch (err) {
       console.error('No se pudo actualizar el director', err);

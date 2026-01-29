@@ -53,6 +53,16 @@ function roundRating(value) {
   return Math.round(num * 10) / 10;
 }
 
+function splitDirectors(value) {
+  return String(value ?? '')
+    .split(/[,;/&]/g)
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
+function normalizeDirectorName(value) {
+  return value.trim().toLowerCase();
+}
 const envFromFile = loadDotEnv();
 const args = parseArgs();
 
@@ -75,6 +85,9 @@ const COLLECTION_ID = args.get('collection-id') ?? null;
 const OVERRIDE_TMDB_ID = args.has('tmdb-id') ? toNumber(args.get('tmdb-id'), null) : null;
 const SYNC_DIRECTORS = args.get('sync-directors') === 'true';
 const DIRECTORS_LIMIT = toNumber(args.get('directors-limit'), null);
+const SYNC_DIRECTOR_NAMES = args.get('sync-director-names') === 'true';
+const DIRECTOR_NAMES_LIMIT = toNumber(args.get('director-names-limit'), null);
+const DIRECTOR_NAMES_ONLY_MISSING = args.get('director-names-only-missing') === 'true';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.');
@@ -91,6 +104,7 @@ const tmdbBaseUrl = 'https://api.themoviedb.org/3';
 const sinceMs = SINCE_DAYS * 24 * 60 * 60 * 1000;
 const minDelayMs = Math.ceil(1000 / MAX_RPS);
 const processedDirectorIds = new Set();
+const processedDirectorNames = new Set();
 
 async function supabaseRequest(pathname, options = {}) {
   const url = `${restBaseUrl}/${pathname}`;
@@ -172,6 +186,16 @@ async function fetchDirectorBatch(offset, limit) {
     offset: String(offset),
   });
   return supabaseRequest(`tmdb_directors?${params.toString()}`);
+}
+
+async function fetchDirectorByName(name) {
+  const params = new URLSearchParams({
+    select: 'tmdb_person_id,profile_path,name',
+    limit: '1',
+  });
+  params.set('name', `ilike.*${name.replace(/%/g, '\\%')}*`);
+  const rows = await supabaseRequest(`tmdb_directors?${params.toString()}`);
+  return rows?.[0] ?? null;
 }
 
 async function fetchExistingTmdbRows(collectionIds) {
@@ -269,6 +293,19 @@ async function fetchPersonMovieCredits(personId) {
   return tmdbRequest(`person/${personId}/movie_credits`, { language: 'es-ES' });
 }
 
+async function searchPersonByName(name) {
+  const data = await tmdbRequest('search/person', {
+    query: name,
+    include_adult: false,
+    language: 'es-ES',
+  });
+  return data?.results?.[0] ?? null;
+}
+
+async function fetchPersonDetails(personId) {
+  return tmdbRequest(`person/${personId}`, { language: 'es-ES' });
+}
+
 async function syncDirectorFilmography(personId) {
   if (!personId || processedDirectorIds.has(personId)) return;
   processedDirectorIds.add(personId);
@@ -285,6 +322,45 @@ async function syncDirectorFilmography(personId) {
     }))
     .filter((item) => item.tmdb_movie_id);
   await upsertDirectorFilmography(directed);
+}
+
+async function syncDirectorByName(name, tmdbIdOverride) {
+  const normalized = normalizeDirectorName(name);
+  if (processedDirectorNames.has(normalized)) return { status: 'skipped', reason: 'duplicate' };
+  processedDirectorNames.add(normalized);
+
+  let existing = null;
+  if (DIRECTOR_NAMES_ONLY_MISSING) {
+    existing = await fetchDirectorByName(name);
+    if (existing?.profile_path && existing.tmdb_person_id && !FORCE) {
+      return { status: 'skipped', reason: 'exists' };
+    }
+  }
+
+  let tmdbId = Number.isFinite(tmdbIdOverride) ? tmdbIdOverride : existing?.tmdb_person_id ?? null;
+  if (!tmdbId) {
+    const match = await searchPersonByName(name);
+    if (!match?.id) {
+      return { status: 'not-found' };
+    }
+    tmdbId = match.id;
+  }
+
+  const details = await fetchPersonDetails(tmdbId);
+  if (!details?.id) {
+    return { status: 'not-found' };
+  }
+
+  await upsertTmdbDirector({
+    tmdb_person_id: details.id,
+    name: details.name ?? name,
+    profile_path: details.profile_path ?? null,
+    raw_json: details,
+    last_synced_at: new Date().toISOString(),
+  });
+
+  await syncDirectorFilmography(details.id);
+  return { status: 'synced', tmdb_id: details.id, name: details.name ?? name };
 }
 
 async function processMovie(record, existing, overrideTmdbId) {
@@ -408,6 +484,58 @@ async function run() {
     console.log(`Director filmography sync done. processed=${processed}`);
     return;
   }
+  if (SYNC_DIRECTOR_NAMES) {
+    console.log('Syncing directors by name from collection...');
+    let offset = 0;
+    let processedMovies = 0;
+    const limit = LIMIT ?? Number.MAX_SAFE_INTEGER;
+    const directorMap = new Map();
+
+    while (processedMovies < limit) {
+      const batchLimit = Math.min(BATCH_SIZE, limit - processedMovies);
+      const records = await fetchCollectionBatch(offset, batchLimit);
+      if (!records || records.length === 0) break;
+
+      for (const record of records) {
+        const directorValue = record['Director'];
+        const tmdbIdValue = toNumber(record['DirectorTMDbId'], null);
+        const names = splitDirectors(directorValue);
+        names.forEach((dirName) => {
+          const normalized = normalizeDirectorName(dirName);
+          if (directorMap.has(normalized)) return;
+          const resolvedTmdbId = names.length === 1 ? tmdbIdValue : null;
+          directorMap.set(normalized, { name: dirName, tmdbId: resolvedTmdbId });
+        });
+        if (DIRECTOR_NAMES_LIMIT && directorMap.size >= DIRECTOR_NAMES_LIMIT) break;
+      }
+
+      processedMovies += records.length;
+      offset += records.length;
+      if (DIRECTOR_NAMES_LIMIT && directorMap.size >= DIRECTOR_NAMES_LIMIT) break;
+    }
+
+    const directors = Array.from(directorMap.values());
+    let processed = 0;
+    let synced = 0;
+    let skipped = 0;
+    let notFound = 0;
+    const cap = DIRECTOR_NAMES_LIMIT ?? directors.length;
+
+    for (const director of directors.slice(0, cap)) {
+      const result = await syncDirectorByName(director.name, director.tmdbId);
+      processed += 1;
+      if (result.status === 'synced') synced += 1;
+      else if (result.status === 'not-found') notFound += 1;
+      else skipped += 1;
+      if (processed >= cap) break;
+      await sleep(minDelayMs);
+    }
+
+    console.log(
+      `Director name sync done. processed=${processed} synced=${synced} not_found=${notFound} skipped=${skipped}`
+    );
+    return;
+  }
   let offset = 0;
   let processed = 0;
   let synced = 0;
@@ -447,3 +575,15 @@ run().catch((error) => {
   console.error('Sync failed:', error);
   process.exit(1);
 });
+
+
+
+
+
+
+
+
+
+
+
+
