@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb, getPersonWritingCredits } from '../services/tmdbPeopleService';
-import { saveDirectorTmdb } from '../services/adminApi';
+import { refreshDirectorTmdb, saveDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
@@ -263,6 +263,48 @@ export const DirectorPage: React.FC = () => {
     }
   };
 
+  const handleRefreshDirector = async () => {
+    if (!adminSession) return;
+    const parsedId = adminTmdbId.trim() ? Number(adminTmdbId.trim()) : null;
+    if (adminTmdbId.trim() && !Number.isFinite(parsedId)) {
+      setRefreshMessage('El TMDb ID debe ser numÃ©rico.');
+      return;
+    }
+    setRefreshBusy(true);
+    setRefreshMessage(null);
+    try {
+      const response = await refreshDirectorTmdb({ name: directorName, tmdbId: parsedId ?? tmdbPersonId ?? null });
+      let nextName = personName || directorName;
+      let nextProfileUrl = profileUrl;
+      let nextTmdbId = tmdbPersonId;
+      if (response?.name) {
+        setPersonName(response.name);
+        nextName = response.name;
+      }
+      if (response?.profilePath) {
+        const url = await buildDirectorProfileUrl(response.profilePath);
+        setProfileUrl(url);
+        nextProfileUrl = url;
+      }
+      setBiography(response?.biography ?? null);
+      if (response?.tmdbId) {
+        const filmography = await fetchDirectorFilmographyByPersonId(response.tmdbId);
+        setKnownFor(filmography);
+        setTmdbPersonId(response.tmdbId);
+        setAdminTmdbId(String(response.tmdbId));
+        nextTmdbId = response.tmdbId;
+      }
+      updateDirectorCache(nextName, nextTmdbId ?? null, nextProfileUrl);
+      window.dispatchEvent(new Event('director-cache-updated'));
+      setRefreshMessage('TMDb validado.');
+    } catch (err) {
+      console.error('No se pudo actualizar el director', err);
+      setRefreshMessage('No se pudo validar TMDb.');
+    } finally {
+      setRefreshBusy(false);
+    }
+  };
+
   const { directedMovies, writtenWorks, directedOwnedCount, directedTotalCount, writtenCount } = useMemo(() => {
     const directorJobs = new Set(['director', 'series director', 'director de la serie']);
     const writingJobs = new Set(['writer', 'screenplay', 'story', 'teleplay', 'novel', 'book', 'characters']);
@@ -472,6 +514,9 @@ export const DirectorPage: React.FC = () => {
                   style={{ width: 120 }}
                 />
               </label>
+              <button className="btn" onClick={handleRefreshDirector} disabled={refreshBusy}>
+                {refreshBusy ? 'Validando...' : 'Validar TMDb'}
+              </button>
               <button className="btn" onClick={handleSaveDirector} disabled={refreshBusy}>
                 {refreshBusy ? 'Guardando...' : 'Guardar en Supabase'}
               </button>

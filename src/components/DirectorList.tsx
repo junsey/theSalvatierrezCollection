@@ -59,6 +59,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const { tmdbEnrichmentEnabled } = useMovies();
   const collator = useMemo(() => new Intl.Collator('es', { sensitivity: 'base' }), []);
   const directorOverrides = useMemo(() => buildDirectorOverrideMap(movies), [movies]);
+  const [cacheBuster, setCacheBuster] = useState(0);
   const [supabaseProfiles, setSupabaseProfiles] = useState<
     Record<string, { profileUrl?: string; tmdbId?: number | null }>
   >({});
@@ -146,7 +147,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [directors.length]);
+  }, [directors.length, cacheBuster]);
 
   const getTotalFromEntry = (entry?: {
     totalWorksDirected?: number | null;
@@ -332,7 +333,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       active = false;
     };
-  }, [collator, directors, directorOverrides, tmdbEnrichmentEnabled]);
+  }, [collator, directors, directorOverrides, tmdbEnrichmentEnabled, cacheBuster]);
 
   useEffect(() => {
     let cancelled = false;
@@ -458,7 +459,15 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return () => {
       cancelled = true;
     };
-  }, [profiles, tmdbEnrichmentEnabled]);
+  }, [profiles, tmdbEnrichmentEnabled, cacheBuster]);
+
+  useEffect(() => {
+    const handler = () => setCacheBuster((value) => value + 1);
+    window.addEventListener('director-cache-updated', handler);
+    return () => {
+      window.removeEventListener('director-cache-updated', handler);
+    };
+  }, []);
 
   const uniqueProfiles = useMemo(() => {
     const map = new Map<string, DirectorListProfile>();
