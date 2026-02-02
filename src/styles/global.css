@@ -307,6 +307,7 @@ button:hover {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .metrics-grid {
@@ -371,7 +372,7 @@ button:hover {
 
 .metric-card__value {
   position: relative;
-  color: var(--text);
+  color: var(--accent-2);
   font-weight: 800;
   font-size: clamp(26px, 4vw, 34px);
   line-height: 1.2;
@@ -491,6 +492,7 @@ button:hover {
 .donut__number {
   font-size: 28px;
   font-weight: 700;
+  color: var(--accent-2);
 }
 
 .donut__label {
@@ -554,6 +556,11 @@ button:hover {
 
 .treasure-section__header h2 {
   margin: 6px 0 2px;
+}
+
+.treasure-section__subtitle {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .treasure-grid {
@@ -640,15 +647,48 @@ button:hover {
   pointer-events: none;
 }
 
-.banner__text h1 {
-  margin: 6px 0 10px;
-  font-size: clamp(24px, 3vw, 32px);
-}
-
 .banner__text .lore {
-  color: var(--text-muted);
+  color: var(--text);
   margin: 0 0 14px;
   line-height: 1.6;
+}
+
+.banner__text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.banner__title {
+  margin: 6px 0 0;
+  font-size: clamp(36px, 6vw, 52px);
+}
+
+.banner__subtitle {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 30px);
+}
+
+.archive-search {
+  width: min(760px, 100%);
+  margin: 8px auto 0;
+}
+
+.archive-search__input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(8, 10, 15, 0.92);
+  font-size: 16px;
+  text-align: center;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.4);
+}
+
+.archive-search__input::placeholder {
+  color: var(--text-muted);
 }
 
 .banner__chart {
@@ -712,6 +752,20 @@ button:hover {
 .chart-total {
   font-weight: 700;
   color: var(--text);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.chart-total__number {
+  color: var(--accent-2);
+}
+
+.chart-total__label {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .chart-panel__body {
@@ -745,6 +799,13 @@ button:hover {
   font-weight: 600;
   letter-spacing: 0.02em;
   box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.status-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(224, 160, 64, 0.18);
 }
 
 .status-pill span {
@@ -759,6 +820,7 @@ button:hover {
   display: block;
   font-size: 16px;
   line-height: 1.1;
+  color: var(--accent-2);
 }
 
 .status-pill--watched {
@@ -796,6 +858,152 @@ button:hover {
 
 .treasure-section {
   margin-top: 0;
+}
+
+.vaults-section {
+  display: grid;
+  gap: 16px;
+}
+
+.vaults-section__subtitle {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.vaults-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.vault-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, rgba(10, 12, 18, 0.95), rgba(18, 20, 30, 0.9));
+  color: var(--text);
+  text-decoration: none;
+  min-height: 190px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.vault-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(224, 160, 64, 0.45);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.4);
+}
+
+.vault-card__glow {
+  position: absolute;
+  inset: -40% -20%;
+  background: radial-gradient(circle at 30% 20%, rgba(224, 160, 64, 0.18), transparent 60%);
+  opacity: 0.8;
+  filter: blur(30px);
+  pointer-events: none;
+}
+
+.vault-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.vault-card__icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  display: grid;
+  place-items: center;
+}
+
+.vault-card__icon svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.4;
+}
+
+.vault-card__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.vault-card__label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.vault-card__count {
+  font-size: clamp(24px, 4vw, 32px);
+  color: var(--accent-2);
+  text-shadow: 0 0 10px rgba(224, 160, 64, 0.25);
+}
+
+.vault-card__body {
+  position: relative;
+  margin-top: 6px;
+}
+
+.status-section {
+  display: grid;
+  gap: 16px;
+}
+
+.status-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.status-section__subtitle {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.status-section__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 16px;
+  align-items: start;
+}
+
+.status-section__metrics {
+  display: grid;
+  gap: 12px;
+}
+
+.donut-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.donut-link .donut {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.donut-link:hover .donut {
+  transform: translateY(-2px);
+  box-shadow: 0 0 22px rgba(224, 160, 64, 0.18);
+}
+
+@media (max-width: 900px) {
+  .status-section__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .filters-row {
@@ -1472,11 +1680,61 @@ a.ghost {
   overflow: hidden;
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
 }
 
 .movie-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 0 24px rgba(255, 54, 93, 0.35);
+}
+
+.movie-card--curator .card-body {
+  position: relative;
+  z-index: 1;
+}
+
+.movie-card__actions {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(5, 7, 11, 0.82);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.movie-card--curator:hover .movie-card__actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.movie-card__action {
+  min-width: 160px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 12, 18, 0.9);
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.movie-card__action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(224, 160, 64, 0.5);
+  box-shadow: 0 0 16px rgba(224, 160, 64, 0.18);
+}
+
+.movie-card__action.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 .poster-frame {

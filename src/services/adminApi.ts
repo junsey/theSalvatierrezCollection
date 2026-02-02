@@ -126,3 +126,10 @@ export async function refreshDirectorTmdb(payload: { name: string; tmdbId?: numb
     body: JSON.stringify(payload)
   });
 }
+
+export async function saveDirectorTmdb(payload: { name: string; tmdbId?: number | null }) {
+  return adminFetch('/api/directors/save', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}

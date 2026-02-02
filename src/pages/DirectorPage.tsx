@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { DirectedMovie, fetchDirectorFromTMDb, getPersonWritingCredits } from '../services/tmdbPeopleService';
-import { refreshDirectorTmdb } from '../services/adminApi';
+import { saveDirectorTmdb } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { buildDirectorOverrideMap, normalizeDirectorName, splitDirectors } from '../services/directors';
 import { buildDirectorProfileUrl, fetchDirectorByName, fetchDirectorFilmographyByPersonId } from '../services/supabaseDirectors';
@@ -222,7 +222,7 @@ export const DirectorPage: React.FC = () => {
     };
   }, [directorName, directorOverrides, tmdbEnrichmentEnabled]);
 
-  const handleRefreshDirector = async () => {
+  const handleSaveDirector = async () => {
     if (!adminSession) return;
     const parsedId = adminTmdbId.trim() ? Number(adminTmdbId.trim()) : null;
     if (adminTmdbId.trim() && !Number.isFinite(parsedId)) {
@@ -232,7 +232,7 @@ export const DirectorPage: React.FC = () => {
     setRefreshBusy(true);
     setRefreshMessage(null);
     try {
-      const response = await refreshDirectorTmdb({ name: directorName, tmdbId: parsedId ?? tmdbPersonId ?? null });
+      const response = await saveDirectorTmdb({ name: directorName, tmdbId: parsedId ?? tmdbPersonId ?? null });
       let nextName = personName || directorName;
       let nextProfileUrl = profileUrl;
       let nextTmdbId = tmdbPersonId;
@@ -254,10 +254,10 @@ export const DirectorPage: React.FC = () => {
         nextTmdbId = response.tmdbId;
       }
       updateDirectorCache(nextName, nextTmdbId ?? null, nextProfileUrl);
-      setRefreshMessage('TMDb actualizado para este director.');
+      setRefreshMessage('Guardado en Supabase.');
     } catch (err) {
       console.error('No se pudo actualizar el director', err);
-      setRefreshMessage('No se pudo actualizar TMDb.');
+      setRefreshMessage('No se pudo guardar en Supabase.');
     } finally {
       setRefreshBusy(false);
     }
@@ -472,8 +472,8 @@ export const DirectorPage: React.FC = () => {
                   style={{ width: 120 }}
                 />
               </label>
-              <button className="btn" onClick={handleRefreshDirector} disabled={refreshBusy}>
-                {refreshBusy ? 'Actualizando...' : 'Actualizar TMDb'}
+              <button className="btn" onClick={handleSaveDirector} disabled={refreshBusy}>
+                {refreshBusy ? 'Guardando...' : 'Guardar en Supabase'}
               </button>
               {refreshMessage && <span className="text-muted">{refreshMessage}</span>}
             </div>
@@ -510,7 +510,7 @@ export const DirectorPage: React.FC = () => {
                 Obras dirigidas: {directedTotalCount || 0} (en coleccion: {directedOwnedCount}) · Obras escritas: {writtenCount || 0}
               </p>
               {adminSession && knownFor.length === 0 && (
-                <p className="muted">No hay filmografia en Supabase. Usa "Actualizar TMDb" para generarla.</p>
+                <p className="muted">No hay filmografia en Supabase. Usa "Guardar en Supabase" para generarla.</p>
               )}
               {directedMovies.length > 0
                 ? renderSection('Obras dirigidas', directedMovies, 'No hay obras dirigidas registradas.')

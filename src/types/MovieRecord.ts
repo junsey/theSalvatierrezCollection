@@ -82,6 +82,7 @@ export type MovieFilters = {
   saga: string | null;
   series: 'all' | 'series' | 'movies';
   seen: 'all' | 'seen' | 'unseen';
+  status: 'all' | 'untested' | 'deposit' | 'damaged';
   view: 'grid' | 'list';
   sort:
     | 'title-asc'

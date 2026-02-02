@@ -17,6 +17,7 @@ const baseFilters: MovieFilters = {
   saga: null,
   series: 'series',
   seen: 'all',
+  status: 'all',
   view: 'grid',
   sort: 'title-asc'
 };
@@ -66,6 +67,18 @@ export const SeriesSectionPage: React.FC = () => {
         if (filters.seen === 'all') return true;
         if (filters.seen === 'seen') return m.seen;
         return !m.seen;
+      })
+      .filter((m) => {
+        switch (filters.status) {
+          case 'deposit':
+            return Boolean(m.enDeposito);
+          case 'damaged':
+            return m.funcionaStatus === 'damaged';
+          case 'untested':
+            return m.funcionaStatus === 'untested' && !m.seen;
+          default:
+            return true;
+        }
       })
       .sort((a, b) => {
         switch (filters.sort) {

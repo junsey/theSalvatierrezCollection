@@ -1,12 +1,21 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { MovieRecord } from '../types/MovieRecord';
+
+type MovieCardAction = {
+  label: string;
+  onClick?: () => void;
+  to?: string;
+  disabled?: boolean;
+};
 
 interface Props {
   movie: MovieRecord;
   onClick?: () => void;
+  actions?: MovieCardAction[];
 }
 
-export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
+export const MovieCard: React.FC<Props> = ({ movie, onClick, actions }) => {
   const pawValue =
     movie.ratingGloria != null && movie.ratingRodrigo != null
       ? (movie.ratingGloria + movie.ratingRodrigo) / 2
@@ -19,7 +28,12 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
   const groupedSeasons = movie.groupedSeasons ?? [];
 
   return (
-    <div className="movie-card" onClick={onClick} role="button" tabIndex={0}>
+    <div
+      className={`movie-card${actions?.length ? ' movie-card--curator' : ''}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+    >
       <div className="poster-frame">
         <img
           className="poster"
@@ -36,7 +50,7 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
       </div>
       <div className="card-body">
         <strong>{displayTitle}</strong>
-        <small>{movie.tmdbYear ?? movie.year ?? 'Year ?'} • {movie.seccion}</small>
+        <small>{movie.tmdbYear ?? movie.year ?? 'Year ?'} - {movie.seccion}</small>
         {groupedSeasons.length > 0 && (
           <div className="card-seasons">
             {groupedSeasons.map((season) => (
@@ -75,6 +89,46 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
           )}
         </div>
       </div>
+      {actions?.length ? (
+        <div className="movie-card__actions">
+          {actions.map((action) => {
+            if (action.to) {
+              return (
+                <Link
+                  key={action.label}
+                  to={action.to}
+                  className={`movie-card__action${action.disabled ? ' is-disabled' : ''}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (action.disabled) {
+                      event.preventDefault();
+                      return;
+                    }
+                    action.onClick?.();
+                  }}
+                >
+                  {action.label}
+                </Link>
+              );
+            }
+
+            return (
+              <button
+                key={action.label}
+                type="button"
+                className={`movie-card__action${action.disabled ? ' is-disabled' : ''}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  action.onClick?.();
+                }}
+                disabled={action.disabled}
+              >
+                {action.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 };
