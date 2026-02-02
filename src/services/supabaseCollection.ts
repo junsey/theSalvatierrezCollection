@@ -215,3 +215,4 @@ export async function fetchCollectionFromSupabase(): Promise<FetchMoviesResult |
   };
   return { movies: mapped, meta };
 }
+

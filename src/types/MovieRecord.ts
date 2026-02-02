@@ -4,6 +4,8 @@ export type SeriesEpisode = {
   tmdbId?: number | null;
   name?: string | null;
   airDate?: string | null;
+  overview?: string | null;
+  tmdbRating?: number | null;
   seen?: boolean;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;

@@ -536,6 +536,18 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const [episodeInputs, setEpisodeInputs] = useState<Record<string, EpisodeInput>>({});
   const [episodeLoading, setEpisodeLoading] = useState(false);
   const [episodeError, setEpisodeError] = useState<string | null>(null);
+  const [activeSeriesTab, setActiveSeriesTab] = useState<'seasons' | 'episodes'>('seasons');
+  const [episodeModal, setEpisodeModal] = useState<{
+    seasonNumber: number;
+    episodeNumber: number;
+  } | null>(null);
+  const [episodeModalInput, setEpisodeModalInput] = useState({
+    seen: true,
+    ratingGloria: '',
+    ratingRodrigo: '',
+    busy: false,
+    error: undefined as string | undefined
+  });
   const episodeRecordsRef = useRef<MovieRecord['seriesEpisodes']>(currentMovie.seriesEpisodes ?? []);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
   const [plotExpanded, setPlotExpanded] = useState(false);
@@ -590,6 +602,15 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setEpisodeInputs({});
     setEpisodeLoading(false);
     setEpisodeError(null);
+    setActiveSeriesTab('seasons');
+    setEpisodeModal(null);
+    setEpisodeModalInput({
+      seen: true,
+      ratingGloria: '',
+      ratingRodrigo: '',
+      busy: false,
+      error: undefined
+    });
     setActiveTab('summary');
     setPlotExpanded(false);
     setShowCompactTitle(false);
@@ -826,6 +847,73 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     }));
   };
 
+  const updateEpisodeModalField = (field: 'seen' | 'ratingGloria' | 'ratingRodrigo', value: string | boolean) => {
+    setEpisodeModalInput((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const openEpisodeModal = (episode: NonNullable<MovieRecord['seriesEpisodes']>[number]) => {
+    setEpisodeModal({ seasonNumber: episode.seasonNumber, episodeNumber: episode.episodeNumber });
+    setEpisodeModalInput({
+      seen: true,
+      ratingGloria: episode.ratingGloria != null ? String(episode.ratingGloria) : '',
+      ratingRodrigo: episode.ratingRodrigo != null ? String(episode.ratingRodrigo) : '',
+      busy: false,
+      error: undefined
+    });
+  };
+
+  const handleSaveEpisodeModal = async () => {
+    if (!adminSession || !episodeModal) return;
+    setEpisodeModalInput((prev) => ({ ...prev, busy: true, error: undefined }));
+    try {
+      const ratingGloria = episodeModalInput.ratingGloria ? Number(episodeModalInput.ratingGloria) : null;
+      const ratingRodrigo = episodeModalInput.ratingRodrigo ? Number(episodeModalInput.ratingRodrigo) : null;
+      const updatedEpisodes = (episodeRecordsRef.current ?? []).map((episode) => {
+        if (episode.seasonNumber !== episodeModal.seasonNumber || episode.episodeNumber !== episodeModal.episodeNumber) {
+          return episode;
+        }
+        return {
+          ...episode,
+          seen: episodeModalInput.seen,
+          ratingGloria,
+          ratingRodrigo
+        };
+      });
+      await updateMovieStatus({ collectionId: movie.id, seriesEpisodes: updatedEpisodes });
+      applyMovieStatusUpdate(movie.id, { seriesEpisodes: updatedEpisodes });
+      setEpisodeRecords(updatedEpisodes);
+      setEpisodeModal(null);
+    } catch (error) {
+      console.error(error);
+      setEpisodeModalInput((prev) => ({ ...prev, busy: false, error: 'No se pudo guardar.' }));
+    }
+  };
+
+  const handleClearEpisode = async (episode: NonNullable<MovieRecord['seriesEpisodes']>[number]) => {
+    if (!adminSession) return;
+    try {
+      const updatedEpisodes = (episodeRecordsRef.current ?? []).map((entry) => {
+        if (entry.seasonNumber !== episode.seasonNumber || entry.episodeNumber !== episode.episodeNumber) {
+          return entry;
+        }
+        return {
+          ...entry,
+          seen: false,
+          ratingGloria: null,
+          ratingRodrigo: null
+        };
+      });
+      await updateMovieStatus({ collectionId: movie.id, seriesEpisodes: updatedEpisodes });
+      applyMovieStatusUpdate(movie.id, { seriesEpisodes: updatedEpisodes });
+      setEpisodeRecords(updatedEpisodes);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleSaveEpisode = async (seasonNumber: number, episodeNumber: number) => {
     if (!adminSession) return;
     const key = buildEpisodeKey(seasonNumber, episodeNumber);
@@ -904,6 +992,21 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return Array.from(new Set([...fromTmdb, ...fromEpisodes].filter(Number.isFinite))).sort((a, b) => a - b);
   }, [currentMovie.tmdbSeasons, episodeRecords]);
 
+  const ownedSeasons = useMemo(() => {
+    const owned = new Set<number>();
+    movies.forEach((entry) => {
+      const isSeries = entry.series || entry.tmdbType === 'tv';
+      if (!isSeries || entry.season == null) return;
+      if (currentMovie.tmdbId && entry.tmdbId === currentMovie.tmdbId) {
+        owned.add(entry.season);
+      }
+    });
+    if (currentMovie.season != null) {
+      owned.add(currentMovie.season);
+    }
+    return owned;
+  }, [currentMovie.season, currentMovie.tmdbId, movies]);
+
   useEffect(() => {
     if (episodeSeason != null) return;
     if (episodeSeasonOptions.length > 0) {
@@ -940,6 +1043,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
         tmdbId: episode.tmdbId ?? prev?.tmdbId ?? null,
         name: episode.name ?? prev?.name ?? null,
         airDate: episode.airDate ?? prev?.airDate ?? null,
+        overview: episode.overview ?? prev?.overview ?? null,
+        tmdbRating: episode.tmdbRating ?? prev?.tmdbRating ?? null,
         seen: prev?.seen ?? false,
         ratingGloria: prev?.ratingGloria ?? null,
         ratingRodrigo: prev?.ratingRodrigo ?? null
@@ -950,7 +1055,14 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     const changed = merged.length !== existing.length || merged.some((episode) => {
       const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
       const prev = existingMap.get(key);
-      return !prev || prev.name !== episode.name || prev.airDate !== episode.airDate || prev.tmdbId !== episode.tmdbId;
+      return (
+        !prev ||
+        prev.name !== episode.name ||
+        prev.airDate !== episode.airDate ||
+        prev.tmdbId !== episode.tmdbId ||
+        prev.overview !== episode.overview ||
+        prev.tmdbRating !== episode.tmdbRating
+      );
     });
     return { merged, changed };
   };
@@ -1077,7 +1189,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           </p>
           {currentMovie.plot && currentMovie.plot.length > 180 && (
             <button className="ghost" onClick={() => setPlotExpanded((prev) => !prev)} type="button">
-              {plotExpanded ? 'Ver menos' : 'Ver más'}
+              {plotExpanded ? 'Ver menos' : 'Ver mas'}
             </button>
           )}
         </div>
@@ -1089,7 +1201,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
               <p>{dubbingLabel} / {currentMovie.format}</p>
             </div>
             <div>
-              <strong>Estado físico</strong>
+              <strong>Estado fisico</strong>
               <p>{funcionaLabel}</p>
             </div>
             {currentMovie.group && (
@@ -1108,138 +1220,215 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             )}
           </div>
         </div>
+
         {(currentMovie.tmdbType === 'tv' || currentMovie.series) && (
           <div className="detail-sheet__section">
-            <div className="director-section__heading">
-              <strong>Temporadas</strong>
-              {currentMovie.season != null && (
-                <small className="muted"> Temporada solicitada: {currentMovie.season}</small>
-              )}
-            </div>
-            {displaySeasons && displaySeasons.length > 0 ? (
-              <ul className="detail-sheet__season-list">
-                {displaySeasons.map((season) => (
-                  <li key={season.seasonNumber}>
-                    <div>
-                      T{season.seasonNumber}{' '}
-                      {season.name && <em className="muted">({season.name})</em>}
-                      {currentMovie.season === season.seasonNumber && <strong> — Seleccionada</strong>}
+            <div className="detail-tabs">
+              <div className="detail-tabs__list" role="tablist" aria-label="Temporadas y capitulos">
+                <button
+                  role="tab"
+                  aria-selected={activeSeriesTab === 'seasons'}
+                  className={`detail-tabs__tab ${activeSeriesTab === 'seasons' ? 'is-active' : ''}`}
+                  onClick={() => setActiveSeriesTab('seasons')}
+                  type="button"
+                >
+                  Temporadas
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={activeSeriesTab === 'episodes'}
+                  className={`detail-tabs__tab ${activeSeriesTab === 'episodes' ? 'is-active' : ''}`}
+                  onClick={() => setActiveSeriesTab('episodes')}
+                  type="button"
+                >
+                  Capitulos
+                </button>
+              </div>
+              <div role="tabpanel" hidden={activeSeriesTab !== 'seasons'} className="detail-tabs__panel">
+                <div className="director-section__heading">
+                  <strong>Temporadas</strong>
+                  {currentMovie.season != null && (
+                    <small className="muted"> Temporada solicitada: {currentMovie.season}</small>
+                  )}
+                </div>
+                {displaySeasons && displaySeasons.length > 0 ? (
+                  <>
+                    <div
+                      style={{
+                        display: 'flex',
+                        gap: 12,
+                        overflowX: 'auto',
+                        paddingBottom: 6
+                      }}
+                    >
+                      {displaySeasons.map((season) => {
+                        const owned = ownedSeasons.has(season.seasonNumber);
+                        const isActive = episodeSeason === season.seasonNumber;
+                        return (
+                          <button
+                            key={season.seasonNumber}
+                            type="button"
+                            onClick={() => {
+                              setEpisodeSeason(season.seasonNumber);
+                              if (owned) {
+                                setActiveSeriesTab('episodes');
+                              }
+                            }}
+                            style={{
+                              border: isActive ? '2px solid var(--accent-2)' : '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: 14,
+                              padding: 8,
+                              background: 'rgba(0,0,0,0.2)',
+                              color: 'inherit',
+                              minWidth: 140,
+                              textAlign: 'left',
+                              cursor: owned ? 'pointer' : 'default'
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 120,
+                                height: 170,
+                                borderRadius: 10,
+                                backgroundColor: 'rgba(255,255,255,0.08)',
+                                backgroundImage: season.posterUrl ? `url(${season.posterUrl})` : undefined,
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center',
+                                filter: owned ? 'none' : 'grayscale(1)',
+                                opacity: owned ? 1 : 0.5,
+                                marginBottom: 8
+                              }}
+                            />
+                            <div style={{ fontWeight: 600 }}>
+                              T{season.seasonNumber}
+                            </div>
+                            {season.name && <div className="muted">{season.name}</div>}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="muted">
-                      Episodios: {season.episodeCount ?? 'A??'}{' '}
-                      {season.airDate && <span>• Estreno: {season.airDate}</span>}
-                    </div>
-                    {season.posterUrl && (
-                      <div className="detail-sheet__season-poster">
-                        <img
-                          src={season.posterUrl}
-                          alt={season.name ?? `Temporada ${season.seasonNumber}`}
-                          loading="lazy"
-                        />
+                    {episodeSeason != null && (
+                      <div className="muted" style={{ marginTop: 8 }}>
+                        {(() => {
+                          const selected = displaySeasons.find((season) => season.seasonNumber === episodeSeason);
+                          if (!selected) return null;
+                          return (
+                            <>
+                              Episodios: {selected.episodeCount ?? '�'}
+                              {selected.airDate && <span> � Estreno: {selected.airDate}</span>}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">Sin temporadas registradas.</p>
-            )}
-          </div>
-        )}
-        {(currentMovie.tmdbType === 'tv' || currentMovie.series) && (
-          <div className="detail-sheet__section">
-            <div className="director-section__heading" style={{ alignItems: 'center' }}>
-              <strong>CapÃ­tulos</strong>
-              {episodeSeasonOptions.length > 1 && (
-                <label className="detail-sheet__field" style={{ minWidth: 140 }}>
-                  <span>Temporada</span>
-                  <select
-                    value={episodeSeason ?? ''}
-                    onChange={(event) => setEpisodeSeason(event.target.value ? Number(event.target.value) : null)}
-                  >
-                    {episodeSeasonOptions.map((season) => (
-                      <option key={season} value={season}>
-                        T{season}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {episodeSeason != null && (
-                <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
-              )}
-            </div>
-            {!currentMovie.tmdbId && (
-              <p className="muted">Sin ID de TMDb para cargar capÃ­tulos.</p>
-            )}
-            {episodeLoading && <p className="muted">Cargando capÃ­tulos...</p>}
-            {episodeError && <p className="muted">{episodeError}</p>}
-            {seasonEpisodes.length > 0 ? (
-              <ul className="detail-sheet__season-list">
-                {seasonEpisodes.map((episode) => {
-                  const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
-                  const input = episodeInputs[key];
-                  return (
-                    <li key={key} style={{ display: 'grid', gap: 10 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                        <div>
+                  </>
+                ) : (
+                  <p className="muted">Sin temporadas registradas.</p>
+                )}
+              </div>
+              <div role="tabpanel" hidden={activeSeriesTab !== 'episodes'} className="detail-tabs__panel">
+                <div className="director-section__heading" style={{ alignItems: 'center' }}>
+                  <strong>Capitulos</strong>
+                  {episodeSeasonOptions.length > 1 && (
+                    <label className="detail-sheet__field" style={{ minWidth: 140 }}>
+                      <span>Temporada</span>
+                      <select
+                        value={episodeSeason ?? ''}
+                        onChange={(event) => setEpisodeSeason(event.target.value ? Number(event.target.value) : null)}
+                      >
+                        {episodeSeasonOptions.map((season) => (
+                          <option key={season} value={season}>
+                            T{season}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {episodeSeason != null && (
+                    <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
+                  )}
+                </div>
+                {!currentMovie.tmdbId && (
+                  <p className="muted">Sin ID de TMDb para cargar capitulos.</p>
+                )}
+                {episodeLoading && <p className="muted">Cargando capitulos...</p>}
+                {episodeError && <p className="muted">{episodeError}</p>}
+                {seasonEpisodes.length > 0 ? (
+                  <div style={{ display: 'grid', gap: 16 }}>
+                    {seasonEpisodes.map((episode) => {
+                      const myRatings = [episode.ratingGloria, episode.ratingRodrigo].filter(
+                        (value): value is number => value != null
+                      );
+                      const myAverage = myRatings.length
+                        ? (myRatings.reduce((sum, value) => sum + value, 0) / myRatings.length).toFixed(1)
+                        : '�';
+                      const tmdbScore = episode.tmdbRating != null ? episode.tmdbRating.toFixed(1) : '�';
+                      return (
+                        <div
+                          key={buildEpisodeKey(episode.seasonNumber, episode.episodeNumber)}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'minmax(0, 1fr) 180px',
+                            gap: 16,
+                            alignItems: 'start',
+                            paddingBottom: 16,
+                            borderBottom: '1px solid rgba(255,255,255,0.08)'
+                          }}
+                        >
                           <div>
-                            <strong>S{episode.seasonNumber}E{episode.episodeNumber}</strong>{' '}
-                            {episode.name && <span>{episode.name}</span>}
+                            <div style={{ fontWeight: 600 }}>
+                              S{episode.seasonNumber}E{episode.episodeNumber} {episode.name ?? ''}
+                            </div>
+                            <div className="muted" style={{ marginTop: 6 }}>
+                              {episode.overview || 'Sin sinopsis.'}
+                            </div>
+                            <div className="muted" style={{ marginTop: 6 }}>
+                              {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
+                              {episode.seen && <span> � Visto</span>}
+                            </div>
                           </div>
-                          <div className="muted">
-                            {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
-                            {episode.seen && <span> â€¢ Visto</span>}
+                          <div
+                            style={{
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: 12,
+                              padding: 12,
+                              display: 'grid',
+                              gap: 8
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span className="muted">Mi nota</span>
+                              <strong>{myAverage}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                              <span className="muted">TMDb</span>
+                              <strong>{tmdbScore}</strong>
+                            </div>
+                            {adminSession && (
+                              <button
+                                className="btn"
+                                type="button"
+                                onClick={() => {
+                                  if (episode.seen) {
+                                    void handleClearEpisode(episode);
+                                  } else {
+                                    openEpisodeModal(episode);
+                                  }
+                                }}
+                              >
+                                {episode.seen ? 'Limpiar puntuacion' : 'Marcar visto'}
+                              </button>
+                            )}
                           </div>
                         </div>
-                        {adminSession && input && (
-                          <div style={{ display: 'grid', gap: 6, minWidth: 220 }}>
-                            <label className="ritual-admin__check">
-                              <input
-                                type="checkbox"
-                                checked={input.seen}
-                                onChange={(event) => updateEpisodeField(key, 'seen', event.target.checked)}
-                              />
-                              <span>Visto</span>
-                            </label>
-                            <div className="ritual-admin__ratings">
-                              <label>
-                                <span>Gloria</span>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  value={input.ratingGloria}
-                                  onChange={(event) => updateEpisodeField(key, 'ratingGloria', event.target.value)}
-                                />
-                              </label>
-                              <label>
-                                <span>Rodrigo</span>
-                                <input
-                                  type="number"
-                                  step="0.5"
-                                  value={input.ratingRodrigo}
-                                  onChange={(event) => updateEpisodeField(key, 'ratingRodrigo', event.target.value)}
-                                />
-                              </label>
-                            </div>
-                            <button
-                              className="btn"
-                              onClick={() => handleSaveEpisode(episode.seasonNumber, episode.episodeNumber)}
-                              disabled={input.busy}
-                            >
-                              {input.busy ? 'Guardando...' : 'Guardar'}
-                            </button>
-                            {input.error && <p className="ritual-admin__error">{input.error}</p>}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="muted">Sin capÃ­tulos disponibles.</p>
-            )}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="muted">Sin capitulos disponibles.</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1393,8 +1582,30 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           </div>
         </div>
       )}
+      {adminSession && episodeModal && (
+        <div
+          className="modal-backdrop"
+          style={{ zIndex: 46 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setEpisodeModal(null);
+          }}
+        >
+          <div className="modal watched-modal" onClick={(event) => event.stopPropagation()}>
+            <WatchedForm
+              input={episodeModalInput}
+              onChange={updateEpisodeModalField}
+              onSave={handleSaveEpisodeModal}
+              onCancel={() => setEpisodeModal(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export const MovieDetail: React.FC<Props> = (props) => <MovieDetailSheet {...props} />;
+
+
+
