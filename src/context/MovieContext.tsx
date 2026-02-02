@@ -54,6 +54,7 @@ interface MovieContextValue {
       ratingRodrigo?: number | null;
       enDeposito?: boolean;
       funcionaStatus?: MovieRecord['funcionaStatus'];
+      seriesEpisodes?: MovieRecord['seriesEpisodes'];
     }
   ) => void;
   setTmdbEnrichmentEnabled: (value: boolean) => void;
@@ -356,6 +357,7 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ratingRodrigo?: number | null;
       enDeposito?: boolean;
       funcionaStatus?: MovieRecord['funcionaStatus'];
+      seriesEpisodes?: MovieRecord['seriesEpisodes'];
     }
   ) => {
     setMovies((prev) => {
@@ -367,7 +369,8 @@ export const MovieProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           ratingGloria: updates.ratingGloria ?? movie.ratingGloria,
           ratingRodrigo: updates.ratingRodrigo ?? movie.ratingRodrigo,
           enDeposito: updates.enDeposito ?? movie.enDeposito,
-          funcionaStatus: updates.funcionaStatus ?? movie.funcionaStatus
+          funcionaStatus: updates.funcionaStatus ?? (updates.seen === true ? 'working' : movie.funcionaStatus),
+          seriesEpisodes: updates.seriesEpisodes ?? movie.seriesEpisodes
         };
       });
       const cached = loadMovieCache();
@@ -446,4 +449,14 @@ export const useMovies = (): MovieContextValue => {
   if (!ctx) throw new Error('useMovies must be used within MovieProvider');
   return ctx;
 };
+
+
+
+
+
+
+
+
+
+
 

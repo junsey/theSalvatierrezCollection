@@ -246,6 +246,9 @@ type TvSearchResult = {
 
 type TvDetailResult = TvSearchResult & {
   overview?: string | null;
+  genres?: { id: number; name: string }[];
+  seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null; poster_path?: string | null }[];
+};
 
 type TvSeasonDetailResult = {
   air_date?: string | null;
@@ -259,9 +262,6 @@ type TvSeasonDetailResult = {
     season_number: number;
     air_date?: string | null;
   }[];
-};
-  genres?: { id: number; name: string }[];
-  seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null; poster_path?: string | null }[];
 };
 
 function isTvResult(result: SearchResult | TvSearchResult | null): result is TvSearchResult {
@@ -705,6 +705,12 @@ export async function enrichMoviesBatch(
 
   return results;
 }
+
+
+
+
+
+
 
 
 
