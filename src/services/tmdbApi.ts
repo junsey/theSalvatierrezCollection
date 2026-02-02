@@ -261,6 +261,8 @@ type TvSeasonDetailResult = {
     episode_number: number;
     season_number: number;
     air_date?: string | null;
+    overview?: string | null;
+    vote_average?: number | null;
   }[];
 };
 
@@ -420,7 +422,9 @@ export async function fetchTvSeasonEpisodes(tmdbId: number, season: number): Pro
       episodeNumber: episode.episode_number,
       tmdbId: episode.id,
       name: episode.name,
-      airDate: episode.air_date ?? null
+      airDate: episode.air_date ?? null,
+      overview: episode.overview ?? null,
+      tmdbRating: episode.vote_average ?? null
     }));
   } catch (error) {
     console.warn('TMDb season episodes fetch failed', error);

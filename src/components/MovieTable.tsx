@@ -35,11 +35,11 @@ export const MovieTable: React.FC<Props> = ({ movies, onSelect }) => {
               <td>
                 <img
                   src={movie.posterUrl ?? 'https://via.placeholder.com/60x90/0b0f17/ffffff?text=No+Poster'}
-                  alt={movie.title}
+                  alt={movie.groupedDisplayTitle ?? movie.title}
                   width={50}
                 />
               </td>
-              <td>{movie.title}</td>
+              <td>{movie.groupedDisplayTitle ?? movie.title}</td>
               <td>{movie.tmdbYear ?? movie.year ?? '—'}</td>
               <td>{movie.seccion}</td>
               <td>{movie.genreRaw}</td>

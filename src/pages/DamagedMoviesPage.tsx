@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { MovieCard } from '../components/MovieCard';
+import { groupSeriesForDisplay } from '../services/seriesGrouping';
 import { MovieDetail } from '../components/MovieDetail';
 import { useMovies } from '../context/MovieContext';
 import { MovieRecord } from '../types/MovieRecord';
@@ -12,6 +13,8 @@ export const DamagedMoviesPage: React.FC = () => {
     () => visibleMovies.filter((movie) => movie.funcionaStatus === 'damaged'),
     [visibleMovies]
   );
+
+  const grouped = useMemo(() => groupSeriesForDisplay(damagedMovies, damagedMovies), [damagedMovies]);
 
   return (
     <section>
@@ -30,7 +33,7 @@ export const DamagedMoviesPage: React.FC = () => {
 
       {!loading && !error && damagedMovies.length > 0 && (
         <div className="movie-grid movie-grid--six">
-          {damagedMovies.map((movie) => (
+          {grouped.map((movie) => (
             <MovieCard
               key={movie.id}
               movie={movie}

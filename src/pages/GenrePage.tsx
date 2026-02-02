@@ -7,6 +7,7 @@ import { MovieTable } from '../components/MovieTable';
 import { useMovies } from '../context/MovieContext';
 import { compareShelfSort } from '../services/movieSort';
 import { normalizeText } from '../services/textNormalize';
+import { groupSeriesForDisplay } from '../services/seriesGrouping';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const baseFilters: MovieFilters = {
@@ -89,6 +90,8 @@ export const GenrePage: React.FC = () => {
       });
   }, [genreMovies, filters, ratings]);
 
+  const grouped = useMemo(() => groupSeriesForDisplay(genreMovies, filtered), [genreMovies, filtered]);
+
   return (
     <section>
       <h1>Género: {genreName}</h1>
@@ -100,12 +103,12 @@ export const GenrePage: React.FC = () => {
       />
       {filters.view === 'grid' ? (
         <div className="movie-grid">
-          {filtered.map((movie) => (
+          {grouped.map((movie) => (
             <MovieCard key={movie.id} movie={movie} onClick={() => setActiveMovie(movie)} />
           ))}
         </div>
       ) : (
-        <MovieTable movies={filtered} onSelect={setActiveMovie} />
+        <MovieTable movies={grouped} onSelect={setActiveMovie} />
       )}
       {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
     </section>

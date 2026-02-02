@@ -53,6 +53,13 @@ export type MovieRecord = {
     posterPath?: string | null;
     posterUrl?: string;
   }[];
+  groupedSeasons?: {
+    seasonNumber: number;
+    owned: boolean;
+    posterUrl?: string;
+  }[];
+  groupedDisplayTitle?: string;
+  groupedIsSeriesCard?: boolean;
   tmdbStatus?: TmdbStatus;
 };
 

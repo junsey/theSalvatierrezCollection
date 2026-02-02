@@ -15,6 +15,8 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
     ? movie.tmdbSeasons?.find((season) => season.seasonNumber === movie.season)?.posterUrl
     : undefined;
   const posterUrl = seasonPoster ?? movie.posterUrl;
+  const displayTitle = movie.groupedDisplayTitle ?? movie.title;
+  const groupedSeasons = movie.groupedSeasons ?? [];
 
   return (
     <div className="movie-card" onClick={onClick} role="button" tabIndex={0}>
@@ -22,7 +24,7 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
         <img
           className="poster"
           src={posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
-          alt={movie.title}
+          alt={displayTitle}
           loading="lazy"
         />
         <span
@@ -33,8 +35,24 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
         </span>
       </div>
       <div className="card-body">
-        <strong>{movie.title}</strong>
+        <strong>{displayTitle}</strong>
         <small>{movie.tmdbYear ?? movie.year ?? 'Year ?'} • {movie.seccion}</small>
+        {groupedSeasons.length > 0 && (
+          <div className="card-seasons">
+            {groupedSeasons.map((season) => (
+              <span
+                key={season.seasonNumber}
+                className="badge"
+                style={{
+                  background: season.owned ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  color: season.owned ? 'inherit' : 'var(--text-muted)'
+                }}
+              >
+                T{season.seasonNumber}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="card-ratings">
           <span className="badge">TMDb: {movie.tmdbRating?.toFixed(1) ?? 'N/A'}</span>
           <span className="badge">Paws: {pawValue != null ? pawValue.toFixed(1) : 'N/A'}</span>

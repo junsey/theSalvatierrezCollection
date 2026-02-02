@@ -1504,6 +1504,13 @@ a.ghost {
   gap: 6px;
 }
 
+.card-seasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
 .card-ratings,
 .card-tags {
   display: flex;

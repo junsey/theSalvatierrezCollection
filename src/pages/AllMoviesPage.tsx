@@ -8,6 +8,7 @@ import { useMovies } from '../context/MovieContext';
 import { setStoredFilters, getStoredFilters } from '../services/localStorage';
 import { compareShelfSort } from '../services/movieSort';
 import { normalizeText } from '../services/textNormalize';
+import { groupSeriesForDisplay } from '../services/seriesGrouping';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 const defaultFilters: MovieFilters = {
@@ -97,10 +98,12 @@ export const AllMoviesPage: React.FC = () => {
       });
   }, [visibleMovies, filters, ratings]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const grouped = useMemo(() => groupSeriesForDisplay(visibleMovies, filtered), [visibleMovies, filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(grouped.length / pageSize));
   const pagedMovies = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
+    return grouped.slice(start, start + pageSize);
   }, [filtered, page, pageSize]);
 
   useEffect(() => {
@@ -152,8 +155,8 @@ export const AllMoviesPage: React.FC = () => {
       }}
     >
       <span className="muted">
-        Mostrando {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1}-
-        {Math.min(page * pageSize, filtered.length)} de {filtered.length}
+        Mostrando {grouped.length === 0 ? 0 : (page - 1) * pageSize + 1}-
+        {Math.min(page * pageSize, grouped.length)} de {grouped.length}
       </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
