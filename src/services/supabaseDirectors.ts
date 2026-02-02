@@ -155,3 +155,20 @@ export async function fetchAllDirectorProfiles(): Promise<Record<string, { profi
   }
   return map;
 }
+
+export async function fetchDirectorDirectory(): Promise<Array<{ name: string; tmdbId: number | null; profileUrl?: string }>> {
+  if (!isConfigured()) return [];
+  const params = new URLSearchParams({
+    select: 'name,profile_path,tmdb_person_id',
+    limit: '2000'
+  });
+  const rows = await supabaseRequest<SupabaseDirectorRow[]>(`tmdb_directors?${params.toString()}`);
+  const base = await getTmdbImageBaseUrl();
+  return (rows ?? [])
+    .filter((row) => row.name)
+    .map((row) => ({
+      name: row.name,
+      tmdbId: row.tmdb_person_id ?? null,
+      profileUrl: row.profile_path ? `${base}w300${row.profile_path}` : undefined
+    }));
+}

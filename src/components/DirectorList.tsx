@@ -15,7 +15,11 @@ import {
   loadDirectorCache,
   saveDirectorCache
 } from '../lib/directorCache';
-import { fetchAllDirectorProfiles, fetchDirectorFilmographyCountByPersonId } from '../services/supabaseDirectors';
+import {
+  fetchAllDirectorProfiles,
+  fetchDirectorDirectory,
+  fetchDirectorFilmographyCountByPersonId
+} from '../services/supabaseDirectors';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -63,7 +67,17 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [supabaseProfiles, setSupabaseProfiles] = useState<
     Record<string, { profileUrl?: string; tmdbId?: number | null }>
   >({});
+  const [supabaseDirectory, setSupabaseDirectory] = useState<
+    Array<{ name: string; tmdbId: number | null; profileUrl?: string }>
+  >([]);
   const directors = useMemo(() => {
+    const directoryById = new Map<number, { name: string; profileUrl?: string }>();
+    supabaseDirectory.forEach((entry) => {
+      if (Number.isFinite(entry.tmdbId)) {
+        directoryById.set(entry.tmdbId as number, { name: entry.name, profileUrl: entry.profileUrl });
+      }
+    });
+
     const map = new Map<
       string,
       {
@@ -77,40 +91,61 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     const worksByDirector = new Map<string, Set<string>>();
 
     movies.forEach((movie) => {
-      splitDirectors(movie.director)
-        .filter(Boolean)
-        .forEach((name) => {
-          const normalizedName = normalizeDirectorName(name);
-          const overrideId = directorOverrides.get(normalizedName);
-          const supabaseId = supabaseProfiles[normalizedName]?.tmdbId ?? null;
-          const tmdbId = overrideId ?? supabaseId ?? undefined;
-          const key = buildDirectorKey(name, tmdbId);
-          const mapKey = normalizedName;
+      const rawNames = splitDirectors(movie.director).filter(Boolean);
+      const ids = movie.directorTmdbIds?.filter((id) => Number.isFinite(id)) ?? [];
+      if (ids.length === 0 && movie.directorTmdbId != null && Number.isFinite(movie.directorTmdbId)) {
+        ids.push(movie.directorTmdbId);
+      }
+
+      const resolved = ids.length > 0
+        ? ids.map((id, index) => {
+            const directoryEntry = directoryById.get(id);
+            const fallbackName = rawNames[index] ?? rawNames[0] ?? '';
+            return {
+              name: directoryEntry?.name ?? fallbackName,
+              tmdbId: id
+            };
+          })
+        : rawNames.map((name) => ({
+            name,
+            tmdbId:
+              directorOverrides.get(normalizeDirectorName(name)) ??
+              supabaseProfiles[normalizeDirectorName(name)]?.tmdbId ??
+              undefined
+          }));
+
+      resolved
+        .filter((entry) => entry.name)
+        .forEach((entry) => {
+          const normalizedName = normalizeDirectorName(entry.name);
+          const tmdbId = entry.tmdbId ?? undefined;
+          const key = buildDirectorKey(entry.name, tmdbId);
+          const mapKey = tmdbId ? `tmdb-${tmdbId}` : normalizedName;
 
           if (!map.has(mapKey)) {
             map.set(mapKey, {
               key,
-              name: name.trim(),
+              name: entry.name.trim(),
               normalizedName,
               tmdbId: tmdbId ?? undefined,
               worksCount: 0
             });
           }
-          const entry = map.get(mapKey)!;
+          const entryRow = map.get(mapKey)!;
           const workKey = getWorkKey(movie);
           const workKeys = worksByDirector.get(mapKey) ?? new Set<string>();
           if (!worksByDirector.has(mapKey)) {
             worksByDirector.set(mapKey, workKeys);
           }
           if (!workKeys.has(workKey)) {
-            entry.worksCount += 1;
+            entryRow.worksCount += 1;
             workKeys.add(workKey);
           }
         });
     });
 
     return Array.from(map.values()).sort((a, b) => collator.compare(a.name, b.name));
-  }, [collator, directorOverrides, movies, supabaseProfiles]);
+  }, [collator, directorOverrides, movies, supabaseProfiles, supabaseDirectory]);
   const availableLetters = useMemo(() => {
     const letters = new Set<string>();
     directors.forEach((director) => {
@@ -135,8 +170,10 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     async function loadSupabaseProfiles() {
       try {
         const map = await fetchAllDirectorProfiles();
+        const directory = await fetchDirectorDirectory();
         if (!active) return;
         setSupabaseProfiles(map);
+        setSupabaseDirectory(directory);
       } catch (error) {
         console.warn('No se pudieron cargar retratos desde Supabase', error);
       }
