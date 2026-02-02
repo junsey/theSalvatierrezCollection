@@ -1296,8 +1296,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                     if (!selected) return null;
                     return (
                       <>
-                        Episodios: {selected.episodeCount ?? '???'}
-                        {selected.airDate && <span> ??? Estreno: {selected.airDate}</span>}
+                        Episodios: {selected.episodeCount ?? '-'}
+                        {selected.airDate && <span> - Estreno: {selected.airDate}</span>}
                       </>
                     );
                   })()}
