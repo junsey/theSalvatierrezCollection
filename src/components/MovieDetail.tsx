@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-type TabId = 'summary' | 'details' | 'admin';
+type TabId = 'summary' | 'details' | 'admin' | 'seasons' | 'episodes';
 
 type TabItem = {
   id: TabId;
@@ -536,7 +536,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   const [episodeInputs, setEpisodeInputs] = useState<Record<string, EpisodeInput>>({});
   const [episodeLoading, setEpisodeLoading] = useState(false);
   const [episodeError, setEpisodeError] = useState<string | null>(null);
-  const [activeSeriesTab, setActiveSeriesTab] = useState<'seasons' | 'episodes'>('seasons');
   const [episodeModal, setEpisodeModal] = useState<{
     seasonNumber: number;
     episodeNumber: number;
@@ -602,7 +601,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setEpisodeInputs({});
     setEpisodeLoading(false);
     setEpisodeError(null);
-    setActiveSeriesTab('seasons');
     setEpisodeModal(null);
     setEpisodeModalInput({
       seen: true,
@@ -1221,35 +1219,6 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
           </div>
         </div>
 
-        {(currentMovie.tmdbType === 'tv' || currentMovie.series) && (
-          <div className="detail-sheet__section">
-            <div className="detail-tabs">
-              <div className="detail-tabs__list" role="tablist" aria-label="Temporadas y capitulos">
-                <button
-                  role="tab"
-                  aria-selected={activeSeriesTab === 'seasons'}
-                  className={`detail-tabs__tab ${activeSeriesTab === 'seasons' ? 'is-active' : ''}`}
-                  onClick={() => setActiveSeriesTab('seasons')}
-                  type="button"
-                >
-                  Temporadas
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={activeSeriesTab === 'episodes'}
-                  className={`detail-tabs__tab ${activeSeriesTab === 'episodes' ? 'is-active' : ''}`}
-                  onClick={() => setActiveSeriesTab('episodes')}
-                  type="button"
-                >
-                  Capitulos
-                </button>
-              </div>
-              <div role="tabpanel" hidden={activeSeriesTab !== 'seasons'} className="detail-tabs__panel">
-                <div className="director-section__heading">
-                  <strong>Temporadas</strong>
-                  {currentMovie.season != null && (
-                    <small className="muted"> Temporada solicitada: {currentMovie.season}</small>
-                  )}
                 </div>
                 {displaySeasons && displaySeasons.length > 0 ? (
                   <>
@@ -1271,7 +1240,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                             onClick={() => {
                               setEpisodeSeason(season.seasonNumber);
                               if (owned) {
-                                setActiveSeriesTab('episodes');
+                                setActiveTab('episodes');
                               }
                             }}
                             style={{

@@ -11,13 +11,17 @@ export const MovieCard: React.FC<Props> = ({ movie, onClick }) => {
     movie.ratingGloria != null && movie.ratingRodrigo != null
       ? (movie.ratingGloria + movie.ratingRodrigo) / 2
       : movie.ratingGloria ?? movie.ratingRodrigo ?? null;
+  const seasonPoster = movie.season != null
+    ? movie.tmdbSeasons?.find((season) => season.seasonNumber === movie.season)?.posterUrl
+    : undefined;
+  const posterUrl = seasonPoster ?? movie.posterUrl;
 
   return (
     <div className="movie-card" onClick={onClick} role="button" tabIndex={0}>
       <div className="poster-frame">
         <img
           className="poster"
-          src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
+          src={posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
           alt={movie.title}
           loading="lazy"
         />
