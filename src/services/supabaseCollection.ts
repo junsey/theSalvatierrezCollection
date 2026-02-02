@@ -22,8 +22,6 @@ type CollectionRow = {
   Funciona?: string | boolean | null;
   'En depA3sito'?: boolean | string | null;
   Region?: string | null;
-  'Capitulos de Serie  '?: unknown;
-  'Capitulos de Serie '?: unknown;
   'Capitulos de Serie'?: unknown;
 };
 
@@ -173,11 +171,7 @@ function mapRow(row: CollectionRow): MovieRecord {
     region: toText(row.Region),
     enDeposito: parseEnDeposito((row as any)['En depósito']),
     funcionaStatus: parseFunciona(row.Funciona ?? ''),
-    seriesEpisodes: parseSeriesEpisodes(
-      row['Capitulos de Serie  '] ??
-      (row as any)['Capitulos de Serie '] ??
-      (row as any)['Capitulos de Serie']
-    )
+    seriesEpisodes: parseSeriesEpisodes(row['Capitulos de Serie'])
   };
 }
 

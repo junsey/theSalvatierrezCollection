@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
       payload.Funciona = toBoolOrNull(body.funciona);
     }
     if (Array.isArray(body.seriesEpisodes)) {
-      payload['Capitulos de Serie  '] = body.seriesEpisodes;
+      payload['Capitulos de Serie'] = body.seriesEpisodes;
     }
     if (payload.Vista === true && payload.Funciona === undefined) {
       payload.Funciona = true;

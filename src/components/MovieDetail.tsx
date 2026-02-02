@@ -957,7 +957,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   useEffect(() => {
     let active = true;
     async function fetchEpisodes() {
-      if (!tmdbEnrichmentEnabled || currentMovie.tmdbType !== 'tv' || !currentMovie.tmdbId || episodeSeason == null) {
+      const isSeries = currentMovie.tmdbType === 'tv' || currentMovie.series;
+      if (!tmdbEnrichmentEnabled || !isSeries || !currentMovie.tmdbId || episodeSeason == null) {
         return;
       }
       setEpisodeLoading(true);
@@ -1106,7 +1107,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             )}
           </div>
         </div>
-        {currentMovie.tmdbType === 'tv' && (
+        {(currentMovie.tmdbType === 'tv' || currentMovie.series) && (
           <div className="detail-sheet__section">
             <div className="director-section__heading">
               <strong>Temporadas</strong>
@@ -1144,7 +1145,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             )}
           </div>
         )}
-        {currentMovie.tmdbType === 'tv' && (
+        {(currentMovie.tmdbType === 'tv' || currentMovie.series) && (
           <div className="detail-sheet__section">
             <div className="director-section__heading" style={{ alignItems: 'center' }}>
               <strong>CapÃ­tulos</strong>

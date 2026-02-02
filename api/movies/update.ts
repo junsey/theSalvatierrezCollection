@@ -57,7 +57,7 @@ export default async function handler(req: any, res: any) {
       'Puntuacion Rodrigo': toNumberOrNull(body.ratingRodrigo),
       'Puntuacion Gloria': toNumberOrNull(body.ratingGloria),
       'En depósito': toBoolOrNull(body.enDeposito),
-      'Capitulos de Serie  ': Array.isArray(body.seriesEpisodes) ? body.seriesEpisodes : undefined
+      'Capitulos de Serie': Array.isArray(body.seriesEpisodes) ? body.seriesEpisodes : undefined
     } as Record<string, any>;
 
     if (body.funcionaStatus) {
