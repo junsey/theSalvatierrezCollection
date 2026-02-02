@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+﻿import React, { useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { MovieCard } from '../components/MovieCard';
 import { useMovies } from '../context/MovieContext';
-import { MovieRecord } from '../types/MovieRecord';
+import { setStoredFilters } from '../services/localStorage';
+import { MovieFilters, MovieRecord } from '../types/MovieRecord';
 
 type DonutDatum = {
   label: string;
@@ -41,7 +42,7 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
       </svg>
       <div className="donut__center">
         <span className="donut__number">{total}</span>
-        <span className="donut__label">Títulos</span>
+        <span className="donut__label">Relics</span>
       </div>
     </div>
   );
@@ -51,8 +52,9 @@ const MetricCard: React.FC<{
   title?: React.ReactNode;
   caption: string;
   href?: string;
+  onClick?: () => void;
   children?: React.ReactNode;
-}> = ({ title, caption, href, children }) => {
+}> = ({ title, caption, href, onClick, children }) => {
   const content = (
     <div className="metric-card">
       <div className="metric-card__glow" />
@@ -65,7 +67,19 @@ const MetricCard: React.FC<{
   );
 
   if (href) {
-    return <Link to={href} className="metric-card__link">{content}</Link>;
+    return (
+      <Link to={href} className="metric-card__link" onClick={onClick}>
+        {content}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" className="metric-card__link metric-card__button" onClick={onClick}>
+        {content}
+      </button>
+    );
   }
 
   return content;
@@ -83,10 +97,10 @@ const formatPalette = [
 const FormatMiniChart: React.FC<{
   data: { entries: [string, number][]; total: number };
 }> = ({ data }) => {
-  if (!data.entries.length) return <p className="muted">Sin formatos registrados.</p>;
+  if (!data.entries.length) return <p className="muted">No formats registered yet.</p>;
 
   return (
-    <div className="format-chart" aria-label="Distribución de formatos">
+    <div className="format-chart" aria-label="Format distribution">
       <div className="format-chart__stack">
         {data.entries.map(([label, value], index) => (
           <div
@@ -118,18 +132,53 @@ const FormatMiniChart: React.FC<{
   );
 };
 
-const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
+const TreasuresGrid: React.FC<{
+  movies: MovieRecord[];
+  onView: (movie: MovieRecord) => void;
+  onMarkViewed: (movie: MovieRecord) => void;
+}> = ({ movies, onView, onMarkViewed }) => {
   const slots = Array.from({ length: 5 }, (_, index) => movies[index] ?? null);
 
   return (
     <div className="treasure-grid">
       {slots.map((movie, index) =>
         movie ? (
-          <MovieCard key={movie.id} movie={movie} />
+          <div
+            key={movie.id}
+            className="treasure-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onView(movie)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') onView(movie);
+            }}
+          >
+            <MovieCard movie={movie} />
+            <div
+              className="treasure-card__actions"
+              onClick={(event) => event.stopPropagation()}
+              role="presentation"
+            >
+              <button type="button" className="treasure-card__action" onClick={() => onView(movie)}>
+                View Details
+              </button>
+              <button
+                type="button"
+                className="treasure-card__action"
+                onClick={() => onMarkViewed(movie)}
+                disabled={movie.seen}
+              >
+                Mark as Viewed
+              </button>
+              <Link className="treasure-card__action" to={`/admin/movies/${movie.id}/edit`}>
+                Add Note
+              </Link>
+            </div>
+          </div>
         ) : (
           <div key={`placeholder-${index}`} className="treasure-placeholder">
             <div className="treasure-placeholder__veil" />
-            <p>Espacio reservado para futuras reliquias.</p>
+            <p>Space reserved for future relics.</p>
           </div>
         )
       )}
@@ -138,7 +187,9 @@ const TreasuresGrid: React.FC<{ movies: MovieRecord[] }> = ({ movies }) => {
 };
 
 export const HomePage: React.FC = () => {
-  const { visibleMovies: movies, loading } = useMovies();
+  const { visibleMovies: movies, loading, updateSeen } = useMovies();
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     totalMovies,
@@ -166,7 +217,7 @@ export const HomePage: React.FC = () => {
     const directors = Array.from(new Set(movies.map((m) => m.director.trim()).filter(Boolean))).length;
 
     const formatCounts = movies.reduce<Record<string, number>>((acc, movie) => {
-      const key = movie.format && movie.format.trim() ? movie.format.trim() : 'Sin identificar';
+      const key = movie.format && movie.format.trim() ? movie.format.trim() : 'Unidentified';
       acc[key] = (acc[key] ?? 0) + 1;
       return acc;
     }, {});
@@ -183,10 +234,10 @@ export const HomePage: React.FC = () => {
       .map(({ movie }) => movie);
 
     const watchChart: DonutDatum[] = [
-      { label: 'Vista', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
-      { label: 'No vista', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
-      { label: 'Sin probar', value: untested, color: 'rgba(230, 176, 64, 0.9)' },
-      { label: 'En depósito', value: enDeposito, color: 'rgba(98, 174, 255, 0.9)' }
+      { label: 'Viewed', value: watched, color: 'rgba(111, 207, 151, 0.92)' },
+      { label: 'Unviewed', value: unseen, color: 'rgba(224, 68, 68, 0.92)' },
+      { label: 'Unverified', value: untested, color: 'rgba(230, 176, 64, 0.9)' },
+      { label: 'In Deposit', value: enDeposito, color: 'rgba(98, 174, 255, 0.9)' }
     ];
 
     return {
@@ -211,55 +262,202 @@ export const HomePage: React.FC = () => {
     return { entries, total };
   }, [formatBreakdown]);
 
+  const applyFilters = (filters: Partial<MovieFilters>) => {
+    setStoredFilters({
+      query: '',
+      seccion: null,
+      genre: null,
+      saga: null,
+      series: 'all',
+      seen: 'all',
+      view: 'grid',
+      sort: 'title-asc',
+      condition: 'all',
+      deposit: 'all',
+      ...filters
+    });
+  };
+
+  const applyFiltersAndNavigate = (filters: Partial<MovieFilters>, target = '/movies') => {
+    applyFilters(filters);
+    navigate(target);
+  };
+
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = searchQuery.trim();
+    applyFiltersAndNavigate({ query: trimmed });
+  };
+
+  const handleViewDetails = (movie: MovieRecord) => {
+    if (movie.tmdbId != null) {
+      navigate(`/movies?tmdbId=${movie.tmdbId}`);
+      return;
+    }
+    applyFiltersAndNavigate({ query: movie.title });
+  };
+
   return (
     <main className="grand-hall">
       <section className="grand-hall__banner">
         <div className="banner__text">
-          <p className="eyebrow">Castillo Salvatiérrez — Grand Hall of the Archive</p>
-          <h1>Castillo Salvatiérrez — Grand Hall of the Archive</h1>
-          <p className="lore">
-            Welcome to the Grand Archive of Castillo Salvatíerrez. Here lie the cinematic relics of bygone eras:
-            preserved, restored, and safeguarded beneath arcane-lit lanterns. May the spirits of celluloid guide your
-            exploration.
-          </p>
+          <p className="eyebrow">The Grand Archive</p>
+          <h1>The Grand Archive</h1>
+          <h2 className="banner__subtitle">Castillo Salvatiérrez</h2>
+          <p className="lore">Explore, catalog and rediscover your film legacy.</p>
+          <form className="hero-search" onSubmit={handleSearchSubmit}>
+            <input
+              type="search"
+              className="hero-search__input"
+              placeholder="Search the Archive by title, director, year or format..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              aria-label="Search the archive"
+            />
+          </form>
           <div className="hero-actions">
             <Link className="nav-link nav-link--solid" to="/movies">Enter the Archive</Link>
-            <Link className="nav-link nav-link--ghost" to="/surprise">Random Ritual</Link>
+            <Link className="nav-link nav-link--ghost" to="/surprise">Invoke Random Relic</Link>
           </div>
         </div>
-        <div className="banner__chart">
-          <div className="chart-panel">
-            <header className="chart-panel__header">
-              <div>
-                <p className="eyebrow">Inventario Total</p>
-                <h2>Tesoros Custodiados</h2>
-              </div>
-              <span className="chart-total">{movies.length.toLocaleString()} títulos</span>
-            </header>
-            <div className="chart-panel__body">
+      </section>
+
+      <section className="treasure-section">
+        <div className="treasure-section__header">
+          <div>
+            <p className="eyebrow">Curator’s Selection</p>
+            <h2>Five Relics of Highest Renown</h2>
+          </div>
+          <Link className="nav-link nav-link--ghost" to="/movies">Explore Full Archive</Link>
+        </div>
+        {loading ? (
+          <p className="muted">Summoning relics...</p>
+        ) : (
+          <>
+            {topRated.length === 0 && <p className="muted">No ratings recorded yet.</p>}
+            <TreasuresGrid
+              movies={topRated}
+              onView={handleViewDetails}
+              onMarkViewed={(movie) => updateSeen(movie.id, true)}
+            />
+          </>
+        )}
+      </section>
+
+      <section className="vaults-section">
+        <div className="vaults-section__header">
+          <div>
+            <p className="eyebrow">Archive Wings</p>
+            <h2>Quick Access Vaults</h2>
+          </div>
+          <p className="muted">Every count leads to a hall of the archive.</p>
+        </div>
+        <div className="vaults-grid">
+          <button
+            type="button"
+            className="vault-card"
+            onClick={() => applyFiltersAndNavigate({ series: 'movies' })}
+          >
+            <span className="vault-card__icon">🎞️</span>
+            <span className="vault-card__count">{loading ? '…' : totalMovies.toLocaleString()}</span>
+            <span className="vault-card__label">Motion Picture Vault</span>
+          </button>
+          <button
+            type="button"
+            className="vault-card"
+            onClick={() => applyFiltersAndNavigate({ series: 'series' })}
+          >
+            <span className="vault-card__icon">📺</span>
+            <span className="vault-card__count">{loading ? '…' : totalSeries.toLocaleString()}</span>
+            <span className="vault-card__label">Series Vault</span>
+          </button>
+          <Link className="vault-card vault-card__link" to="/directors">
+            <span className="vault-card__icon">🜂</span>
+            <span className="vault-card__count">{loading ? '…' : directors.toLocaleString()}</span>
+            <span className="vault-card__label">Directors Index</span>
+          </Link>
+          <button type="button" className="vault-card" onClick={() => applyFiltersAndNavigate({})}>
+            <span className="vault-card__icon">⛶</span>
+            <span className="vault-card__count">{loading ? '…' : formatChartData.total.toLocaleString()}</span>
+            <span className="vault-card__label">Media Formats</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="archive-status">
+        <div className="archive-status__header">
+          <div>
+            <p className="eyebrow">Archive Status</p>
+            <h2>Relics Under Custody</h2>
+          </div>
+          <button
+            type="button"
+            className="nav-link nav-link--ghost"
+            onClick={() => applyFiltersAndNavigate({})}
+          >
+            Explore Full Archive
+          </button>
+        </div>
+        <div className="chart-panel">
+          <header className="chart-panel__header">
+            <div>
+              <p className="eyebrow">Archive Status</p>
+              <h3>Relics Under Custody</h3>
+            </div>
+            <button type="button" className="chart-total" onClick={() => applyFiltersAndNavigate({})}>
+              {movies.length.toLocaleString()} titles
+            </button>
+          </header>
+          <div className="chart-panel__body">
+            <button
+              type="button"
+              className="donut-link"
+              onClick={() => applyFiltersAndNavigate({})}
+              aria-label="Explore full archive"
+            >
               <StatDonut data={watchChart} total={movies.length} />
-              <div className="chart-panel__legend">
-                <div className="status-pill status-pill--watched">
-                  <span>Vistas</span>
-                  <strong>{watchedCount}</strong>
-                </div>
-                <div className="status-pill status-pill--unwatched">
-                  <span>No vistas</span>
-                  <strong>{unseenCount}</strong>
-                </div>
-                <div className="status-pill status-pill--untested">
-                  <span>Sin probar</span>
-                  <strong>{untestedCount}</strong>
-                </div>
-                <div className="status-pill status-pill--deposit">
-                  <span>En depósito</span>
-                  <strong>{depositCount}</strong>
-                </div>
-                <div className="status-pill status-pill--damaged">
-                  <span>Dañadas</span>
-                  <strong>{damaged}</strong>
-                </div>
-              </div>
+            </button>
+            <div className="chart-panel__legend">
+              <button
+                type="button"
+                className="status-pill status-pill--watched"
+                onClick={() => applyFiltersAndNavigate({ seen: 'seen' })}
+              >
+                <span>Viewed</span>
+                <strong>{watchedCount}</strong>
+              </button>
+              <button
+                type="button"
+                className="status-pill status-pill--unwatched"
+                onClick={() => applyFiltersAndNavigate({ seen: 'unseen' })}
+              >
+                <span>Unviewed</span>
+                <strong>{unseenCount}</strong>
+              </button>
+              <button
+                type="button"
+                className="status-pill status-pill--untested"
+                onClick={() => applyFiltersAndNavigate({ condition: 'untested', seen: 'unseen' })}
+              >
+                <span>Unverified</span>
+                <strong>{untestedCount}</strong>
+              </button>
+              <button
+                type="button"
+                className="status-pill status-pill--deposit"
+                onClick={() => applyFiltersAndNavigate({ deposit: 'deposit' })}
+              >
+                <span>In Deposit</span>
+                <strong>{depositCount}</strong>
+              </button>
+              <button
+                type="button"
+                className="status-pill status-pill--damaged"
+                onClick={() => applyFiltersAndNavigate({ condition: 'damaged' })}
+              >
+                <span>Damaged</span>
+                <strong>{damaged}</strong>
+              </button>
             </div>
           </div>
         </div>
@@ -269,44 +467,34 @@ export const HomePage: React.FC = () => {
         <div className="metrics-grid">
           <MetricCard
             title={loading ? '…' : totalMovies.toLocaleString()}
-            caption="Archivo de Películas"
+            caption="Motion Picture Vault"
+            href="/movies"
+            onClick={() => applyFilters({ series: 'movies' })}
           />
           <MetricCard
             title={loading ? '…' : totalSeries.toLocaleString()}
-            caption="Archivo de Series"
+            caption="Series Vault"
+            href="/movies"
+            onClick={() => applyFilters({ series: 'series' })}
           />
           <MetricCard
             title={loading ? '…' : directors.toLocaleString()}
-            caption="Archivo de Directores"
+            caption="Directors Index"
             href="/directors"
           />
           <MetricCard
             title={loading ? '…' : sections.toLocaleString()}
-            caption="Secciones del archivo"
+            caption="Archive Wings"
             href="/sections"
           />
-          <MetricCard title={loading ? '…' : formatChartData.total.toLocaleString()} caption="Formatos">
+          <MetricCard
+            title={loading ? '…' : formatChartData.total.toLocaleString()}
+            caption="Media Formats"
+            href="/movies"
+          >
             <FormatMiniChart data={formatChartData} />
           </MetricCard>
         </div>
-      </section>
-
-      <section className="treasure-section">
-        <div className="treasure-section__header">
-          <div>
-            <p className="eyebrow">Selección de la Casa</p>
-            <h2>Los Cinco Tesoros Mejor Valorados del Castillo</h2>
-          </div>
-          <Link className="nav-link nav-link--ghost" to="/movies">Ver todo el catálogo</Link>
-        </div>
-        {loading ? (
-          <p className="muted">Invocando reliquias...</p>
-        ) : (
-          <>
-            {topRated.length === 0 && <p className="muted">Aún no hay puntuaciones registradas.</p>}
-            <TreasuresGrid movies={topRated} />
-          </>
-        )}
       </section>
     </main>
   );
