@@ -643,7 +643,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   useEffect(() => {
     let active = true;
     async function fetchSeasons() {
-      if (!tmdbEnrichmentEnabled || currentMovie.tmdbType !== 'tv' || !currentMovie.tmdbId) {
+      const isSeries = currentMovie.tmdbType === 'tv' || currentMovie.series;
+      if (!isSeries || !currentMovie.tmdbId) {
         setSeasonOverrides(null);
         return;
       }
@@ -665,7 +666,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       active = false;
     };
-  }, [currentMovie.tmdbId, currentMovie.tmdbType, currentMovie.tmdbSeasons, tmdbEnrichmentEnabled]);
+  }, [currentMovie.tmdbId, currentMovie.tmdbType, currentMovie.tmdbSeasons, currentMovie.series]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -958,7 +959,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     let active = true;
     async function fetchEpisodes() {
       const isSeries = currentMovie.tmdbType === 'tv' || currentMovie.series;
-      if (!tmdbEnrichmentEnabled || !isSeries || !currentMovie.tmdbId || episodeSeason == null) {
+      if (!isSeries || !currentMovie.tmdbId || episodeSeason == null) {
         return;
       }
       setEpisodeLoading(true);
@@ -987,7 +988,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     return () => {
       active = false;
     };
-  }, [adminSession, applyMovieStatusUpdate, currentMovie.tmdbId, currentMovie.tmdbType, episodeSeason, movie.id, tmdbEnrichmentEnabled]);
+  }, [adminSession, applyMovieStatusUpdate, currentMovie.tmdbId, currentMovie.tmdbType, episodeSeason, movie.id, currentMovie.series]);
 
   const seasonEpisodes = useMemo(() => {
     if (episodeSeason == null) return [];
@@ -1168,6 +1169,9 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                 <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
               )}
             </div>
+            {!currentMovie.tmdbId && (
+              <p className="muted">Sin ID de TMDb para cargar capÃ­tulos.</p>
+            )}
             {episodeLoading && <p className="muted">Cargando capÃ­tulos...</p>}
             {episodeError && <p className="muted">{episodeError}</p>}
             {seasonEpisodes.length > 0 ? (
