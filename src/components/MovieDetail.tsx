@@ -1168,6 +1168,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   };
 
   const dubbingValue = currentMovie.dubbing as unknown;
+  const isSeries = currentMovie.tmdbType === 'tv' || currentMovie.series;
   const dubbingLabel =
     typeof dubbingValue === 'boolean'
       ? dubbingValue
@@ -1339,8 +1340,8 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                 );
                 const myAverage = myRatings.length
                   ? (myRatings.reduce((sum, value) => sum + value, 0) / myRatings.length).toFixed(1)
-                  : '???';
-                const tmdbScore = episode.tmdbRating != null ? episode.tmdbRating.toFixed(1) : '???';
+                  : '-';
+                const tmdbScore = episode.tmdbRating != null ? episode.tmdbRating.toFixed(1) : '-';
                 return (
                   <div
                     key={buildEpisodeKey(episode.seasonNumber, episode.episodeNumber)}
@@ -1362,7 +1363,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
                       </div>
                       <div className="muted" style={{ marginTop: 6 }}>
                         {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
-                        {episode.seen && <span> ??? Visto</span>}
+                        {episode.seen && <span> - Visto</span>}
                       </div>
                     </div>
                     <div
@@ -1473,6 +1474,11 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     { id: 'summary', label: 'Resumen', content: summaryContent },
     { id: 'details', label: 'Detalles', content: detailsContent }
   ];
+
+  if (isSeries) {
+    tabs.push({ id: 'seasons', label: 'Temporadas', content: seasonsContent });
+    tabs.push({ id: 'episodes', label: 'Capitulos', content: episodesContent });
+  }
 
   if (adminSession) {
     tabs.push({
