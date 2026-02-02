@@ -9,11 +9,13 @@ import { SectionPage } from './pages/SectionPage';
 import { SurpriseMovieNightPage } from './pages/SurpriseMovieNightPage';
 import { DirectorsHub } from './pages/DirectorsHub';
 import { SectionsHub } from './pages/SectionsHub';
+import { SeriesSectionsHub } from './pages/SeriesSectionsHub';
 import { SagasHub } from './pages/SagasHub';
 import { SettingsPage } from './pages/SettingsPage';
 import { DamagedMoviesPage } from './pages/DamagedMoviesPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { EditMoviePage } from './pages/EditMoviePage';
+import { SeriesSectionPage } from './pages/SeriesSectionPage';
 
 const App: React.FC = () => {
   return (
@@ -27,6 +29,8 @@ const App: React.FC = () => {
           <Route path="/directors/:name" element={<DirectorPage />} />
           <Route path="/sections" element={<SectionsHub />} />
           <Route path="/sections/:name" element={<SectionPage />} />
+          <Route path="/sections-series" element={<SeriesSectionsHub />} />
+          <Route path="/sections-series/:name" element={<SeriesSectionPage />} />
           <Route path="/sagas" element={<SagasHub />} />
           <Route path="/surprise" element={<SurpriseMovieNightPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />

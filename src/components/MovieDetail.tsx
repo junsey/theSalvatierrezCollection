@@ -4,7 +4,7 @@ import { useMovies } from '../context/MovieContext';
 import { fixMovieTmdb, resolveMovieTmdb, updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
-import { fetchTvSeasons } from '../services/tmdbApi';
+import { fetchTvSeasonEpisodes, fetchTvSeasons } from '../services/tmdbApi';
 
 interface Props {
   movie: MovieRecord;
@@ -18,6 +18,16 @@ type TabItem = {
   label: string;
   content: React.ReactNode;
 };
+
+type EpisodeInput = {
+  seen: boolean;
+  ratingGloria: string;
+  ratingRodrigo: string;
+  busy?: boolean;
+  error?: string;
+};
+
+const buildEpisodeKey = (seasonNumber: number, episodeNumber: number) => `${seasonNumber}-${episodeNumber}`;
 
 const focusableSelector =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -521,6 +531,12 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     error: undefined as string | undefined
   });
   const [seasonOverrides, setSeasonOverrides] = useState<MovieRecord['tmdbSeasons'] | null>(null);
+  const [episodeSeason, setEpisodeSeason] = useState<number | null>(currentMovie.season ?? null);
+  const [episodeRecords, setEpisodeRecords] = useState<MovieRecord['seriesEpisodes']>(currentMovie.seriesEpisodes ?? []);
+  const [episodeInputs, setEpisodeInputs] = useState<Record<string, EpisodeInput>>({});
+  const [episodeLoading, setEpisodeLoading] = useState(false);
+  const [episodeError, setEpisodeError] = useState<string | null>(null);
+  const episodeRecordsRef = useRef<MovieRecord['seriesEpisodes']>(currentMovie.seriesEpisodes ?? []);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
   const [plotExpanded, setPlotExpanded] = useState(false);
   const [showCompactTitle, setShowCompactTitle] = useState(false);
@@ -569,6 +585,11 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     setAdminBusy(false);
     setAdminSeason(currentMovie.season != null ? String(currentMovie.season) : '');
     setSeasonOverrides(null);
+    setEpisodeSeason(currentMovie.season ?? null);
+    setEpisodeRecords(currentMovie.seriesEpisodes ?? []);
+    setEpisodeInputs({});
+    setEpisodeLoading(false);
+    setEpisodeError(null);
     setActiveTab('summary');
     setPlotExpanded(false);
     setShowCompactTitle(false);
@@ -581,6 +602,10 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
       error: undefined
     });
   }, [movie.id]);
+
+  useEffect(() => {
+    episodeRecordsRef.current = episodeRecords;
+  }, [episodeRecords]);
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -790,6 +815,53 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     }));
   };
 
+  const updateEpisodeField = (key: string, field: keyof EpisodeInput, value: string | boolean) => {
+    setEpisodeInputs((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSaveEpisode = async (seasonNumber: number, episodeNumber: number) => {
+    if (!adminSession) return;
+    const key = buildEpisodeKey(seasonNumber, episodeNumber);
+    const input = episodeInputs[key];
+    if (!input) return;
+    setEpisodeInputs((prev) => ({
+      ...prev,
+      [key]: { ...input, busy: true, error: undefined }
+    }));
+    try {
+      const ratingGloria = input.ratingGloria ? Number(input.ratingGloria) : null;
+      const ratingRodrigo = input.ratingRodrigo ? Number(input.ratingRodrigo) : null;
+      const updatedEpisodes = (episodeRecordsRef.current ?? []).map((episode) => {
+        if (episode.seasonNumber !== seasonNumber || episode.episodeNumber !== episodeNumber) return episode;
+        return {
+          ...episode,
+          seen: input.seen,
+          ratingGloria,
+          ratingRodrigo
+        };
+      });
+      await updateMovieStatus({ collectionId: movie.id, seriesEpisodes: updatedEpisodes });
+      applyMovieStatusUpdate(movie.id, { seriesEpisodes: updatedEpisodes });
+      setEpisodeRecords(updatedEpisodes);
+      setEpisodeInputs((prev) => ({
+        ...prev,
+        [key]: { ...input, busy: false, error: undefined }
+      }));
+    } catch (error) {
+      console.error(error);
+      setEpisodeInputs((prev) => ({
+        ...prev,
+        [key]: { ...input, busy: false, error: 'No se pudo guardar.' }
+      }));
+    }
+  };
+
   const handleSaveWatched = async () => {
     if (!adminSession) return;
     setWatchedInput((prev) => ({ ...prev, busy: true, error: undefined }));
@@ -825,6 +897,19 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     }
   };
 
+  const episodeSeasonOptions = useMemo(() => {
+    const fromTmdb = (currentMovie.tmdbSeasons ?? []).map((season) => season.seasonNumber);
+    const fromEpisodes = (episodeRecords ?? []).map((episode) => episode.seasonNumber);
+    return Array.from(new Set([...fromTmdb, ...fromEpisodes].filter(Number.isFinite))).sort((a, b) => a - b);
+  }, [currentMovie.tmdbSeasons, episodeRecords]);
+
+  useEffect(() => {
+    if (episodeSeason != null) return;
+    if (episodeSeasonOptions.length > 0) {
+      setEpisodeSeason(episodeSeasonOptions[0]);
+    }
+  }, [episodeSeason, episodeSeasonOptions]);
+
   const displaySeasons = useMemo(() => {
     const base = currentMovie.tmdbSeasons ?? [];
     const overrides = seasonOverrides ?? [];
@@ -834,6 +919,100 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
       ? base.map((season) => ({ ...season, ...map.get(season.seasonNumber) }))
       : overrides;
   }, [currentMovie.tmdbSeasons, seasonOverrides]);
+
+  const sortEpisodes = (a: NonNullable<MovieRecord['seriesEpisodes']>[number], b: NonNullable<MovieRecord['seriesEpisodes']>[number]) =>
+    a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber;
+
+  const mergeEpisodeRecords = (
+    current: MovieRecord['seriesEpisodes'] | undefined,
+    incoming: NonNullable<MovieRecord['seriesEpisodes']>,
+    seasonNumber: number
+  ) => {
+    const existing = current ?? [];
+    const existingMap = new Map(existing.map((episode) => [buildEpisodeKey(episode.seasonNumber, episode.episodeNumber), episode]));
+    const mergedSeason = incoming.map((episode) => {
+      const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
+      const prev = existingMap.get(key);
+      return {
+        seasonNumber: episode.seasonNumber,
+        episodeNumber: episode.episodeNumber,
+        tmdbId: episode.tmdbId ?? prev?.tmdbId ?? null,
+        name: episode.name ?? prev?.name ?? null,
+        airDate: episode.airDate ?? prev?.airDate ?? null,
+        seen: prev?.seen ?? false,
+        ratingGloria: prev?.ratingGloria ?? null,
+        ratingRodrigo: prev?.ratingRodrigo ?? null
+      };
+    });
+    const rest = existing.filter((episode) => episode.seasonNumber !== seasonNumber);
+    const merged = [...rest, ...mergedSeason].sort(sortEpisodes);
+    const changed = merged.length !== existing.length || merged.some((episode) => {
+      const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
+      const prev = existingMap.get(key);
+      return !prev || prev.name !== episode.name || prev.airDate !== episode.airDate || prev.tmdbId !== episode.tmdbId;
+    });
+    return { merged, changed };
+  };
+
+  useEffect(() => {
+    let active = true;
+    async function fetchEpisodes() {
+      if (!tmdbEnrichmentEnabled || currentMovie.tmdbType !== 'tv' || !currentMovie.tmdbId || episodeSeason == null) {
+        return;
+      }
+      setEpisodeLoading(true);
+      setEpisodeError(null);
+      const episodes = await fetchTvSeasonEpisodes(currentMovie.tmdbId, episodeSeason);
+      if (!active) return;
+      if (episodes.length === 0) {
+        setEpisodeLoading(false);
+        return;
+      }
+      const { merged, changed } = mergeEpisodeRecords(episodeRecordsRef.current ?? [], episodes, episodeSeason);
+      if (changed) {
+        setEpisodeRecords(merged);
+        if (adminSession) {
+          try {
+            await updateMovieStatus({ collectionId: movie.id, seriesEpisodes: merged });
+            applyMovieStatusUpdate(movie.id, { seriesEpisodes: merged });
+          } catch (error) {
+            console.warn('No se pudo guardar capitulos en Supabase', error);
+          }
+        }
+      }
+      setEpisodeLoading(false);
+    }
+    fetchEpisodes();
+    return () => {
+      active = false;
+    };
+  }, [adminSession, applyMovieStatusUpdate, currentMovie.tmdbId, currentMovie.tmdbType, episodeSeason, movie.id, tmdbEnrichmentEnabled]);
+
+  const seasonEpisodes = useMemo(() => {
+    if (episodeSeason == null) return [];
+    return (episodeRecords ?? []).filter((episode) => episode.seasonNumber === episodeSeason).sort(sortEpisodes);
+  }, [episodeRecords, episodeSeason]);
+
+  const episodesSeen = useMemo(() => seasonEpisodes.filter((episode) => episode.seen).length, [seasonEpisodes]);
+
+  useEffect(() => {
+    if (episodeSeason == null) return;
+    setEpisodeInputs((prev) => {
+      const next: Record<string, EpisodeInput> = {};
+      seasonEpisodes.forEach((episode) => {
+        const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
+        const existing = prev[key];
+        next[key] = existing?.busy
+          ? existing
+          : {
+              seen: episode.seen ?? false,
+              ratingGloria: episode.ratingGloria != null ? String(episode.ratingGloria) : '',
+              ratingRodrigo: episode.ratingRodrigo != null ? String(episode.ratingRodrigo) : ''
+            };
+      });
+      return next;
+    });
+  }, [episodeSeason, seasonEpisodes]);
 
   const requestClose = () => {
     if (closeTimeoutRef.current != null) return;
@@ -965,6 +1144,99 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             )}
           </div>
         )}
+        {currentMovie.tmdbType === 'tv' && (
+          <div className="detail-sheet__section">
+            <div className="director-section__heading" style={{ alignItems: 'center' }}>
+              <strong>CapÃ­tulos</strong>
+              {episodeSeasonOptions.length > 1 && (
+                <label className="detail-sheet__field" style={{ minWidth: 140 }}>
+                  <span>Temporada</span>
+                  <select
+                    value={episodeSeason ?? ''}
+                    onChange={(event) => setEpisodeSeason(event.target.value ? Number(event.target.value) : null)}
+                  >
+                    {episodeSeasonOptions.map((season) => (
+                      <option key={season} value={season}>
+                        T{season}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {episodeSeason != null && (
+                <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
+              )}
+            </div>
+            {episodeLoading && <p className="muted">Cargando capÃ­tulos...</p>}
+            {episodeError && <p className="muted">{episodeError}</p>}
+            {seasonEpisodes.length > 0 ? (
+              <ul className="detail-sheet__season-list">
+                {seasonEpisodes.map((episode) => {
+                  const key = buildEpisodeKey(episode.seasonNumber, episode.episodeNumber);
+                  const input = episodeInputs[key];
+                  return (
+                    <li key={key} style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                          <div>
+                            <strong>S{episode.seasonNumber}E{episode.episodeNumber}</strong>{' '}
+                            {episode.name && <span>{episode.name}</span>}
+                          </div>
+                          <div className="muted">
+                            {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
+                            {episode.seen && <span> â€¢ Visto</span>}
+                          </div>
+                        </div>
+                        {adminSession && input && (
+                          <div style={{ display: 'grid', gap: 6, minWidth: 220 }}>
+                            <label className="ritual-admin__check">
+                              <input
+                                type="checkbox"
+                                checked={input.seen}
+                                onChange={(event) => updateEpisodeField(key, 'seen', event.target.checked)}
+                              />
+                              <span>Visto</span>
+                            </label>
+                            <div className="ritual-admin__ratings">
+                              <label>
+                                <span>Gloria</span>
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  value={input.ratingGloria}
+                                  onChange={(event) => updateEpisodeField(key, 'ratingGloria', event.target.value)}
+                                />
+                              </label>
+                              <label>
+                                <span>Rodrigo</span>
+                                <input
+                                  type="number"
+                                  step="0.5"
+                                  value={input.ratingRodrigo}
+                                  onChange={(event) => updateEpisodeField(key, 'ratingRodrigo', event.target.value)}
+                                />
+                              </label>
+                            </div>
+                            <button
+                              className="btn"
+                              onClick={() => handleSaveEpisode(episode.seasonNumber, episode.episodeNumber)}
+                              disabled={input.busy}
+                            >
+                              {input.busy ? 'Guardando...' : 'Guardar'}
+                            </button>
+                            {input.error && <p className="ritual-admin__error">{input.error}</p>}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="muted">Sin capÃ­tulos disponibles.</p>
+            )}
+          </div>
+        )}
       </div>
       <aside className="detail-sheet__sidebar">
         <RatingsCard movie={currentMovie} />
@@ -992,6 +1264,10 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
               {currentMovie.tmdbGenres && currentMovie.tmdbGenres.length > 0 && (
                 <small className="muted">TMDb: {currentMovie.tmdbGenres.join(', ')}</small>
               )}
+            </div>
+            <div>
+              <strong>Región</strong>
+              <p>{currentMovie.region || '—'}</p>
             </div>
             <div>
               <strong>Tipo</strong>

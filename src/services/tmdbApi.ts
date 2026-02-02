@@ -1,4 +1,4 @@
-import { MovieRecord, TmdbStatus } from '../types/MovieRecord';
+import { MovieRecord, SeriesEpisode, TmdbStatus } from '../types/MovieRecord';
 
 export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 export const TMDB_BEARER = import.meta.env.VITE_TMDB_BEARER;
@@ -246,6 +246,20 @@ type TvSearchResult = {
 
 type TvDetailResult = TvSearchResult & {
   overview?: string | null;
+
+type TvSeasonDetailResult = {
+  air_date?: string | null;
+  episode_count?: number | null;
+  name?: string | null;
+  poster_path?: string | null;
+  episodes?: {
+    id: number;
+    name: string;
+    episode_number: number;
+    season_number: number;
+    air_date?: string | null;
+  }[];
+};
   genres?: { id: number; name: string }[];
   seasons?: { season_number: number; name?: string | null; episode_count?: number | null; air_date?: string | null; poster_path?: string | null }[];
 };
@@ -387,13 +401,30 @@ async function fetchTvSeasonDetails(id: number, season: number, maxRps?: number)
   }
   const url = `${API_BASE}/tv/${id}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
   try {
-    return await tmdbFetchJson<{ air_date?: string | null; episode_count?: number | null; name?: string | null; poster_path?: string | null }>(
-      url,
-      maxRps
-    );
+    return await tmdbFetchJson<TvSeasonDetailResult>(url, maxRps);
   } catch (error) {
     console.warn('TMDb season fetch failed', error);
     return null;
+  }
+}
+
+export async function fetchTvSeasonEpisodes(tmdbId: number, season: number): Promise<SeriesEpisode[]> {
+  if (!TMDB_API_KEY || typeof TMDB_API_KEY !== 'string' || TMDB_API_KEY.trim() === '') {
+    return [];
+  }
+  const url = `${API_BASE}/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
+  try {
+    const details = await tmdbFetchJson<TvSeasonDetailResult>(url);
+    return (details.episodes ?? []).map((episode) => ({
+      seasonNumber: episode.season_number,
+      episodeNumber: episode.episode_number,
+      tmdbId: episode.id,
+      name: episode.name,
+      airDate: episode.air_date ?? null
+    }));
+  } catch (error) {
+    console.warn('TMDb season episodes fetch failed', error);
+    return [];
   }
 }
 
@@ -674,3 +705,8 @@ export async function enrichMoviesBatch(
 
   return results;
 }
+
+
+
+
+

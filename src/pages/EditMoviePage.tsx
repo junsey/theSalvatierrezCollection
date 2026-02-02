@@ -17,8 +17,9 @@ type FormState = {
   season: string;
   ratingGloria: string;
   ratingRodrigo: string;
-  dubbing: string;
+  dubbing: '' | 'true' | 'false';
   format: string;
+  region: string;
   enDeposito: boolean;
   funcionaStatus: 'working' | 'damaged' | 'untested';
 };
@@ -61,8 +62,9 @@ export const EditMoviePage: React.FC = () => {
       season: movie.season != null ? String(movie.season) : '',
       ratingGloria: movie.ratingGloria != null ? String(movie.ratingGloria) : '',
       ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
-      dubbing: movie.dubbing ?? '',
+      dubbing: typeof movie.dubbing === 'boolean' ? (movie.dubbing ? 'true' : 'false') : '',
       format: movie.format ?? '',
+      region: movie.region ?? '',
       enDeposito: Boolean(movie.enDeposito),
       funcionaStatus: movie.funcionaStatus ?? 'untested'
     });
@@ -92,7 +94,7 @@ export const EditMoviePage: React.FC = () => {
     const year = parseNumber(form.year);
     if (form.year.trim() && year == null) {
       setStatus('error');
-      setError('El anio debe ser numerico.');
+      setError('El año debe ser numerico.');
       return;
     }
     const season = parseNumber(form.season);
@@ -113,6 +115,7 @@ export const EditMoviePage: React.FC = () => {
       setError('La puntuacion de Rodrigo debe ser numerica.');
       return;
     }
+    const dubbing = form.dubbing === '' ? null : form.dubbing === 'true';
 
     setStatus('saving');
     setError(null);
@@ -132,8 +135,9 @@ export const EditMoviePage: React.FC = () => {
         seen: form.seen,
         ratingGloria,
         ratingRodrigo,
-        dubbing: form.dubbing.trim(),
+        dubbing,
         format: form.format.trim(),
+        region: form.region.trim(),
         enDeposito: form.enDeposito,
         funcionaStatus: form.funcionaStatus
       });
@@ -254,7 +258,7 @@ export const EditMoviePage: React.FC = () => {
             />
           </label>
           <label>
-            <strong>Anio</strong>
+            <strong>Año</strong>
             <input
               type="number"
               value={form.year}
@@ -323,10 +327,21 @@ export const EditMoviePage: React.FC = () => {
           </label>
           <label>
             <strong>Doblaje</strong>
+            <select
+              value={form.dubbing}
+              onChange={(event) => handleChange({ dubbing: event.target.value as FormState['dubbing'] })}
+            >
+              <option value="">No especificado</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+          <label>
+            <strong>Región</strong>
             <input
               type="text"
-              value={form.dubbing}
-              onChange={(event) => handleChange({ dubbing: event.target.value })}
+              value={form.region}
+              onChange={(event) => handleChange({ region: event.target.value })}
             />
           </label>
           <label>

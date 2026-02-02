@@ -8,6 +8,7 @@ interface SectionCardProps {
   seen: number;
   backgroundUrl?: string | null;
   featured?: boolean;
+  basePath?: string;
 }
 
 const DEFAULT_SECTION_BG = '/assets/sections/default.jpg';
@@ -17,7 +18,8 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   total,
   seen,
   backgroundUrl,
-  featured = false
+  featured = false,
+  basePath = '/sections'
 }) => {
   const fallbackArt = useMemo(() => getSectionArt(name) || DEFAULT_SECTION_BG, [name]);
   const ratio = total > 0 ? seen / total : 0;
@@ -35,7 +37,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
 
   return (
     <Link
-      to={`/sections/${encodeURIComponent(name)}`}
+      to={`${basePath}/${encodeURIComponent(name)}`}
       className={['section-card', featured ? 'section-card--featured' : '', progressClass].filter(Boolean).join(' ')}
     >
       <div className="section-card__bg" style={{ backgroundImage: `url(${resolvedBackground})` }} aria-hidden="true" />

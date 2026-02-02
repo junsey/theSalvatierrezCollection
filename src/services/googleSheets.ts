@@ -111,7 +111,7 @@ function parseCsv(csvText: string): Record<string, string>[] {
 const parseBoolean = (value: string): boolean => {
   const normalized = value.toLowerCase();
   return normalized === 'si' || normalized === 'sÃ­' || normalized === 'yes' || normalized === '1' || normalized === 'true';
-};
+};\n\nconst parseDoblaje = (value: string): boolean | null => {\n  const normalized = value.trim().toLowerCase();\n  if (!normalized) return null;\n  if (['si', 'sí', 'yes', '1', 'true'].includes(normalized)) return true;\n  if (['no', '0', 'false'].includes(normalized)) return false;\n  return null;\n};
 
 const safeNumber = (value: string): number | null => {
   const num = Number(value);
@@ -167,9 +167,10 @@ function mapToMovie(record: Record<string, string>, index: number): MovieRecord 
     rating: safeNumber(record['Puntuacion'] ?? ''),
     ratingGloria: safeNumber(record['Puntuacion Gloria'] ?? ''),
     ratingRodrigo: safeNumber(record['Puntuacion Rodrigo'] ?? ''),
-    dubbing: record['Doblaje'] ?? '',
+    dubbing: parseDoblaje(record['Doblaje'] ?? ''),
     format: record['Formato'] ?? '',
     enDeposito,
+    region: record['Region'] ?? '',
     funcionaStatus
   };
 }
@@ -287,3 +288,8 @@ export function getSheetUrl(): string {
   const [primary] = buildSheetUrls();
   return primary;
 }
+
+
+
+
+

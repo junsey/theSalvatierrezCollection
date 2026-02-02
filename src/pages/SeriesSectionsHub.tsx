@@ -3,21 +3,25 @@ import { Link } from 'react-router-dom';
 import { SectionList } from '../components/SectionList';
 import { useMovies } from '../context/MovieContext';
 
-export const SectionsHub: React.FC = () => {
+export const SeriesSectionsHub: React.FC = () => {
   const { visibleMovies: movies } = useMovies();
+  const seriesMovies = useMemo(
+    () => movies.filter((movie) => movie.series || movie.tmdbType === 'tv'),
+    [movies]
+  );
   const [orderBy, setOrderBy] = useState<'pending' | 'largest' | 'alpha'>('pending');
   const totals = useMemo(() => {
-    const total = movies.length;
-    const seen = movies.filter((movie) => movie.seen).length;
+    const total = seriesMovies.length;
+    const seen = seriesMovies.filter((movie) => movie.seen).length;
     return { total, seen, pending: Math.max(total - seen, 0) };
-  }, [movies]);
+  }, [seriesMovies]);
 
   return (
     <section className="sections-hub">
       <header className="sections-hub__header">
         <div>
-          <h1>Sections</h1>
-          <p className="text-muted">Explora la colección por secciones y prioriza tus pendientes.</p>
+          <h1>Sections: Series</h1>
+          <p className="text-muted">Explora la coleccion por secciones solo para series.</p>
         </div>
         <div className="sections-hub__metrics">
           <div className="sections-hub__metric">
@@ -36,10 +40,10 @@ export const SectionsHub: React.FC = () => {
       </header>
       <div className="sections-hub__toolbar">
         <div className="sections-hub__chips">
-          <Link className="sections-hub__chip is-active" to="/sections">
+          <Link className="sections-hub__chip" to="/sections">
             Todas
           </Link>
-          <Link className="sections-hub__chip" to="/sections-series">
+          <Link className="sections-hub__chip is-active" to="/sections-series">
             Series
           </Link>
           <button className="sections-hub__chip" type="button" disabled>
@@ -55,14 +59,13 @@ export const SectionsHub: React.FC = () => {
         <label className="sections-hub__order">
           <span>Ordenar por</span>
           <select value={orderBy} onChange={(event) => setOrderBy(event.target.value as 'pending' | 'largest' | 'alpha')}>
-            <option value="pending">Más pendientes</option>
-            <option value="largest">Más grandes</option>
-            <option value="alpha">A–Z</option>
+            <option value="pending">Mas pendientes</option>
+            <option value="largest">Mas grandes</option>
+            <option value="alpha">A�Z</option>
           </select>
         </label>
       </div>
-      <SectionList movies={movies} orderBy={orderBy} />
+      <SectionList movies={seriesMovies} orderBy={orderBy} basePath="/sections-series" />
     </section>
   );
 };
-

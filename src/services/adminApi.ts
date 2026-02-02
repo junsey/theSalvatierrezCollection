@@ -46,9 +46,11 @@ export async function createMovie(payload: {
   seen?: boolean;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
-  dubbing?: string;
+  dubbing?: boolean | null;
   format?: string;
+  region?: string;
   funciona?: string;
+  seriesEpisodes?: unknown[];
 }) {
   return adminFetch('/api/movies/create', {
     method: 'POST',
@@ -63,6 +65,7 @@ export async function updateMovieStatus(payload: {
   ratingRodrigo?: number | null;
   enDeposito?: boolean | null;
   funcionaStatus?: 'working' | 'damaged' | 'untested';
+  seriesEpisodes?: unknown[];
 }) {
   return adminFetch('/api/movies/status', {
     method: 'PATCH',
@@ -104,10 +107,12 @@ export async function updateMovie(payload: {
   seen?: boolean | null;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
-  dubbing?: string;
+  dubbing?: boolean | null;
   format?: string;
+  region?: string;
   enDeposito?: boolean | null;
   funcionaStatus?: 'working' | 'damaged' | 'untested';
+  seriesEpisodes?: unknown[];
 }) {
   return adminFetch('/api/movies/update', {
     method: 'PATCH',

@@ -148,7 +148,9 @@ export const SettingsPage: React.FC = () => {
 
     dubbing: '',
 
-    format: ''
+    format: '',
+
+    region: ''
 
   });
 
@@ -331,6 +333,7 @@ export const SettingsPage: React.FC = () => {
     const season = Number.isFinite(seasonValue) ? seasonValue : null;
 
     try {
+      const dubbing = newMovie.dubbing === '' ? null : newMovie.dubbing === 'true';
       const payload = {
         seccion: newMovie.seccion.trim(),
         title: newMovie.title.trim(),
@@ -345,8 +348,9 @@ export const SettingsPage: React.FC = () => {
         seen: newMovie.seen,
         ratingGloria: newMovie.ratingGloria ? Number(newMovie.ratingGloria) : null,
         ratingRodrigo: newMovie.ratingRodrigo ? Number(newMovie.ratingRodrigo) : null,
-        dubbing: newMovie.dubbing.trim(),
-        format: newMovie.format.trim()
+        dubbing,
+        format: newMovie.format.trim(),
+        region: newMovie.region.trim()
       };
 
       if (!payload.seccion || !payload.title) {
@@ -371,7 +375,9 @@ export const SettingsPage: React.FC = () => {
         ratingGloria: '',
         ratingRodrigo: '',
         dubbing: '',
-        format: ''
+        format: '',
+
+    region: ''
       });
       setNewMovieType('movie');
     } catch (error) {
@@ -503,10 +509,21 @@ const newMovieContent = adminSession ? (
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <strong>Doblaje</strong>
-            <input
-              type="text"
+            <select
               value={newMovie.dubbing}
               onChange={(event) => setNewMovie({ ...newMovie, dubbing: event.target.value })}
+            >
+              <option value="">No especificado</option>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <strong>Región</strong>
+            <input
+              type="text"
+              value={newMovie.region}
+              onChange={(event) => setNewMovie({ ...newMovie, region: event.target.value })}
             />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -949,3 +966,17 @@ const newMovieContent = adminSession ? (
   );
 
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+

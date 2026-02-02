@@ -29,7 +29,11 @@ const pickSectionBackground = (movies: MovieRecord[]) => {
   return pick.posterUrl ?? null;
 };
 
-export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy }> = ({ movies, orderBy }) => {
+export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy; basePath?: string }> = ({
+  movies,
+  orderBy,
+  basePath
+}) => {
   const sectionGroups = useMemo(() => {
     const map = new Map<string, MovieRecord[]>();
     movies.forEach((movie) => {
@@ -92,6 +96,7 @@ export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy }> 
                 seen={section.seen}
                 backgroundUrl={section.backgroundUrl}
                 featured
+                basePath={basePath}
               />
             ))}
           </div>
@@ -105,6 +110,7 @@ export const SectionList: React.FC<{ movies: MovieRecord[]; orderBy: OrderBy }> 
             total={section.total}
             seen={section.seen}
             backgroundUrl={section.backgroundUrl}
+            basePath={basePath}
           />
         ))}
       </div>

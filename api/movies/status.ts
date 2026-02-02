@@ -40,6 +40,12 @@ export default async function handler(req: any, res: any) {
     } else if (body.funciona !== undefined) {
       payload.Funciona = toBoolOrNull(body.funciona);
     }
+    if (Array.isArray(body.seriesEpisodes)) {
+      payload['Capitulos de Serie  '] = body.seriesEpisodes;
+    }
+    if (payload.Vista === true && payload.Funciona === undefined) {
+      payload.Funciona = true;
+    }
     if (Object.keys(payload).length === 0) {
       return reject(res, 400, 'No hay campos para actualizar.');
     }

@@ -1,3 +1,14 @@
+export type SeriesEpisode = {
+  seasonNumber: number;
+  episodeNumber: number;
+  tmdbId?: number | null;
+  name?: string | null;
+  airDate?: string | null;
+  seen?: boolean;
+  ratingGloria?: number | null;
+  ratingRodrigo?: number | null;
+};
+
 export type MovieRecord = {
   id: string;
   seccion: string;
@@ -16,10 +27,12 @@ export type MovieRecord = {
   rating?: number | null;
   ratingGloria?: number | null;
   ratingRodrigo?: number | null;
-  dubbing: string;
+  dubbing: boolean | string | null;
   format: string;
+  region?: string;
   enDeposito?: boolean;
   funcionaStatus: 'working' | 'damaged' | 'untested';
+  seriesEpisodes?: SeriesEpisode[];
   tmdbId?: number;
   tmdbRating?: number | null;
   tmdbYear?: number | null;

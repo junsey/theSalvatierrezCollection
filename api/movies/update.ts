@@ -51,11 +51,13 @@ export default async function handler(req: any, res: any) {
       Director: toText(body.director),
       Grupo: toText(body.group),
       Vista: toBoolOrNull(body.seen),
-      Doblaje: toNullIfEmpty(body.dubbing),
+      Doblaje: toBoolOrNull(body.dubbing),
       Formato: toText(body.format),
+      Region: toNullIfEmpty(body.region),
       'Puntuacion Rodrigo': toNumberOrNull(body.ratingRodrigo),
       'Puntuacion Gloria': toNumberOrNull(body.ratingGloria),
-      'En depósito': toBoolOrNull(body.enDeposito)
+      'En depósito': toBoolOrNull(body.enDeposito),
+      'Capitulos de Serie  ': Array.isArray(body.seriesEpisodes) ? body.seriesEpisodes : undefined
     } as Record<string, any>;
 
     if (body.funcionaStatus) {
@@ -73,6 +75,9 @@ export default async function handler(req: any, res: any) {
       }
     });
 
+    if (payload.Vista === true && payload.Funciona === undefined) {
+      payload.Funciona = true;
+    }
     if (!payload.Seccion || !payload.Titulo) {
       return reject(res, 400, 'Seccion y titulo son obligatorios.');
     }

@@ -446,3 +446,4 @@ export const useMovies = (): MovieContextValue => {
   if (!ctx) throw new Error('useMovies must be used within MovieProvider');
   return ctx;
 };
+

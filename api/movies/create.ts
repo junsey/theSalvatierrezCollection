@@ -21,8 +21,8 @@ export default async function handler(req: any, res: any) {
     const toBoolOrNull = (value: any) => {
       if (typeof value === 'boolean') return value;
       if (value == null || value === '') return null;
-      if (value === 1 || value === '1') return true;
-      if (value === 0 || value === '0') return false;
+      if (value === 1 || value === '1' || value === 'true') return true;
+      if (value === 0 || value === '0' || value === 'false') return false;
       return null;
     };
     const payload = {
@@ -37,11 +37,13 @@ export default async function handler(req: any, res: any) {
       Director: toText(body.director),
       Grupo: toText(body.group),
       Vista: toBoolOrNull(body.seen),
-      Doblaje: toText(body.dubbing),
+      Doblaje: toBoolOrNull(body.dubbing),
       Formato: toText(body.format),
+      Region: toNullIfEmpty(body.region),
       'Puntuacion Rodrigo': body.ratingRodrigo ?? null,
       'Puntuacion Gloria': body.ratingGloria ?? null,
-      Funciona: toNullIfEmpty(body.funciona)
+      Funciona: toBoolOrNull(body.funciona),
+      'Capitulos de Serie  ': Array.isArray(body.seriesEpisodes) ? body.seriesEpisodes : undefined
     } as Record<string, any>;
     Object.keys(payload).forEach((key) => {
       const value = payload[key];
@@ -52,6 +54,9 @@ export default async function handler(req: any, res: any) {
         delete payload[key];
       }
     });
+    if (payload.Vista === true && payload.Funciona === undefined) {
+      payload.Funciona = true;
+    }
     if (!payload.Seccion || !payload.Titulo) {
       return reject(res, 400, 'Seccion y titulo son obligatorios.');
     }
@@ -69,4 +74,3 @@ export default async function handler(req: any, res: any) {
     return reject(res, 500, 'No se pudo crear la pelicula.');
   }
 }
-

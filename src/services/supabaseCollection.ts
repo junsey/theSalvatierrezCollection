@@ -15,12 +15,16 @@ type CollectionRow = {
   Director?: string | null;
   Grupo?: string | null;
   Vista?: boolean | null;
-  Doblaje?: string | null;
+  Doblaje?: string | boolean | null;
   Formato?: string | null;
   'Puntuacion Rodrigo'?: number | null;
   'Puntuacion Gloria'?: number | null;
   Funciona?: string | boolean | null;
   'En depA3sito'?: boolean | string | null;
+  Region?: string | null;
+  'Capitulos de Serie  '?: unknown;
+  'Capitulos de Serie '?: unknown;
+  'Capitulos de Serie'?: unknown;
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -89,6 +93,59 @@ const parseEnDeposito = (value: unknown): boolean => {
   return Boolean(value);
 };
 
+const parseDoblaje = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value;
+  if (value == null) return null;
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return null;
+    if (['si', 'sí', 's�', 'true', '1', 'yes'].includes(normalized)) return true;
+    if (['no', 'false', '0'].includes(normalized)) return false;
+  }
+  return null;
+};
+
+const parseSeriesEpisodes = (value: unknown): MovieRecord['seriesEpisodes'] => {
+  if (!value) return undefined;
+  const raw = typeof value === 'string'
+    ? (() => {
+        try {
+          return JSON.parse(value);
+        } catch (error) {
+          console.warn('No se pudo parsear Capitulos de Serie', error);
+          return null;
+        }
+      })()
+    : value;
+  if (!Array.isArray(raw)) return undefined;
+  const parsed = raw
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const data = entry as Record<string, unknown>;
+      const seasonNumber = Number(data.seasonNumber ?? data.season_number ?? data.season ?? null);
+      const episodeNumber = Number(data.episodeNumber ?? data.episode_number ?? data.episode ?? null);
+      if (!Number.isFinite(seasonNumber) || !Number.isFinite(episodeNumber)) return null;
+      const tmdbIdValue = data.tmdbId ?? data.tmdb_id ?? data.id ?? null;
+      const tmdbId = tmdbIdValue == null ? null : Number(tmdbIdValue);
+      return {
+        seasonNumber,
+        episodeNumber,
+        tmdbId: Number.isFinite(tmdbId) ? tmdbId : null,
+        name: typeof data.name === 'string' ? data.name : null,
+        airDate: typeof data.airDate === 'string' ? data.airDate : typeof data.air_date === 'string' ? data.air_date : null,
+        seen: typeof data.seen === 'boolean' ? data.seen : undefined,
+        ratingGloria: Number.isFinite(Number(data.ratingGloria)) ? Number(data.ratingGloria) : null,
+        ratingRodrigo: Number.isFinite(Number(data.ratingRodrigo)) ? Number(data.ratingRodrigo) : null
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  return parsed.length ? parsed : undefined;
+};
+
 const toText = (value: unknown, fallback = ''): string => {
   if (value == null) return fallback;
   if (typeof value === 'string') return value;
@@ -111,10 +168,16 @@ function mapRow(row: CollectionRow): MovieRecord {
     season: row.Temporada ?? undefined,
     ratingGloria: row['Puntuacion Gloria'] ?? null,
     ratingRodrigo: row['Puntuacion Rodrigo'] ?? null,
-    dubbing: toText(row.Doblaje),
+    dubbing: parseDoblaje(row.Doblaje),
     format: toText(row.Formato),
+    region: toText(row.Region),
     enDeposito: parseEnDeposito((row as any)['En depósito']),
-    funcionaStatus: parseFunciona(row.Funciona ?? '')
+    funcionaStatus: parseFunciona(row.Funciona ?? ''),
+    seriesEpisodes: parseSeriesEpisodes(
+      row['Capitulos de Serie  '] ??
+      (row as any)['Capitulos de Serie '] ??
+      (row as any)['Capitulos de Serie']
+    )
   };
 }
 
