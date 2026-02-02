@@ -1218,188 +1218,194 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
             )}
           </div>
         </div>
+      </div>
+      <aside className="detail-sheet__sidebar">
+        <RatingsCard movie={currentMovie} />
+      </aside>
+    </div>
+  );
 
+  const seasonsContent = (
+    <div className="detail-sheet__content-grid">
+      <div className="detail-sheet__main">
+        <div className="detail-sheet__section">
+          <div className="director-section__heading">
+            <strong>Temporadas</strong>
+            {currentMovie.season != null && (
+              <small className="muted"> Temporada solicitada: {currentMovie.season}</small>
+            )}
+          </div>
+          {displaySeasons && displaySeasons.length > 0 ? (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  overflowX: 'auto',
+                  paddingBottom: 6
+                }}
+              >
+                {displaySeasons.map((season) => {
+                  const owned = ownedSeasons.has(season.seasonNumber);
+                  const isActive = episodeSeason === season.seasonNumber;
+                  return (
+                    <button
+                      key={season.seasonNumber}
+                      type="button"
+                      onClick={() => {
+                        if (!owned) return;
+                        setEpisodeSeason(season.seasonNumber);
+                        setActiveTab('episodes');
+                      }}
+                      style={{
+                        border: isActive ? '2px solid var(--accent-2)' : '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 14,
+                        padding: 8,
+                        background: 'rgba(0,0,0,0.2)',
+                        color: 'inherit',
+                        minWidth: 140,
+                        textAlign: 'left',
+                        cursor: owned ? 'pointer' : 'default'
+                      }}
+                      aria-disabled={!owned}
+                    >
+                      <div
+                        style={{
+                          width: 120,
+                          height: 170,
+                          borderRadius: 10,
+                          backgroundColor: 'rgba(255,255,255,0.08)',
+                          backgroundImage: season.posterUrl ? `url(${season.posterUrl})` : undefined,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          filter: owned ? 'none' : 'grayscale(1)',
+                          opacity: owned ? 1 : 0.5,
+                          marginBottom: 8
+                        }}
+                      />
+                      <div style={{ fontWeight: 600 }}>T{season.seasonNumber}</div>
+                      {season.name && <div className="muted">{season.name}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              {episodeSeason != null && (
+                <div className="muted" style={{ marginTop: 8 }}>
+                  {(() => {
+                    const selected = displaySeasons.find((season) => season.seasonNumber === episodeSeason);
+                    if (!selected) return null;
+                    return (
+                      <>
+                        Episodios: {selected.episodeCount ?? '???'}
+                        {selected.airDate && <span> ??? Estreno: {selected.airDate}</span>}
+                      </>
+                    );
+                  })()}
                 </div>
-                {displaySeasons && displaySeasons.length > 0 ? (
-                  <>
+              )}
+            </>
+          ) : (
+            <p className="muted">Sin temporadas registradas.</p>
+          )}
+        </div>
+      </div>
+      <aside className="detail-sheet__sidebar">
+        <RatingsCard movie={currentMovie} />
+      </aside>
+    </div>
+  );
+
+  const episodesContent = (
+    <div className="detail-sheet__content-grid">
+      <div className="detail-sheet__main">
+        <div className="detail-sheet__section">
+          <div className="director-section__heading" style={{ alignItems: 'center' }}>
+            <strong>Capitulos</strong>
+            {episodeSeason != null && (
+              <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
+            )}
+          </div>
+          {episodeSeason == null && <p className="muted">Selecciona una temporada para ver los capitulos.</p>}
+          {!currentMovie.tmdbId && (
+            <p className="muted">Sin ID de TMDb para cargar capitulos.</p>
+          )}
+          {episodeSeason != null && episodeLoading && <p className="muted">Cargando capitulos...</p>}
+          {episodeSeason != null && episodeError && <p className="muted">{episodeError}</p>}
+          {episodeSeason != null && seasonEpisodes.length > 0 ? (
+            <div style={{ display: 'grid', gap: 16 }}>
+              {seasonEpisodes.map((episode) => {
+                const myRatings = [episode.ratingGloria, episode.ratingRodrigo].filter(
+                  (value): value is number => value != null
+                );
+                const myAverage = myRatings.length
+                  ? (myRatings.reduce((sum, value) => sum + value, 0) / myRatings.length).toFixed(1)
+                  : '???';
+                const tmdbScore = episode.tmdbRating != null ? episode.tmdbRating.toFixed(1) : '???';
+                return (
+                  <div
+                    key={buildEpisodeKey(episode.seasonNumber, episode.episodeNumber)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) 180px',
+                      gap: 16,
+                      alignItems: 'start',
+                      paddingBottom: 16,
+                      borderBottom: '1px solid rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>
+                        S{episode.seasonNumber}E{episode.episodeNumber} {episode.name ?? ''}
+                      </div>
+                      <div className="muted" style={{ marginTop: 6 }}>
+                        {episode.overview || 'Sin sinopsis.'}
+                      </div>
+                      <div className="muted" style={{ marginTop: 6 }}>
+                        {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
+                        {episode.seen && <span> ??? Visto</span>}
+                      </div>
+                    </div>
                     <div
                       style={{
-                        display: 'flex',
-                        gap: 12,
-                        overflowX: 'auto',
-                        paddingBottom: 6
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 12,
+                        padding: 12,
+                        display: 'grid',
+                        gap: 8
                       }}
                     >
-                      {displaySeasons.map((season) => {
-                        const owned = ownedSeasons.has(season.seasonNumber);
-                        const isActive = episodeSeason === season.seasonNumber;
-                        return (
-                          <button
-                            key={season.seasonNumber}
-                            type="button"
-                            onClick={() => {
-                              setEpisodeSeason(season.seasonNumber);
-                              if (owned) {
-                                setActiveTab('episodes');
-                              }
-                            }}
-                            style={{
-                              border: isActive ? '2px solid var(--accent-2)' : '1px solid rgba(255,255,255,0.1)',
-                              borderRadius: 14,
-                              padding: 8,
-                              background: 'rgba(0,0,0,0.2)',
-                              color: 'inherit',
-                              minWidth: 140,
-                              textAlign: 'left',
-                              cursor: owned ? 'pointer' : 'default'
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: 120,
-                                height: 170,
-                                borderRadius: 10,
-                                backgroundColor: 'rgba(255,255,255,0.08)',
-                                backgroundImage: season.posterUrl ? `url(${season.posterUrl})` : undefined,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                                filter: owned ? 'none' : 'grayscale(1)',
-                                opacity: owned ? 1 : 0.5,
-                                marginBottom: 8
-                              }}
-                            />
-                            <div style={{ fontWeight: 600 }}>
-                              T{season.seasonNumber}
-                            </div>
-                            {season.name && <div className="muted">{season.name}</div>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {episodeSeason != null && (
-                      <div className="muted" style={{ marginTop: 8 }}>
-                        {(() => {
-                          const selected = displaySeasons.find((season) => season.seasonNumber === episodeSeason);
-                          if (!selected) return null;
-                          return (
-                            <>
-                              Episodios: {selected.episodeCount ?? '—'}
-                              {selected.airDate && <span> • Estreno: {selected.airDate}</span>}
-                            </>
-                          );
-                        })()}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span className="muted">Mi nota</span>
+                        <strong>{myAverage}</strong>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="muted">Sin temporadas registradas.</p>
-                )}
-              </div>
-              <div role="tabpanel" hidden={activeSeriesTab !== 'episodes'} className="detail-tabs__panel">
-                <div className="director-section__heading" style={{ alignItems: 'center' }}>
-                  <strong>Capitulos</strong>
-                  {episodeSeasonOptions.length > 1 && (
-                    <label className="detail-sheet__field" style={{ minWidth: 140 }}>
-                      <span>Temporada</span>
-                      <select
-                        value={episodeSeason ?? ''}
-                        onChange={(event) => setEpisodeSeason(event.target.value ? Number(event.target.value) : null)}
-                      >
-                        {episodeSeasonOptions.map((season) => (
-                          <option key={season} value={season}>
-                            T{season}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {episodeSeason != null && (
-                    <small className="muted">Vistos: {episodesSeen}/{seasonEpisodes.length}</small>
-                  )}
-                </div>
-                {!currentMovie.tmdbId && (
-                  <p className="muted">Sin ID de TMDb para cargar capitulos.</p>
-                )}
-                {episodeLoading && <p className="muted">Cargando capitulos...</p>}
-                {episodeError && <p className="muted">{episodeError}</p>}
-                {seasonEpisodes.length > 0 ? (
-                  <div style={{ display: 'grid', gap: 16 }}>
-                    {seasonEpisodes.map((episode) => {
-                      const myRatings = [episode.ratingGloria, episode.ratingRodrigo].filter(
-                        (value): value is number => value != null
-                      );
-                      const myAverage = myRatings.length
-                        ? (myRatings.reduce((sum, value) => sum + value, 0) / myRatings.length).toFixed(1)
-                        : '—';
-                      const tmdbScore = episode.tmdbRating != null ? episode.tmdbRating.toFixed(1) : '—';
-                      return (
-                        <div
-                          key={buildEpisodeKey(episode.seasonNumber, episode.episodeNumber)}
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(0, 1fr) 180px',
-                            gap: 16,
-                            alignItems: 'start',
-                            paddingBottom: 16,
-                            borderBottom: '1px solid rgba(255,255,255,0.08)'
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span className="muted">TMDb</span>
+                        <strong>{tmdbScore}</strong>
+                      </div>
+                      {adminSession && (
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => {
+                            if (episode.seen) {
+                              void handleClearEpisode(episode);
+                            } else {
+                              openEpisodeModal(episode);
+                            }
                           }}
                         >
-                          <div>
-                            <div style={{ fontWeight: 600 }}>
-                              S{episode.seasonNumber}E{episode.episodeNumber} {episode.name ?? ''}
-                            </div>
-                            <div className="muted" style={{ marginTop: 6 }}>
-                              {episode.overview || 'Sin sinopsis.'}
-                            </div>
-                            <div className="muted" style={{ marginTop: 6 }}>
-                              {episode.airDate ? `Estreno: ${episode.airDate}` : 'Sin fecha'}
-                              {episode.seen && <span> • Visto</span>}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              borderRadius: 12,
-                              padding: 12,
-                              display: 'grid',
-                              gap: 8
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span className="muted">Mi nota</span>
-                              <strong>{myAverage}</strong>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                              <span className="muted">TMDb</span>
-                              <strong>{tmdbScore}</strong>
-                            </div>
-                            {adminSession && (
-                              <button
-                                className="btn"
-                                type="button"
-                                onClick={() => {
-                                  if (episode.seen) {
-                                    void handleClearEpisode(episode);
-                                  } else {
-                                    openEpisodeModal(episode);
-                                  }
-                                }}
-                              >
-                                {episode.seen ? 'Limpiar puntuacion' : 'Marcar visto'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                          {episode.seen ? 'Limpiar puntuacion' : 'Marcar visto'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <p className="muted">Sin capitulos disponibles.</p>
-                )}
-              </div>
+                );
+              })}
             </div>
-          </div>
-        )}
+          ) : episodeSeason != null ? (
+            <p className="muted">Sin capitulos disponibles.</p>
+          ) : null}
+        </div>
       </div>
       <aside className="detail-sheet__sidebar">
         <RatingsCard movie={currentMovie} />
@@ -1408,6 +1414,7 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
   );
 
   const detailsContent = (
+
     <div className="detail-sheet__content-grid">
       <div className="detail-sheet__main">
         <div className="detail-sheet__section">
