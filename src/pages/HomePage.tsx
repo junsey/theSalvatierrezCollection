@@ -11,7 +11,12 @@ type DonutDatum = {
   color: string;
 };
 
-const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, total }) => {
+const StatDonut: React.FC<{
+  data: DonutDatum[];
+  total: number;
+  centerNumber?: React.ReactNode;
+  centerLabel?: React.ReactNode;
+}> = ({ data, total, centerNumber, centerLabel }) => {
   const radius = 48;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
@@ -41,8 +46,8 @@ const StatDonut: React.FC<{ data: DonutDatum[]; total: number }> = ({ data, tota
         })}
       </svg>
       <div className="donut__center">
-        <span className="donut__number">{total}</span>
-        <span className="donut__label">Relics</span>
+        <span className="donut__number">{centerNumber ?? total}</span>
+        <span className="donut__label">{centerLabel ?? 'Relics'}</span>
       </div>
     </div>
   );
@@ -387,78 +392,69 @@ export const HomePage: React.FC = () => {
       <section className="archive-status">
         <div className="archive-status__header">
           <div>
-            <p className="eyebrow">Archive Status</p>
+            <p className="eyebrow">ARCHIVE STATUS</p>
             <h2>Relics Under Custody</h2>
           </div>
-          <button
-            type="button"
-            className="nav-link nav-link--ghost"
-            onClick={() => applyFiltersAndNavigate({})}
-          >
-            Explore Full Archive
-          </button>
         </div>
         <div className="chart-panel">
-          <header className="chart-panel__header">
-            <div>
-              <p className="eyebrow">Archive Status</p>
-              <h3>Relics Under Custody</h3>
-            </div>
-            <button type="button" className="chart-total" onClick={() => applyFiltersAndNavigate({})}>
-              {movies.length.toLocaleString()} titles
-            </button>
-          </header>
           <div className="chart-panel__body">
-            <button
-              type="button"
-              className="donut-link"
-              onClick={() => applyFiltersAndNavigate({})}
-              aria-label="Explore full archive"
-            >
-              <StatDonut data={watchChart} total={movies.length} />
-            </button>
+            <div className="donut-stack">
+              <button
+                type="button"
+                className="donut-link"
+                onClick={() => applyFiltersAndNavigate({})}
+                aria-label="Explore full archive"
+              >
+                <StatDonut data={watchChart} total={movies.length} centerNumber="1349" centerLabel="Relics" />
+              </button>
+              <p className="donut__subtitle">Under Custody</p>
+            </div>
             <div className="chart-panel__legend">
               <button
                 type="button"
                 className="status-pill status-pill--watched"
                 onClick={() => applyFiltersAndNavigate({ seen: 'seen' })}
               >
-                <span>Viewed</span>
-                <strong>{watchedCount}</strong>
+                <span>Viewed ({watchedCount})</span>
               </button>
               <button
                 type="button"
                 className="status-pill status-pill--unwatched"
                 onClick={() => applyFiltersAndNavigate({ seen: 'unseen' })}
               >
-                <span>Unviewed</span>
-                <strong>{unseenCount}</strong>
+                <span>Unviewed ({unseenCount})</span>
               </button>
               <button
                 type="button"
                 className="status-pill status-pill--untested"
                 onClick={() => applyFiltersAndNavigate({ condition: 'untested', seen: 'unseen' })}
               >
-                <span>Unverified</span>
-                <strong>{untestedCount}</strong>
+                <span>Unverified ({untestedCount})</span>
               </button>
               <button
                 type="button"
                 className="status-pill status-pill--deposit"
                 onClick={() => applyFiltersAndNavigate({ deposit: 'deposit' })}
               >
-                <span>In Deposit</span>
-                <strong>{depositCount}</strong>
+                <span>In Deposit ({depositCount})</span>
               </button>
               <button
                 type="button"
                 className="status-pill status-pill--damaged"
                 onClick={() => applyFiltersAndNavigate({ condition: 'damaged' })}
               >
-                <span>Damaged</span>
-                <strong>{damaged}</strong>
+                <span>Damaged ({damaged})</span>
               </button>
             </div>
+          </div>
+          <div className="chart-panel__footer">
+            <button
+              type="button"
+              className="nav-link nav-link--ghost"
+              onClick={() => applyFiltersAndNavigate({})}
+            >
+              Explore Full Archive
+            </button>
           </div>
         </div>
       </section>
