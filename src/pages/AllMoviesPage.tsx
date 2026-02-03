@@ -105,9 +105,15 @@ export const AllMoviesPage: React.FC = () => {
           case 'title-desc':
             return b.title.localeCompare(a.title);
           case 'year-asc':
-            return (a.year ?? 0) - (b.year ?? 0);
+            if (a.year == null && b.year == null) return titleCompare;
+            if (a.year == null) return 1;
+            if (b.year == null) return -1;
+            return a.year - b.year;
           case 'year-desc':
-            return (b.year ?? 0) - (a.year ?? 0);
+            if (a.year == null && b.year == null) return titleCompare;
+            if (a.year == null) return 1;
+            if (b.year == null) return -1;
+            return b.year - a.year;
           case 'tmdb-desc':
             return Number(b.tmdbRating ?? 0) - Number(a.tmdbRating ?? 0);
           case 'tmdb-asc':
@@ -377,14 +383,18 @@ export const AllMoviesPage: React.FC = () => {
       {filters.view === 'grid' ? (
         <div className="archive-grid">
           {pagedMovies.map((movie) => (
-            <div key={movie.id} className="archive-card" onClick={() => setActiveMovie(movie)}>
+            <div
+              key={movie.id}
+              className={`archive-card ${movie.seen ? 'is-viewed' : ''}`}
+              onClick={() => setActiveMovie(movie)}
+            >
               <div className="archive-card__poster">
                 <img
                   src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
                   alt={movie.groupedDisplayTitle ?? movie.title}
                   loading="lazy"
                 />
-                {movie.seen && <span className="archive-card__badge archive-card__badge--seen">Viewed</span>}
+                {movie.seen && <span className="archive-card__seen-icon" aria-label="Viewed">✓</span>}
                 <div className="archive-card__chips">
                   <span className="archive-card__chip">{movie.tmdbYear ?? movie.year ?? '?'}</span>
                   <span className="archive-card__chip">{movie.seccion}</span>
