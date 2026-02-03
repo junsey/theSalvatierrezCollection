@@ -623,8 +623,6 @@ export const EditMoviePage: React.FC = () => {
               </div>
             </div>
 
-            </div>
-
             <div className="catalog-card">
               <div className="catalog-card__header">
                 <h3>Valoraciones</h3>
