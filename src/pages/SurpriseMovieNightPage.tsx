@@ -8,9 +8,7 @@ export const SurpriseMovieNightPage: React.FC = () => {
   const { visibleMovies: movies } = useMovies();
   const [active, setActive] = useState<MovieRecord | null>(null);
   return (
-    <section>
-      <h1>Surprise Movie Night</h1>
-      <p>Summon a random film with genre/section filtros. Exclude seen movies to keep the ritual fresh.</p>
+    <section className="surprise-page-wrap">
       <SurpriseMovieNight movies={movies} onSelect={setActive} />
       {active && <MovieDetail movie={active} onClose={() => setActive(null)} />}
     </section>
