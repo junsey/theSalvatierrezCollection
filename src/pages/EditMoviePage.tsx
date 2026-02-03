@@ -496,7 +496,7 @@ export const EditMoviePage: React.FC = () => {
         </div>
 
         {status === 'error' && <p className="muted edit-form__error">{error}</p>}
-      </div></div>
+      </div>
     </section>
   );
 };

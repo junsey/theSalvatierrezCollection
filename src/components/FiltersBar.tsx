@@ -16,83 +16,97 @@ export const FiltersBar: React.FC<Props> = ({ filters, onChange, movies, onReset
 
   return (
     <div className="filters-container">
-      <div className="filters-row filters-row--primary">
-        <input
-          className="filter-control filter-control--search"
-          placeholder="Buscar titulo u original"
-          value={filters.query}
-          onChange={(e) => onChange({ query: e.target.value })}
-        />
-        <select
-          className="filter-control filter-control--compact"
-          value={filters.seen}
-          onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}
-        >
-          <option value="all">Vistas + no vistas</option>
-          <option value="seen">Solo vistas</option>
-          <option value="unseen">Solo no vistas</option>
-        </select>
+      <div className="filters-group filters-group--search">
+        <div className="filters-row filters-row--search">
+          <input
+            className="filter-control filter-control--search"
+            placeholder="Search by title or original name..."
+            value={filters.query}
+            onChange={(e) => onChange({ query: e.target.value })}
+          />
+        </div>
       </div>
-      <div className="filters-row filters-row--grid">
+
+      <div className="filters-group filters-group--filters">
+        <div className="filters-row filters-row--grid">
+          <select
+            className="filter-control filter-control--pill"
+            value={filters.seccion ?? ''}
+            onChange={(e) => onChange({ seccion: e.target.value || null })}
+          >
+            <option value="">Section</option>
+            {secciones.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <select
+            className="filter-control filter-control--pill"
+            value={filters.saga ?? ''}
+            onChange={(e) => onChange({ saga: e.target.value || null })}
+          >
+            <option value="">Saga</option>
+            {sagas.map((saga) => (
+              <option key={saga} value={saga}>
+                {saga}
+              </option>
+            ))}
+          </select>
+          <select
+            className="filter-control filter-control--pill"
+            value={filters.series}
+            onChange={(e) => onChange({ series: e.target.value as MovieFilters['series'] })}
+          >
+            <option value="all">Content Type</option>
+            <option value="movies">Movie</option>
+            <option value="series">Series</option>
+          </select>
+          <select
+            className="filter-control filter-control--pill"
+            value={filters.seen}
+            onChange={(e) => onChange({ seen: e.target.value as MovieFilters['seen'] })}
+          >
+            <option value="all">View Status</option>
+            <option value="seen">Viewed</option>
+            <option value="unseen">Unviewed</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="filters-group filters-group--sort">
         <select
-          className="filter-control"
-          value={filters.seccion ?? ''}
-          onChange={(e) => onChange({ seccion: e.target.value || null })}
-        >
-          <option value="">Todas las secciones</option>
-          {secciones.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <select
-          className="filter-control"
-          value={filters.saga ?? ''}
-          onChange={(e) => onChange({ saga: e.target.value || null })}
-        >
-          <option value="">Todas las sagas</option>
-          {sagas.map((saga) => (
-            <option key={saga} value={saga}>
-              {saga}
-            </option>
-          ))}
-        </select>
-        <select
-          className="filter-control"
-          value={filters.series}
-          onChange={(e) => onChange({ series: e.target.value as MovieFilters['series'] })}
-        >
-          <option value="all">Películas y series</option>
-          <option value="movies">Solo películas</option>
-          <option value="series">Solo series</option>
-        </select>
-        <select
-          className="filter-control"
+          className="filter-control filter-control--sort"
           value={filters.sort}
           onChange={(e) => onChange({ sort: e.target.value as MovieFilters['sort'] })}
+          aria-label="Sort by"
         >
-          <option value="title-asc">Título A-Z</option>
-          <option value="title-desc">Título Z-A</option>
-          <option value="shelf-asc">Formato estanteria</option>
-          <option value="year-desc">Año ↓</option>
-          <option value="year-asc">Año ↑</option>
-          <option value="tmdb-desc">TMDb ↓</option>
-          <option value="tmdb-asc">TMDb ↑</option>
-          <option value="rating-desc">Paws ↓</option>
-          <option value="rating-asc">Paws ↑</option>
+          <option value="title-asc">Title A–Z</option>
+          <option value="year-desc">Year</option>
+          <option value="rating-desc">Rating</option>
+          <option value="shelf-asc">Recently Added</option>
         </select>
-      </div>
-      <div className="filters__actions">
-        <button className="filter-control" onClick={() => onChange({ view: 'grid' })} aria-label="Grid view">
-          Carteles
-        </button>
-        <button className="filter-control" onClick={() => onChange({ view: 'list' })} aria-label="List view">
-          Lista
-        </button>
+        <div className="view-toggle" role="group" aria-label="View mode">
+          <button
+            type="button"
+            className={`filter-control view-toggle__button ${filters.view === 'grid' ? 'is-active' : ''}`}
+            onClick={() => onChange({ view: 'grid' })}
+            aria-pressed={filters.view === 'grid'}
+          >
+            Posters
+          </button>
+          <button
+            type="button"
+            className={`filter-control view-toggle__button ${filters.view === 'list' ? 'is-active' : ''}`}
+            onClick={() => onChange({ view: 'list' })}
+            aria-pressed={filters.view === 'list'}
+          >
+            List
+          </button>
+        </div>
         {onReset && (
-          <button className="filter-control ghost" onClick={onReset} aria-label="Limpiar filtros">
-            Limpiar filtros
+          <button className="filter-control ghost filter-control--clear" onClick={onReset} aria-label="Clear filters">
+            Clear Filters
           </button>
         )}
       </div>
