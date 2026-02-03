@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
@@ -120,41 +120,115 @@ export const SettingsPage: React.FC = () => {
 
   const [adminError, setAdminError] = useState<string | null>(null);
 
-  const [newMovie, setNewMovie] = useState({
-
+  const emptyNewMovie = {
     seccion: '',
-
     title: '',
-
     year: '',
-
     saga: '',
-
     originalTitle: '',
-
     genreRaw: '',
-
     director: '',
-
     season: '',
-
     group: '',
-
     seen: false,
-
+    enDeposito: false,
     ratingGloria: '',
-
     ratingRodrigo: '',
-
     dubbing: '',
-
     format: '',
+    formatOther: '',
+    region: '',
+    funcionaStatus: 'untested' as 'working' | 'damaged' | 'untested'
+  };
 
-    region: ''
-
-  });
+  const [newMovie, setNewMovie] = useState(emptyNewMovie);
 
   const [newMovieType, setNewMovieType] = useState<'movie' | 'series'>('movie');
+
+  const formatOptions = ['DVD', 'BR', 'BR4K', 'VHS', 'BR3D', 'Otro'] as const;
+
+  const newMovieRegionOptions = useMemo(() => {
+    switch (newMovie.format) {
+      case 'DVD':
+        return [
+          'Region 0 (Region Free)',
+          'Region 1',
+          'Region 2',
+          'Region 3',
+          'Region 4',
+          'Region 5',
+          'Region 6',
+          'Region 7',
+          'Region 8',
+          'Multi (DVD)'
+        ];
+      case 'BR':
+      case 'BR3D':
+        return ['Region Free', 'Region A', 'Region B', 'Region C', 'Multi (BR)'];
+      case 'BR4K':
+        return ['Region Free (UHD)'];
+      case 'VHS':
+        return ['N/A (VHS)'];
+      case 'Otro':
+        return ['N/A'];
+      default:
+        return [];
+    }
+  }, [newMovie.format]);
+
+  const newMovieRegionRequired = ['DVD', 'BR', 'BR3D', 'BR4K'].includes(newMovie.format);
+
+  const handleNewMovieFormatChange = (value: string) => {
+    const next = { ...newMovie, format: value };
+    if (value !== 'Otro') {
+      next.formatOther = '';
+    }
+    if (value === 'BR4K') {
+      next.region = 'Region Free (UHD)';
+    } else if (value === 'VHS') {
+      next.region = 'N/A (VHS)';
+    } else if (value === 'Otro') {
+      next.region = 'N/A';
+    } else if (!value) {
+      next.region = '';
+    } else {
+      const options =
+        value === 'DVD'
+          ? [
+              'Region 0 (Region Free)',
+              'Region 1',
+              'Region 2',
+              'Region 3',
+              'Region 4',
+              'Region 5',
+              'Region 6',
+              'Region 7',
+              'Region 8',
+              'Multi (DVD)'
+            ]
+          : value === 'BR' || value === 'BR3D'
+            ? ['Region Free', 'Region A', 'Region B', 'Region C', 'Multi (BR)']
+            : [];
+      if (options.length && !options.includes(newMovie.region)) {
+        next.region = '';
+      }
+    }
+    setNewMovie(next);
+  };
+
+  useEffect(() => {
+    if (newMovie.format === 'BR4K' && newMovie.region !== 'Region Free (UHD)') {
+      setNewMovie({ ...newMovie, region: 'Region Free (UHD)' });
+      return;
+    }
+    if (newMovie.format === 'VHS' && !newMovie.region) {
+      setNewMovie({ ...newMovie, region: 'N/A (VHS)' });
+      return;
+    }
+    if (newMovie.format === 'Otro' && !newMovie.region) {
+      setNewMovie({ ...newMovie, region: 'N/A' });
+    }
+  }, [newMovie.format]);
 
   const [newMovieBusy, setNewMovieBusy] = useState(false);
 
@@ -334,6 +408,8 @@ export const SettingsPage: React.FC = () => {
 
     try {
       const dubbing = newMovie.dubbing === '' ? null : newMovie.dubbing === 'true';
+      const format = newMovie.format.trim();
+      const formatOther = format === 'Otro' ? newMovie.formatOther.trim() : '';
       const payload = {
         seccion: newMovie.seccion.trim(),
         title: newMovie.title.trim(),
@@ -349,43 +425,45 @@ export const SettingsPage: React.FC = () => {
         ratingGloria: newMovie.ratingGloria ? Number(newMovie.ratingGloria) : null,
         ratingRodrigo: newMovie.ratingRodrigo ? Number(newMovie.ratingRodrigo) : null,
         dubbing,
-        format: newMovie.format.trim(),
-        region: newMovie.region.trim()
+        format,
+        formatOther,
+        region: newMovie.region.trim(),
+        enDeposito: newMovie.enDeposito,
+        funcionaStatus: newMovie.funcionaStatus
       };
 
       if (!payload.seccion || !payload.title) {
-        setNewMovieStatus('Seccion y titulo son obligatorios.');
+        setNewMovieStatus('Sección y título son obligatorios.');
+        return;
+      }
+
+      if (!format) {
+        setNewMovieStatus('El formato es obligatorio.');
+        return;
+      }
+
+      if (newMovieRegionRequired && !payload.region) {
+        setNewMovieStatus('La región es obligatoria para este formato.');
         return;
       }
 
       await createMovie(payload);
       await refreshSupabase();
-      setNewMovieStatus('Pelicula creada y sincronizada con Supabase.');
-      setNewMovie({
-        seccion: '',
-        title: '',
-        year: '',
-        saga: '',
-        originalTitle: '',
-        genreRaw: '',
-        director: '',
-        season: '',
-        group: '',
-        seen: false,
-        ratingGloria: '',
-        ratingRodrigo: '',
-        dubbing: '',
-        format: '',
-
-    region: ''
-      });
+      setNewMovieStatus('Película creada y sincronizada con Supabase.');
+      setNewMovie(emptyNewMovie);
       setNewMovieType('movie');
     } catch (error) {
       console.error(error);
-      setNewMovieStatus('No se pudo crear la pelicula.');
+      setNewMovieStatus('No se pudo crear la película.');
     } finally {
       setNewMovieBusy(false);
     }
+  };
+
+  const handleNewMovieCancel = () => {
+    setNewMovie(emptyNewMovie);
+    setNewMovieType('movie');
+    setNewMovieStatus(null);
   };
 
   const lastUpdated = sheetMeta?.fetchedAt
@@ -413,167 +491,333 @@ export const SettingsPage: React.FC = () => {
   );
 
 const newMovieContent = adminSession ? (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div className="panel">
-        <h2>Nueva pelicula</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Tipo</strong>
-            <select
-              value={newMovieType}
-              onChange={(event) => setNewMovieType(event.target.value as 'movie' | 'series')}
-            >
-              <option value="movie">Pelicula</option>
-              <option value="series">Serie</option>
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Seccion</strong>
-            <select
-              value={newMovie.seccion}
-              onChange={(event) => setNewMovie({ ...newMovie, seccion: event.target.value })}
-            >
-              <option value="">Selecciona seccion</option>
-              {sectionOptions.map((section) => (
-                <option key={section} value={section}>
-                  {section}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Titulo</strong>
-            <input
-              type="text"
-              value={newMovie.title}
-              onChange={(event) => setNewMovie({ ...newMovie, title: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Ano</strong>
-            <input
-              type="number"
-              value={newMovie.year}
-              onChange={(event) => setNewMovie({ ...newMovie, year: event.target.value })}
-            />
-          </label>
-          {newMovieType === 'series' && (
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <strong>Temporada</strong>
-              <input
-                type="number"
-                value={newMovie.season}
-                onChange={(event) => setNewMovie({ ...newMovie, season: event.target.value })}
-              />
-            </label>
-          )}
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Director</strong>
-            <input
-              type="text"
-              value={newMovie.director}
-              onChange={(event) => setNewMovie({ ...newMovie, director: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Genero</strong>
-            <input
-              type="text"
-              value={newMovie.genreRaw}
-              onChange={(event) => setNewMovie({ ...newMovie, genreRaw: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Saga</strong>
-            <input
-              type="text"
-              value={newMovie.saga}
-              onChange={(event) => setNewMovie({ ...newMovie, saga: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Titulo original</strong>
-            <input
-              type="text"
-              value={newMovie.originalTitle}
-              onChange={(event) => setNewMovie({ ...newMovie, originalTitle: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Grupo</strong>
-            <input
-              type="text"
-              value={newMovie.group}
-              onChange={(event) => setNewMovie({ ...newMovie, group: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Doblaje</strong>
-            <select
-              value={newMovie.dubbing}
-              onChange={(event) => setNewMovie({ ...newMovie, dubbing: event.target.value })}
-            >
-              <option value="">No especificado</option>
-              <option value="true">S�</option>
-              <option value="false">No</option>
-            </select>
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Regi�n</strong>
-            <input
-              type="text"
-              value={newMovie.region}
-              onChange={(event) => setNewMovie({ ...newMovie, region: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Formato</strong>
-            <input
-              type="text"
-              value={newMovie.format}
-              onChange={(event) => setNewMovie({ ...newMovie, format: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Puntuacion Gloria</strong>
-            <input
-              type="number"
-              step="0.5"
-              value={newMovie.ratingGloria}
-              onChange={(event) => setNewMovie({ ...newMovie, ratingGloria: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <strong>Puntuacion Rodrigo</strong>
-            <input
-              type="number"
-              step="0.5"
-              value={newMovie.ratingRodrigo}
-              onChange={(event) => setNewMovie({ ...newMovie, ratingRodrigo: event.target.value })}
-            />
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={newMovie.seen}
-              onChange={(event) => setNewMovie({ ...newMovie, seen: event.target.checked })}
-            />
-            <span>Vista</span>
-          </label>
+    <section className="panel edit-page">
+      <header className="edit-page__header">
+        <div>
+          <p className="eyebrow">Admin</p>
+          <h1>Crear título</h1>
+          <p className="muted">Crear nuevo registro en el catálogo</p>
         </div>
-        <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <button className="btn" onClick={handleCreateMovie} disabled={newMovieBusy}>
-            {newMovieBusy ? 'Guardando...' : 'Crear pelicula'}
-          </button>
-          {newMovieStatus && <span className="muted">{newMovieStatus}</span>}
+      </header>
+
+      <div className="edit-form edit-form--catalog">
+        <div className="catalog-layout">
+          <div className="catalog-column">
+            <div className="catalog-card catalog-card--sticky catalog-card--highlight">
+              <div className="catalog-card__header">
+                <h2>Estructura del Catálogo</h2>
+                <p className="muted">Estos valores definen los campos disponibles.</p>
+              </div>
+              <div className="catalog-card__body catalog-grid">
+                <label>
+                  <strong>Section (required)</strong>
+                  <select
+                    value={newMovie.seccion}
+                    onChange={(event) => setNewMovie({ ...newMovie, seccion: event.target.value })}
+                    required
+                  >
+                    <option value="">Selecciona seccion</option>
+                    {sectionOptions.map((section) => (
+                      <option key={section} value={section}>
+                        {section}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <strong>Type (required)</strong>
+                  <select
+                    value={newMovieType}
+                    onChange={(event) => setNewMovieType(event.target.value as 'movie' | 'series')}
+                  >
+                    <option value="movie">Pelicula</option>
+                    <option value="series">Serie</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div className="catalog-card">
+              <div className="catalog-card__header">
+                <h3>Identidad</h3>
+              </div>
+              <div className="catalog-card__body catalog-grid">
+                <label>
+                  <strong>Titulo</strong>
+                  <input
+                    type="text"
+                    value={newMovie.title}
+                    onChange={(event) => setNewMovie({ ...newMovie, title: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <strong>Titulo original</strong>
+                  <input
+                    type="text"
+                    value={newMovie.originalTitle}
+                    onChange={(event) => setNewMovie({ ...newMovie, originalTitle: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <strong>Saga</strong>
+                  <input
+                    type="text"
+                    value={newMovie.saga}
+                    onChange={(event) => setNewMovie({ ...newMovie, saga: event.target.value })}
+                  />
+                </label>
+                {newMovieType === 'movie' && (
+                  <>
+                    <label>
+                      <strong>Director</strong>
+                      <input
+                        type="text"
+                        value={newMovie.director}
+                        onChange={(event) => setNewMovie({ ...newMovie, director: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <strong>Año</strong>
+                      <input
+                        type="number"
+                        value={newMovie.year}
+                        onChange={(event) => setNewMovie({ ...newMovie, year: event.target.value })}
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="catalog-card">
+              <div className="catalog-card__header">
+                <h3>Clasificación</h3>
+              </div>
+              <div className="catalog-card__body catalog-grid fade-swap" key={`${newMovie.seccion}-${newMovieType}`}>
+                <label>
+                  <strong>Genero</strong>
+                  <input
+                    type="text"
+                    value={newMovie.genreRaw}
+                    onChange={(event) => setNewMovie({ ...newMovie, genreRaw: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <strong>Grupo</strong>
+                  <input
+                    type="text"
+                    value={newMovie.group}
+                    onChange={(event) => setNewMovie({ ...newMovie, group: event.target.value })}
+                  />
+                </label>
+                {newMovieType === 'series' && (
+                  <>
+                    <label>
+                      <strong>Showrunner</strong>
+                      <input
+                        type="text"
+                        value={newMovie.director}
+                        onChange={(event) => setNewMovie({ ...newMovie, director: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <strong>Temporadas</strong>
+                      <input
+                        type="number"
+                        value={newMovie.season}
+                        onChange={(event) => setNewMovie({ ...newMovie, season: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <strong>Episodios</strong>
+                      <input type="text" value="Desconocido" readOnly />
+                    </label>
+                    <label>
+                      <strong>Estado de emisión</strong>
+                      <input type="text" value="Desconocido" readOnly />
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="catalog-column">
+            {newMovieType === 'movie' && (
+              <div className="catalog-card">
+                <div className="catalog-card__header">
+                  <h3>Copia Física</h3>
+                </div>
+                <div className="catalog-card__body catalog-grid">
+                  <label>
+                    <strong>Formato</strong>
+                    <select
+                      value={newMovie.format}
+                      onChange={(event) => handleNewMovieFormatChange(event.target.value)}
+                      required
+                    >
+                      <option value="">Selecciona formato</option>
+                      {formatOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {newMovie.format === 'Otro' && (
+                    <label>
+                      <strong>Especificar formato</strong>
+                      <input
+                        type="text"
+                        value={newMovie.formatOther}
+                        placeholder="Ej: LaserDisc, VCD, Betamax..."
+                        onChange={(event) => setNewMovie({ ...newMovie, formatOther: event.target.value })}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    <strong>Región</strong>
+                    <select
+                      value={newMovie.region}
+                      onChange={(event) => setNewMovie({ ...newMovie, region: event.target.value })}
+                      disabled={!newMovie.format || newMovie.format === 'BR4K'}
+                      required={newMovieRegionRequired}
+                    >
+                      <option value="">Selecciona Región</option>
+                      {newMovieRegionOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="muted field-helper">Las opciones dependen del formato seleccionado.</span>
+                  </label>
+                  <label>
+                    <strong>Doblaje</strong>
+                    <select
+                      value={newMovie.dubbing}
+                      onChange={(event) => setNewMovie({ ...newMovie, dubbing: event.target.value })}
+                    >
+                      <option value="">No especificado</option>
+                      <option value="true">Sí</option>
+                      <option value="false">No</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="catalog-card">
+              <div className="catalog-card__header">
+                <h3>Estado del Ítem</h3>
+              </div>
+              <div className="catalog-card__body">
+                <div className="status-toggles">
+                  <label className="toggle-row">
+                    <span className="toggle-row__text" id="new-seen-toggle-label">
+                      <strong>Visto</strong>
+                      <span className="muted">Marcá si ya la viste.</span>
+                    </span>
+                    <span className="toggle">
+                      <input
+                        id="new-seen-toggle"
+                        type="checkbox"
+                        className="toggle__input"
+                        checked={newMovie.seen}
+                        onChange={(event) => setNewMovie({ ...newMovie, seen: event.target.checked })}
+                        aria-labelledby="new-seen-toggle-label"
+                      />
+                      <span className="toggle__track" aria-hidden="true" />
+                      <span className="toggle__thumb" aria-hidden="true" />
+                    </span>
+                  </label>
+                  <label className="toggle-row">
+                    <span className="toggle-row__text" id="new-deposit-toggle-label">
+                      <strong>En Depósito</strong>
+                      <span className="muted">Marcá si no está físicamente en tu casa.</span>
+                    </span>
+                    <span className="toggle">
+                      <input
+                        id="new-deposit-toggle"
+                        type="checkbox"
+                        className="toggle__input"
+                        checked={newMovie.enDeposito}
+                        onChange={(event) => setNewMovie({ ...newMovie, enDeposito: event.target.checked })}
+                        aria-labelledby="new-deposit-toggle-label"
+                      />
+                      <span className="toggle__track" aria-hidden="true" />
+                      <span className="toggle__thumb" aria-hidden="true" />
+                    </span>
+                  </label>
+                </div>
+                <div className="catalog-grid">
+                  <label>
+                    <strong>Estado de reproducción</strong>
+                    <select
+                      value={newMovie.funcionaStatus}
+                      onChange={(event) => setNewMovie({ ...newMovie, funcionaStatus: event.target.value as 'working' | 'damaged' | 'untested' })}
+                    >
+                      <option value="working">Funciona</option>
+                      <option value="damaged">Danada</option>
+                      <option value="untested">Sin probar</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="catalog-card">
+              <div className="catalog-card__header">
+                <h3>Valoraciones</h3>
+              </div>
+              <div className="catalog-card__body catalog-grid">
+                <label>
+                  <strong>Puntuacion Gloria</strong>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newMovie.ratingGloria}
+                    onChange={(event) => setNewMovie({ ...newMovie, ratingGloria: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <strong>Puntuacion Rodrigo</strong>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={newMovie.ratingRodrigo}
+                    onChange={(event) => setNewMovie({ ...newMovie, ratingRodrigo: event.target.value })}
+                  />
+                </label>
+                <p className="muted ratings-helper">Escala 1 a 10</p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {newMovieStatus && <p className="muted">{newMovieStatus}</p>}
       </div>
-    </div>
+      <footer className="edit-footer">
+        <button className="ghost" type="button" onClick={handleNewMovieCancel}>
+          Cancelar
+        </button>
+        <span className="edit-footer__divider">|</span>
+        <button className="btn" type="button" onClick={handleCreateMovie} disabled={newMovieBusy}>
+          {newMovieBusy ? 'Guardando...' : 'Crear título'}
+        </button>
+      </footer>
+    </section>
   ) : (
-    <div className="panel">
-      <h2>Nueva pelicula</h2>
+    <section className="panel edit-page">
+      <header className="edit-page__header">
+        <div>
+          <p className="eyebrow">Admin</p>
+          <h1>Crear título</h1>
+          <p className="muted">Crear nuevo registro en el catálogo</p>
+        </div>
+      </header>
       <p className="muted">Inicia sesion admin para habilitar la creacion de peliculas.</p>
-    </div>
+    </section>
   );
 
   const whereSectionIndex = useMemo(() => {
@@ -966,6 +1210,11 @@ const newMovieContent = adminSession ? (
   );
 
 };
+
+
+
+
+
 
 
 

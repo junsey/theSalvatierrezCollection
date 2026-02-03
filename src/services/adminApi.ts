@@ -50,6 +50,8 @@ export async function createMovie(payload: {
   format?: string;
   formatOther?: string;
   region?: string;
+  enDeposito?: boolean;
+  funcionaStatus?: 'working' | 'damaged' | 'untested';
   funciona?: string;
   seriesEpisodes?: unknown[];
 }) {
