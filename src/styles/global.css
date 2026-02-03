@@ -2241,8 +2241,9 @@ a.ghost {
 }
 
 @media (min-width: 1280px) {
-.movie-grid--seven {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  .movie-grid--seven {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 
 .surprise-page-wrap {
@@ -2259,16 +2260,18 @@ a.ghost {
   padding: 32px 16px 80px;
 }
 
-.surprise-hero {
+.surprise-header {
   text-align: center;
   display: grid;
   gap: 6px;
+  width: 100%;
 }
 
-.surprise-hero h1 {
+.surprise-header__title {
   margin: 0;
-  font-size: 32px;
+  font-size: 34px;
   color: var(--text);
+  white-space: nowrap;
 }
 
 .surprise-subtitle {
@@ -2619,7 +2622,7 @@ a.ghost {
   white-space: nowrap;
 }
 
-.surprise-hero {
+.surprise-result-hero {
   border-radius: 18px;
   background: rgba(12, 14, 20, 0.72);
   padding: 20px;
@@ -2631,7 +2634,7 @@ a.ghost {
   box-shadow: 0 0 24px rgba(224, 160, 64, 0.08);
 }
 
-.surprise-hero::before {
+.surprise-result-hero::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -2640,8 +2643,8 @@ a.ghost {
   pointer-events: none;
 }
 
-.surprise-hero__poster img,
-.surprise-hero__placeholder {
+.surprise-result-hero__poster img,
+.surprise-result-hero__placeholder {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -2650,31 +2653,31 @@ a.ghost {
   background: rgba(8, 10, 16, 0.7);
 }
 
-.surprise-hero__info {
+.surprise-result-hero__info {
   display: grid;
   gap: 8px;
   position: relative;
   z-index: 1;
 }
 
-.surprise-hero__info h3 {
+.surprise-result-hero__info h3 {
   margin: 0;
   font-size: 24px;
 }
 
-.surprise-hero__meta {
+.surprise-result-hero__meta {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
 }
 
-.surprise-hero__director {
+.surprise-result-hero__director {
   margin: 0;
   color: var(--accent-2);
   font-size: 13px;
 }
 
-.surprise-hero__synopsis {
+.surprise-result-hero__synopsis {
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
@@ -2684,14 +2687,15 @@ a.ghost {
   overflow: hidden;
 }
 
-.surprise-hero__actions {
+.surprise-result-hero__actions {
   margin-top: auto;
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  align-items: center;
 }
 
-.surprise-hero__actions button {
+.surprise-result-hero__actions button {
   height: 36px;
   padding: 0 16px;
   border-radius: 999px;
@@ -2766,11 +2770,22 @@ a.ghost {
     grid-template-columns: 1fr;
   }
 
-  .surprise-hero {
+  .surprise-header__title {
+    white-space: normal;
+    font-size: 26px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .surprise-result-hero {
     grid-template-columns: 1fr;
   }
+
+  .surprise-result-hero__synopsis {
+    -webkit-line-clamp: 4;
+  }
 }
-}
+
 
 .movie-grid--six {
   max-width: 1400px;

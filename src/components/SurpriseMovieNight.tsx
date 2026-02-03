@@ -496,38 +496,54 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     if (onlyViewed) setExcludeViewed(false);
   }, [onlyViewed]);
 
-  const renderCard = (movie: MovieRecord) => (
-    <div className="surprise-hero">
-      <div className="surprise-hero__poster">
-        {movie.posterUrl ? (
-          <img src={movie.posterUrl} alt={movie.title} loading="lazy" />
-        ) : (
-          <div className="surprise-hero__placeholder">No poster</div>
-        )}
-      </div>
-      <div className="surprise-hero__info">
-        <h3>{movie.title}</h3>
-        <p className="surprise-hero__meta">
-          {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.seccion} ? {getGenres(movie)[0] ?? '?'}
-        </p>
-        <p className="surprise-hero__director">{movie.director || '?'}</p>
-        <p className="surprise-hero__synopsis">{movie.plot || 'No synopsis available.'}</p>
-        <div className="surprise-hero__actions">
-          <button className="ghost" onClick={() => onSelect(movie)}>
-            Open
-          </button>
-          <button onClick={() => handleMarkViewed(movie)}>
-            <span aria-hidden>{'\u2713'}</span> Mark Viewed
-          </button>
+  const renderCard = (movie: MovieRecord) => {
+    const year = movie.tmdbYear ?? movie.year ?? null;
+    const genre = getGenres(movie)[0] ?? null;
+    const section = movie.seccion ?? null;
+    const metadata = [year, genre, section].filter(Boolean).join(' ? ');
+    const directorList = (movie.director ?? '')
+      .split(/[,&]/)
+      .map((d) => d.trim())
+      .filter(Boolean);
+    const directorLabel = directorList.length > 1 ? 'Directors' : 'Director';
+    const directorText = directorList.length ? `${directorLabel}: ${directorList.join(', ')}` : null;
+
+    return (
+      <div className="surprise-result-hero">
+        <div className="surprise-result-hero__poster">
+          {movie.posterUrl ? (
+            <img src={movie.posterUrl} alt={movie.title} loading="lazy" />
+          ) : (
+            <div className="surprise-result-hero__placeholder">No poster</div>
+          )}
+        </div>
+        <div className="surprise-result-hero__info">
+          <h3>{movie.title}</h3>
+          {metadata && <p className="surprise-result-hero__meta">{metadata}</p>}
+          {directorText && <p className="surprise-result-hero__director">{directorText}</p>}
+          {movie.plot && <p className="surprise-result-hero__synopsis">{movie.plot}</p>}
+          <div className="surprise-result-hero__actions">
+            <button className="ghost" onClick={() => onSelect(movie)}>
+              Open
+            </button>
+            {adminSession && (
+              <button onClick={() => handleMarkViewed(movie)}>
+                <span aria-hidden>{'✓'}</span> Mark Viewed
+              </button>
+            )}
+            {!adminSession && (
+              <span className="surprise-result-hero__hint">Sign in to track viewed</span>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className={`surprise-page ${isInvoking ? 'is-invoking' : ''}`}>
-      <header className="surprise-hero">
-        <h1>Surprise Movie Night</h1>
+      <header className="surprise-header">
+        <h1 className="surprise-header__title">Surprise Movie Night</h1>
         <p className="surprise-subtitle">Let fate choose tonight's experience.</p>
       </header>
 
