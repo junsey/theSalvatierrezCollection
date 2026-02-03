@@ -19,6 +19,7 @@ type FormState = {
   ratingRodrigo: string;
   dubbing: '' | 'true' | 'false';
   format: string;
+  formatOther: string;
   region: string;
   enDeposito: boolean;
   funcionaStatus: 'working' | 'damaged' | 'untested';
@@ -40,6 +41,7 @@ export const EditMoviePage: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const redirectRef = useRef<number | null>(null);
+  const formatOptions = ['DVD', 'BR', 'BR4K', 'VHS', 'BR3D', 'Otro'] as const;
 
   const sectionOptions = useMemo(
     () => Array.from(new Set(movies.map((item) => item.seccion).filter(Boolean))).sort(),
@@ -64,11 +66,99 @@ export const EditMoviePage: React.FC = () => {
       ratingRodrigo: movie.ratingRodrigo != null ? String(movie.ratingRodrigo) : '',
       dubbing: typeof movie.dubbing === 'boolean' ? (movie.dubbing ? 'true' : 'false') : '',
       format: movie.format ?? '',
+      formatOther: movie.formatOther ?? '',
       region: movie.region ?? '',
       enDeposito: Boolean(movie.enDeposito),
       funcionaStatus: movie.funcionaStatus ?? 'untested'
     });
   }, [movie]);
+
+  const regionOptions = useMemo(() => {
+    switch (form?.format) {
+      case 'DVD':
+        return [
+          'Region 0 (Region Free)',
+          'Region 1',
+          'Region 2',
+          'Region 3',
+          'Region 4',
+          'Region 5',
+          'Region 6',
+          'Region 7',
+          'Region 8',
+          'Multi (DVD)'
+        ];
+      case 'BR':
+      case 'BR3D':
+        return ['Region Free', 'Region A', 'Region B', 'Region C', 'Multi (BR)'];
+      case 'BR4K':
+        return ['Region Free (UHD)'];
+      case 'VHS':
+        return ['N/A (VHS)'];
+      case 'Otro':
+        return ['N/A'];
+      default:
+        return [];
+    }
+  }, [form?.format]);
+
+  const regionRequired = form?.format
+    ? ['DVD', 'BR', 'BR3D', 'BR4K'].includes(form.format)
+    : false;
+
+  const handleFormatChange = (value: string) => {
+    if (!form) return;
+    const next: Partial<FormState> = { format: value };
+    if (value !== 'Otro') {
+      next.formatOther = '';
+    }
+    if (value === 'BR4K') {
+      next.region = 'Region Free (UHD)';
+    } else if (value === 'VHS') {
+      next.region = 'N/A (VHS)';
+    } else if (value === 'Otro') {
+      next.region = 'N/A';
+    } else if (!value) {
+      next.region = '';
+    } else {
+      const options =
+        value === 'DVD'
+          ? [
+              'Region 0 (Region Free)',
+              'Region 1',
+              'Region 2',
+              'Region 3',
+              'Region 4',
+              'Region 5',
+              'Region 6',
+              'Region 7',
+              'Region 8',
+              'Multi (DVD)'
+            ]
+          : value === 'BR' || value === 'BR3D'
+            ? ['Region Free', 'Region A', 'Region B', 'Region C', 'Multi (BR)']
+            : [];
+      if (options.length && !options.includes(form.region)) {
+        next.region = '';
+      }
+    }
+    handleChange(next);
+  };
+
+  useEffect(() => {
+    if (!form) return;
+    if (form.format === 'BR4K' && form.region !== 'Region Free (UHD)') {
+      handleChange({ region: 'Region Free (UHD)' });
+      return;
+    }
+    if (form.format === 'VHS' && !form.region) {
+      handleChange({ region: 'N/A (VHS)' });
+      return;
+    }
+    if (form.format === 'Otro' && !form.region) {
+      handleChange({ region: 'N/A' });
+    }
+  }, [form?.format]);
 
   const seriesEpisodeCount = useMemo(() => {
     if (!movie) return null;
@@ -108,7 +198,18 @@ export const EditMoviePage: React.FC = () => {
     const title = form.title.trim();
     if (!seccion || !title) {
       setStatus('error');
-      setError('Seccion y titulo son obligatorios.');
+      setError('Sección y título son obligatorios.');
+      return;
+    }
+    const format = form.format.trim();
+    if (!format) {
+      setStatus('error');
+      setError('El formato es obligatorio.');
+      return;
+    }
+    if (regionRequired && !form.region.trim()) {
+      setStatus('error');
+      setError('La región es obligatoria para este formato.');
       return;
     }
     const year = parseNumber(form.year);
@@ -136,6 +237,8 @@ export const EditMoviePage: React.FC = () => {
       return;
     }
     const dubbing = form.dubbing === '' ? null : form.dubbing === 'true';
+    const formatOther = format === 'Otro' ? form.formatOther.trim() : '';
+
 
     setStatus('saving');
     setError(null);
@@ -156,7 +259,8 @@ export const EditMoviePage: React.FC = () => {
         ratingGloria,
         ratingRodrigo,
         dubbing,
-        format: form.format.trim(),
+        format,
+        formatOther,
         region: form.region.trim(),
         enDeposito: form.enDeposito,
         funcionaStatus: form.funcionaStatus
@@ -399,26 +503,51 @@ export const EditMoviePage: React.FC = () => {
             {!form.series && (
               <div className="catalog-card">
                 <div className="catalog-card__header">
-                  <h3>Copia Física</h3>
+                <h3>Copia Física</h3>
                 </div>
                 <div className="catalog-card__body catalog-grid">
                   <label>
                     <strong>Formato</strong>
-                    <input
-                      type="text"
+                    <select
                       value={form.format}
-                      placeholder="DVD, Blu-ray, 4K UHD, VHS..."
-                      onChange={(event) => handleChange({ format: event.target.value })}
-                    />
+                      onChange={(event) => handleFormatChange(event.target.value)}
+                      required
+                    >
+                      <option value="">Selecciona formato</option>
+                      {formatOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </label>
+                  {form.format === 'Otro' && (
+                    <label>
+                      <strong>Especificar formato</strong>
+                      <input
+                        type="text"
+                        value={form.formatOther}
+                        placeholder="Ej: LaserDisc, VCD, Betamax..."
+                        onChange={(event) => handleChange({ formatOther: event.target.value })}
+                      />
+                    </label>
+                  )}
                   <label>
                     <strong>Región</strong>
-                    <input
-                      type="text"
+                    <select
                       value={form.region}
-                      placeholder="1, 2, A, B..."
                       onChange={(event) => handleChange({ region: event.target.value })}
-                    />
+                      disabled={!form.format || form.format === 'BR4K'}
+                      required={regionRequired}
+                    >
+                      <option value="">Selecciona región</option>
+                      {regionOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="muted field-helper">Las opciones dependen del formato seleccionado.</span>
                   </label>
                   <label>
                     <strong>Doblaje</strong>
@@ -439,35 +568,61 @@ export const EditMoviePage: React.FC = () => {
               <div className="catalog-card__header">
                 <h3>Estado del Ítem</h3>
               </div>
-              <div className="catalog-card__body catalog-grid">
-                <label>
-                  <strong>Visto</strong>
-                  <input
-                    type="checkbox"
-                    checked={form.seen}
-                    onChange={(event) => handleChange({ seen: event.target.checked })}
-                  />
-                </label>
-                <label>
-                  <strong>En Depósito</strong>
-                  <input
-                    type="checkbox"
-                    checked={form.enDeposito}
-                    onChange={(event) => handleChange({ enDeposito: event.target.checked })}
-                  />
-                </label>
-                <label>
-                  <strong>Estado de reproducción</strong>
-                  <select
-                    value={form.funcionaStatus}
-                    onChange={(event) => handleChange({ funcionaStatus: event.target.value as FormState['funcionaStatus'] })}
-                  >
-                    <option value="working">Funciona</option>
-                    <option value="damaged">Danada</option>
-                    <option value="untested">Sin probar</option>
-                  </select>
-                </label>
+              <div className="catalog-card__body">
+                <div className="status-toggles">
+                  <label className="toggle-row">
+                    <span className="toggle-row__text" id="seen-toggle-label">
+                      <strong>Visto</strong>
+                      <span className="muted">Marcá si ya la viste.</span>
+                    </span>
+                    <span className="toggle">
+                      <input
+                        id="seen-toggle"
+                        type="checkbox"
+                        className="toggle__input"
+                        checked={form.seen}
+                        onChange={(event) => handleChange({ seen: event.target.checked })}
+                        aria-labelledby="seen-toggle-label"
+                      />
+                      <span className="toggle__track" aria-hidden="true" />
+                      <span className="toggle__thumb" aria-hidden="true" />
+                    </span>
+                  </label>
+                  <label className="toggle-row">
+                    <span className="toggle-row__text" id="deposit-toggle-label">
+                      <strong>En Depósito</strong>
+                      <span className="muted">Marcá si no está físicamente en tu casa.</span>
+                    </span>
+                    <span className="toggle">
+                      <input
+                        id="deposit-toggle"
+                        type="checkbox"
+                        className="toggle__input"
+                        checked={form.enDeposito}
+                        onChange={(event) => handleChange({ enDeposito: event.target.checked })}
+                        aria-labelledby="deposit-toggle-label"
+                      />
+                      <span className="toggle__track" aria-hidden="true" />
+                      <span className="toggle__thumb" aria-hidden="true" />
+                    </span>
+                  </label>
+                </div>
+                <div className="catalog-grid">
+                  <label>
+                    <strong>Estado de reproducción</strong>
+                    <select
+                      value={form.funcionaStatus}
+                      onChange={(event) => handleChange({ funcionaStatus: event.target.value as FormState['funcionaStatus'] })}
+                    >
+                      <option value="working">Funciona</option>
+                      <option value="damaged">Danada</option>
+                      <option value="untested">Sin probar</option>
+                    </select>
+                  </label>
+                </div>
               </div>
+            </div>
+
             </div>
 
             <div className="catalog-card">

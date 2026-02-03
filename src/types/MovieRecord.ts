@@ -31,6 +31,7 @@ export type MovieRecord = {
   ratingRodrigo?: number | null;
   dubbing: boolean | string | null;
   format: string;
+  formatOther?: string;
   region?: string;
   enDeposito?: boolean;
   funcionaStatus: 'working' | 'damaged' | 'untested';

@@ -48,6 +48,7 @@ export async function createMovie(payload: {
   ratingRodrigo?: number | null;
   dubbing?: boolean | null;
   format?: string;
+  formatOther?: string;
   region?: string;
   funciona?: string;
   seriesEpisodes?: unknown[];
@@ -109,6 +110,7 @@ export async function updateMovie(payload: {
   ratingRodrigo?: number | null;
   dubbing?: boolean | null;
   format?: string;
+  formatOther?: string;
   region?: string;
   enDeposito?: boolean | null;
   funcionaStatus?: 'working' | 'damaged' | 'untested';
