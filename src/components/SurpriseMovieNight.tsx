@@ -8,7 +8,7 @@ interface Props {
   onSelect: (movie: MovieRecord) => void;
 }
 
-const CONNECTION_TYPES = ['saga', 'director', 'actor', 'subgenre', 'decade', 'contrast'] as const;
+const CONNECTION_TYPES = ['saga', 'director', 'actor', 'subgenre', 'contrast', 'decade'] as const;
 type ConnectionType = (typeof CONNECTION_TYPES)[number];
 type ConnectionResult = {
   movie: MovieRecord;
@@ -39,18 +39,7 @@ const CONTRAST_MAP: Record<string, string> = {
   blockbuster: 'indie'
 };
 
-const MOOD_SECTION_MAP: Record<string, string[]> = {
-  Action: ['Acci?n', 'Action'],
-  Horror: ['Horror', 'Terror'],
-  Comedy: ['Comedia', 'Comedy'],
-  Drama: ['Drama'],
-  'Sci-Fi': ['Ciencia ficci?n', 'Sci-Fi', 'Sci Fi', 'Science Fiction'],
-  Fantasy: ['Fantas?a', 'Fantasy'],
-  Thriller: ['Thriller', 'Suspenso'],
-  Animation: ['Animaci?n', 'Animation']
-};
 
-const MOOD_GENRES = ['Action', 'Horror', 'Comedy', 'Drama', 'Sci-Fi', 'Fantasy', 'Thriller', 'Animation'];
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
 
@@ -112,8 +101,9 @@ const MultiSelect: React.FC<{
   return (
     <div className={`surprise-select ${open ? 'is-open' : ''}`}>
       <button type="button" className="surprise-select__trigger" onClick={() => setOpen((prev) => !prev)}>
-        <span>{label}</span>
+        <span className="surprise-select__label">{label}</span>
         <span className="surprise-select__count">{values.length ? `${values.length} selected` : 'Any'}</span>
+        <span className="surprise-select__action">Choose?</span>
       </button>
       {open && (
         <div className="surprise-select__menu">
@@ -137,6 +127,16 @@ const MultiSelect: React.FC<{
               </button>
             ))}
           </div>
+          <div className="surprise-select__footer">
+            {values.length > 0 && (
+              <button type="button" className="surprise-select__clear" onClick={() => onChange([])}>
+                Clear
+              </button>
+            )}
+            <button type="button" className="surprise-select__done" onClick={() => setOpen(false)}>
+              Done
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -149,8 +149,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [invocationMode, setInvocationMode] = useState<'single' | 'double'>('single');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
-  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+    const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [selectedSubgenres, setSelectedSubgenres] = useState<string[]>([]);
   const [selectedSagas, setSelectedSagas] = useState<string[]>([]);
   const [selectedDirectors, setSelectedDirectors] = useState<string[]>([]);
@@ -161,12 +160,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [includeDamaged, setIncludeDamaged] = useState(false);
   const [isInvoking, setIsInvoking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  const effectiveSections = useMemo(() => {
-    const mapped = selectedMoods.flatMap((mood) => MOOD_SECTION_MAP[mood] ?? []);
-    const all = [...mapped, ...selectedSections];
-    return Array.from(new Set(all.filter(Boolean)));
-  }, [selectedMoods, selectedSections]);
 
   const [result, setResult] = useState<{
     primary: MovieRecord;
@@ -179,9 +172,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     director: 0,
     actor: 0,
     subgenre: 0,
-    decade: 0,
-    contrast: 0
+    contrast: 0,
+    decade: 0
   });
+  const recentConnections = useRef<ConnectionType[]>([]);
 
   const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
   const genres = useMemo(() => unique(movies.flatMap((m) => getGenres(m))), [movies]);
@@ -204,7 +198,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       if (contentType === 'movies' && isSeries) return false;
       if (contentType === 'series' && !isSeries) return false;
 
-      if (effectiveSections.length > 0 && !effectiveSections.includes(movie.seccion)) return false;
+      if (selectedSections.length > 0 && !selectedSections.includes(movie.seccion)) return false;
 
       if (selectedSagas.length > 0 && !selectedSagas.includes(movie.saga)) return false;
       if (selectedDirectors.length > 0 && !selectedDirectors.includes(movie.director)) return false;
@@ -215,7 +209,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         if (!decade || !selectedDecades.includes(decade)) return false;
       }
 
-      const genreFilters = [...selectedMoods, ...selectedSubgenres];
+      const genreFilters = [...selectedSubgenres];
       if (genreFilters.length > 0) {
         const movieGenres = getGenres(movie);
         if (!genreFilters.some((genre) => movieGenres.includes(genre))) return false;
@@ -231,9 +225,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   }, [
     movies,
     contentType,
-    selectedMoods,
     selectedSections,
-    effectiveSections,
     selectedSubgenres,
     selectedSagas,
     selectedDirectors,
@@ -256,10 +248,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
 
   const findConnection = (primary: MovieRecord, pool: MovieRecord[]): ConnectionResult | null => {
     const usage = connectionUsage.current;
-    const minUsage = Math.min(...CONNECTION_TYPES.map((type) => usage[type]));
+    const recent = recentConnections.current;
+    const recentCounts = recent.reduce<Record<ConnectionType, number>>(
+      (acc, type) => ({ ...acc, [type]: (acc[type] ?? 0) + 1 }),
+      { saga: 0, director: 0, actor: 0, subgenre: 0, contrast: 0, decade: 0 }
+    );
     const poolLimited = samplePool(pool.filter((movie) => movie.id !== primary.id));
 
-    const attemptTypes = (allowed: (typeof CONNECTION_TYPES)[number][]) => {
+    const scored = CONNECTION_TYPES.map((type, index) => {
+      const recentPenalty = (recentCounts[type] ?? 0) * 10;
+      const decadePenalty = type === 'decade' ? 20 : 0;
+      return { type, score: index + recentPenalty + decadePenalty + usage[type] };
+    }).sort((a, b) => a.score - b.score);
+
+    const attemptTypes = (allowed: ConnectionType[]) => {
       for (const type of allowed) {
         if (type === 'saga') {
           const saga = primary.saga?.trim();
@@ -330,12 +332,9 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       return null;
     };
 
-    const priorityTypes = CONNECTION_TYPES.filter((type) => usage[type] === minUsage);
-    const secondaryTypes = CONNECTION_TYPES.filter((type) => usage[type] !== minUsage);
-    const firstPass = attemptTypes(priorityTypes);
+    const orderedTypes = scored.map((entry) => entry.type);
+    const firstPass = attemptTypes(orderedTypes);
     if (firstPass) return firstPass;
-    const secondPass = attemptTypes(secondaryTypes);
-    if (secondPass) return secondPass;
 
     const fallback = poolLimited.filter((movie) => movie.seccion === primary.seccion);
     if (fallback.length) {
@@ -375,7 +374,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const query = {
       contentType,
       mode: invocationMode,
-      selectedMoods,
       selectedSections,
       selectedDirectors,
       selectedSagas,
@@ -383,15 +381,13 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         excludeViewed,
         onlyViewed,
         includeDamaged
-      },
-      effectiveSections
+      }
     };
 
     if (import.meta.env.DEV) {
       console.log('[Invoke Fate]', {
         contentType,
         mode: invocationMode,
-        selectedMoodChips: selectedMoods,
         selectedSections,
         selectedDirectors,
         selectedSagas,
@@ -427,6 +423,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
             connection.type === 'random' ? 'Random Pair' : CONNECTION_LABELS[connection.type];
           if (connection.type !== 'random') {
             connectionUsage.current[connection.type] += 1;
+            recentConnections.current = [
+              connection.type,
+              ...recentConnections.current
+            ].slice(0, 10);
           }
           if (import.meta.env.DEV) {
             console.log('[Surprise Double Feature]', {
@@ -497,25 +497,24 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   }, [onlyViewed]);
 
   const renderCard = (movie: MovieRecord) => (
-    <div className="surprise-result-card">
-      <div className="surprise-result-poster">
+    <div className="surprise-hero">
+      <div className="surprise-hero__poster">
         {movie.posterUrl ? (
           <img src={movie.posterUrl} alt={movie.title} loading="lazy" />
         ) : (
-          <div className="surprise-result-placeholder">No poster</div>
+          <div className="surprise-hero__placeholder">No poster</div>
         )}
       </div>
-      <div className="surprise-result-info">
+      <div className="surprise-hero__info">
         <h3>{movie.title}</h3>
-        <p className="muted">
-          {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.seccion}
+        <p className="surprise-hero__meta">
+          {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.seccion} ? {getGenres(movie)[0] ?? '?'}
         </p>
-        <div className="surprise-result-actions">
+        <p className="surprise-hero__director">{movie.director || '?'}</p>
+        <p className="surprise-hero__synopsis">{movie.plot || 'No synopsis available.'}</p>
+        <div className="surprise-hero__actions">
           <button className="ghost" onClick={() => onSelect(movie)}>
             Open
-          </button>
-          <button className="ghost" onClick={handleRespin}>
-            Respin
           </button>
           <button onClick={() => handleMarkViewed(movie)}>
             <span aria-hidden>{'\u2713'}</span> Mark Viewed
@@ -576,32 +575,14 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         {preferencesOpen && (
           <div className="surprise-preferences__body">
             <div className="surprise-preferences__group">
-              <h4>Mood</h4>
-              <div className="surprise-chip-grid surprise-chip-grid--large">
-                {MOOD_GENRES.map((mood) => (
-                  <button
-                    key={mood}
-                    type="button"
-                    className={`surprise-chip ${selectedMoods.includes(mood) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(mood, selectedMoods, setSelectedMoods)}
-                  >
-                    {mood}
-                  </button>
-                ))}
-                <MultiSelect
-                  label="+ More?"
-                  options={sections}
-                  values={selectedSections}
-                  onChange={updateSections}
-                  placeholder="Search sections"
-                />
-              </div>
-              {selectedSections.length > 0 && (
-                <div className="surprise-extra">
-                  <span>Additional sections: {selectedSections.length} selected</span>
-                  <button type="button" onClick={() => setSelectedSections([])}>Clear</button>
-                </div>
-              )}
+              <h4>Sections</h4>
+              <MultiSelect
+                label="Sections"
+                options={sections}
+                values={selectedSections}
+                onChange={updateSections}
+                placeholder="Search sections?"
+              />
             </div>
             <div className="surprise-preferences__group">
               <h4>Collections</h4>
@@ -714,16 +695,26 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         )}
       </div>
 
-      <button className="surprise-invoke" type="button" onClick={() => invoke()} disabled={filtered.length === 0}>
-        INVOKE FATE
-      </button>
+      <div className="surprise-invoke-row">
+        <button className="surprise-invoke" type="button" onClick={() => invoke()} disabled={filtered.length === 0}>
+          INVOKE FATE
+        </button>
+        <button
+          className="surprise-reroll"
+          type="button"
+          onClick={handleRespin}
+          disabled={!result || isInvoking}
+        >
+          REROLL <span aria-hidden>??</span>
+        </button>
+      </div>
 
       {isInvoking && <div className="surprise-invoking">Summoning destiny...</div>}
 
       {message && <div className="surprise-message">{message}</div>}
 
       {result && (
-        <div className={`surprise-results ${invocationMode === 'double' ? 'is-double' : ''}`}>
+        <div className="surprise-results">
           {renderCard(result.primary)}
           {result.secondary && (
             <div className="surprise-connection-badge">
