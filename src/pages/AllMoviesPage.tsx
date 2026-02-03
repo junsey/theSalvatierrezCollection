@@ -216,7 +216,9 @@ export const AllMoviesPage: React.FC = () => {
   const sagas = useMemo(() => uniqueValues(visibleMovies.map((m) => m.saga)), [visibleMovies]);
   const sortOptions: ArchiveOption[] = [
     { value: 'title-asc', label: 'Title A?Z' },
-    { value: 'year-desc', label: 'Year' },
+    { value: 'title-desc', label: 'Title Z?A' },
+    { value: 'year-desc', label: 'Year (Newest)' },
+    { value: 'year-asc', label: 'Year (Oldest)' },
     { value: 'rating-desc', label: 'Rating' },
     { value: 'recent-desc', label: 'Recently Added' },
     { value: 'rating-best', label: 'Best Rated (Highest Avg)' }
