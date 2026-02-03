@@ -283,6 +283,23 @@ export const AllMoviesPage: React.FC = () => {
     enabled: filters.view === 'list'
   });
 
+  const hasActiveFilters =
+    Boolean(filters.query.trim()) ||
+    Boolean(filters.seccion) ||
+    Boolean(filters.saga) ||
+    filters.series !== 'all' ||
+    filters.seen !== 'all';
+
+  const clearFilters = () => {
+    handleChange({
+      query: '',
+      seccion: null,
+      saga: null,
+      series: 'all',
+      seen: 'all'
+    });
+  };
+
   return (
     <section className="archive-page">
       <header className="archive-header">
@@ -291,79 +308,81 @@ export const AllMoviesPage: React.FC = () => {
         {error && <p className="muted">Error: {error}</p>}
       </header>
 
-      <div className="archive-refine">
-        <div className="archive-refine__left">
+      <div className="archive-filter-bar">
+        <div className="archive-filter-row archive-filter-row--top">
           <input
             className="archive-search"
             placeholder="Search by title or original name..."
             value={filters.query}
             onChange={(event) => handleChange({ query: event.target.value })}
           />
-        </div>
-        <div className="archive-refine__center">
-          <ArchiveDropdown
-            label="Section"
-            value={filters.seccion ?? ''}
-            options={[{ value: '', label: 'Both' }, ...secciones.map((s) => ({ value: s, label: s }))]}
-            onChange={(value) => handleChange({ seccion: value || null })}
-            placeholder="Section"
-          />
-          <ArchiveDropdown
-            label="Saga"
-            value={filters.saga ?? ''}
-            options={[{ value: '', label: 'Both' }, ...sagas.map((s) => ({ value: s, label: s }))]}
-            onChange={(value) => handleChange({ saga: value || null })}
-            placeholder="Saga"
-          />
-          <ArchiveDropdown
-            label="Content Type"
-            value={filters.series}
-            options={[
-              { value: 'all', label: 'Both' },
-              { value: 'movies', label: 'Movie' },
-              { value: 'series', label: 'Series' }
-            ]}
-            onChange={(value) => handleChange({ series: value as MovieFilters['series'] })}
-            placeholder="Content Type"
-          />
-          <ArchiveDropdown
-            label="View Status"
-            value={filters.seen}
-            options={[
-              { value: 'all', label: 'Both' },
-              { value: 'seen', label: 'Viewed' },
-              { value: 'unseen', label: 'Unviewed' }
-            ]}
-            onChange={(value) => handleChange({ seen: value as MovieFilters['seen'] })}
-            placeholder="View Status"
-          />
-        </div>
-        <div className="archive-refine__right">
+          <div className="archive-view-toggle">
+            <button
+              type="button"
+              className={`archive-toggle__button ${filters.view === 'grid' ? 'is-active' : ''}`}
+              onClick={() => handleChange({ view: 'grid' })}
+            >
+              Posters
+            </button>
+            <button
+              type="button"
+              className={`archive-toggle__button ${filters.view === 'list' ? 'is-active' : ''}`}
+              onClick={() => handleChange({ view: 'list' })}
+            >
+              List
+            </button>
+          </div>
           <ArchiveDropdown
             label="Sort by"
             value={filters.sort}
             options={sortOptions}
             onChange={(value) => handleChange({ sort: value as MovieFilters['sort'] })}
-            placeholder="Sort by"
+            placeholder="Title A–Z"
           />
         </div>
-      </div>
-
-      <div className="archive-view-toggle">
-        <button
-          type="button"
-          className={`archive-toggle__button ${filters.view === 'grid' ? 'is-active' : ''}`}
-          onClick={() => handleChange({ view: 'grid' })}
-        >
-          Posters
-        </button>
-        <button
-          type="button"
-          className={`archive-toggle__button ${filters.view === 'list' ? 'is-active' : ''}`}
-          onClick={() => handleChange({ view: 'list' })}
-        >
-          List
-        </button>
+        <div className="archive-filter-row archive-filter-row--bottom">
+          <ArchiveDropdown
+            label="Section"
+            value={filters.seccion ?? ''}
+            options={[{ value: '', label: 'All Sections' }, ...secciones.map((s) => ({ value: s, label: s }))]}
+            onChange={(value) => handleChange({ seccion: value || null })}
+            placeholder="All Sections"
+          />
+          <ArchiveDropdown
+            label="Saga"
+            value={filters.saga ?? ''}
+            options={[{ value: '', label: 'All Sagas' }, ...sagas.map((s) => ({ value: s, label: s }))]}
+            onChange={(value) => handleChange({ saga: value || null })}
+            placeholder="All Sagas"
+          />
+          <ArchiveDropdown
+            label="Content Type"
+            value={filters.series}
+            options={[
+              { value: 'all', label: 'All Types' },
+              { value: 'movies', label: 'Movie' },
+              { value: 'series', label: 'Series' }
+            ]}
+            onChange={(value) => handleChange({ series: value as MovieFilters['series'] })}
+            placeholder="All Types"
+          />
+          <ArchiveDropdown
+            label="View Status"
+            value={filters.seen}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'seen', label: 'Viewed' },
+              { value: 'unseen', label: 'Unviewed' }
+            ]}
+            onChange={(value) => handleChange({ seen: value as MovieFilters['seen'] })}
+            placeholder="All"
+          />
+          {hasActiveFilters && (
+            <button type="button" className="archive-clear" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
       {filters.view === 'grid' ? (

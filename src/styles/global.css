@@ -1744,30 +1744,33 @@ a.ghost {
   margin: 0;
 }
 
-.archive-refine {
+.archive-filter-bar {
   display: grid;
-  grid-template-columns: minmax(260px, 1.6fr) 2fr minmax(220px, 1fr);
-  gap: 12px;
-  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 14, 20, 0.75);
 }
 
-.archive-refine__center {
+.archive-filter-row {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
-.archive-refine__right,
-.archive-refine__left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+.archive-filter-row--top {
+  justify-content: space-between;
+}
+
+.archive-filter-row--bottom {
+  justify-content: flex-start;
 }
 
 .archive-search {
-  width: 100%;
-  height: 42px;
+  flex: 1 1 420px;
+  height: 38px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(8, 10, 16, 0.9);
@@ -1782,13 +1785,12 @@ a.ghost {
 
 .archive-dropdown {
   position: relative;
-  width: 100%;
-  max-width: 220px;
+  width: 220px;
 }
 
 .archive-dropdown__trigger {
   width: 100%;
-  height: 36px;
+  height: 34px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(12, 14, 20, 0.9);
@@ -1877,12 +1879,12 @@ a.ghost {
   padding: 4px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 12, 18, 0.6);
+  background: rgba(10, 12, 18, 0.4);
   width: fit-content;
 }
 
 .archive-toggle__button {
-  height: 30px;
+  height: 28px;
   min-width: 90px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -1898,6 +1900,16 @@ a.ghost {
   border-color: rgba(224, 160, 64, 0.45);
   color: var(--accent-2);
   box-shadow: 0 0 10px rgba(224, 160, 64, 0.2);
+}
+
+.archive-clear {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: underline;
+  padding: 0 4px;
 }
 
 .archive-grid {
@@ -2129,12 +2141,18 @@ a.ghost {
 }
 
 @media (max-width: 980px) {
-  .archive-refine {
-    grid-template-columns: 1fr;
+  .archive-filter-row--top {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .archive-refine__right {
-    justify-content: flex-start;
+  .archive-filter-row--bottom {
+    flex-wrap: wrap;
+  }
+
+  .archive-dropdown {
+    width: 100%;
+    max-width: none;
   }
 }
 
