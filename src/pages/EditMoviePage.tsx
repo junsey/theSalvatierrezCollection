@@ -80,14 +80,14 @@ export const EditMoviePage: React.FC = () => {
   }, [movie]);
 
   const seriesAiringStatus = useMemo(() => {
-    if (!movie?.tmdbSeasons?.length) return 'Unknown';
+    if (!movie?.tmdbSeasons?.length) return 'Desconocido';
     const now = new Date();
     const hasFuture = movie.tmdbSeasons.some((season) => {
       if (!season.airDate) return false;
       const parsed = new Date(season.airDate);
       return Number.isFinite(parsed.getTime()) && parsed > now;
     });
-    return hasFuture ? 'Airing' : 'Ended';
+    return hasFuture ? 'En emisión' : 'Finalizada';
   }, [movie]);
 
   useEffect(() => {
@@ -258,8 +258,8 @@ export const EditMoviePage: React.FC = () => {
           <div className="catalog-column">
             <div className="catalog-card catalog-card--sticky catalog-card--highlight">
               <div className="catalog-card__header">
-                <h2>Catalog Structure</h2>
-                <p className="muted">These values define which fields are available.</p>
+                <h2>Estructura del Catálogo</h2>
+                <p className="muted">Estos valores definen los campos disponibles.</p>
               </div>
               <div className="catalog-card__body catalog-grid">
                 <label>
@@ -292,7 +292,7 @@ export const EditMoviePage: React.FC = () => {
 
             <div className="catalog-card">
               <div className="catalog-card__header">
-                <h3>Identity</h3>
+                <h3>Identidad</h3>
               </div>
               <div className="catalog-card__body catalog-grid">
                 <label>
@@ -319,12 +319,32 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ saga: event.target.value })}
                   />
                 </label>
+                {!form.series && (
+                  <>
+                    <label>
+                      <strong>Director</strong>
+                      <input
+                        type="text"
+                        value={form.director}
+                        onChange={(event) => handleChange({ director: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <strong>Año</strong>
+                      <input
+                        type="number"
+                        value={form.year}
+                        onChange={(event) => handleChange({ year: event.target.value })}
+                      />
+                    </label>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="catalog-card">
               <div className="catalog-card__header">
-                <h3>Classification</h3>
+                <h3>Clasificación</h3>
               </div>
               <div className="catalog-card__body catalog-grid fade-swap" key={`${form.seccion}-${form.series ? 'series' : 'movie'}`}>
                 <label>
@@ -343,7 +363,7 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ group: event.target.value })}
                   />
                 </label>
-                {form.series ? (
+                {form.series && (
                   <>
                     <label>
                       <strong>Showrunner</strong>
@@ -354,7 +374,7 @@ export const EditMoviePage: React.FC = () => {
                       />
                     </label>
                     <label>
-                      <strong>Seasons</strong>
+                      <strong>Temporadas</strong>
                       <input
                         type="number"
                         value={form.season}
@@ -362,31 +382,12 @@ export const EditMoviePage: React.FC = () => {
                       />
                     </label>
                     <label>
-                      <strong>Episodes</strong>
-                      <input type="text" value={seriesEpisodeCount ?? 'Unknown'} readOnly />
+                      <strong>Episodios</strong>
+                      <input type="text" value={seriesEpisodeCount ?? 'Desconocido'} readOnly />
                     </label>
                     <label>
-                      <strong>Airing Status</strong>
+                      <strong>Estado de emisión</strong>
                       <input type="text" value={seriesAiringStatus} readOnly />
-                    </label>
-                  </>
-                ) : (
-                  <>
-                    <label>
-                      <strong>Director</strong>
-                      <input
-                        type="text"
-                        value={form.director}
-                        onChange={(event) => handleChange({ director: event.target.value })}
-                      />
-                    </label>
-                    <label>
-                      <strong>A??o</strong>
-                      <input
-                        type="number"
-                        value={form.year}
-                        onChange={(event) => handleChange({ year: event.target.value })}
-                      />
                     </label>
                   </>
                 )}
@@ -398,7 +399,7 @@ export const EditMoviePage: React.FC = () => {
             {!form.series && (
               <div className="catalog-card">
                 <div className="catalog-card__header">
-                  <h3>Physical Copy (Movie only)</h3>
+                  <h3>Copia Física</h3>
                 </div>
                 <div className="catalog-card__body catalog-grid">
                   <label>
@@ -406,14 +407,16 @@ export const EditMoviePage: React.FC = () => {
                     <input
                       type="text"
                       value={form.format}
+                      placeholder="DVD, Blu-ray, 4K UHD, VHS..."
                       onChange={(event) => handleChange({ format: event.target.value })}
                     />
                   </label>
                   <label>
-                    <strong>Regi??n</strong>
+                    <strong>Región</strong>
                     <input
                       type="text"
                       value={form.region}
+                      placeholder="1, 2, A, B..."
                       onChange={(event) => handleChange({ region: event.target.value })}
                     />
                   </label>
@@ -424,7 +427,7 @@ export const EditMoviePage: React.FC = () => {
                       onChange={(event) => handleChange({ dubbing: event.target.value as FormState['dubbing'] })}
                     >
                       <option value="">No especificado</option>
-                      <option value="true">S??</option>
+                      <option value="true">Sí</option>
                       <option value="false">No</option>
                     </select>
                   </label>
@@ -434,11 +437,11 @@ export const EditMoviePage: React.FC = () => {
 
             <div className="catalog-card">
               <div className="catalog-card__header">
-                <h3>Item Status</h3>
+                <h3>Estado del Ítem</h3>
               </div>
               <div className="catalog-card__body catalog-grid">
                 <label>
-                  <strong>Viewed</strong>
+                  <strong>Visto</strong>
                   <input
                     type="checkbox"
                     checked={form.seen}
@@ -446,7 +449,7 @@ export const EditMoviePage: React.FC = () => {
                   />
                 </label>
                 <label>
-                  <strong>In Deposit</strong>
+                  <strong>En Depósito</strong>
                   <input
                     type="checkbox"
                     checked={form.enDeposito}
@@ -454,7 +457,7 @@ export const EditMoviePage: React.FC = () => {
                   />
                 </label>
                 <label>
-                  <strong>Playback Status</strong>
+                  <strong>Estado de reproducción</strong>
                   <select
                     value={form.funcionaStatus}
                     onChange={(event) => handleChange({ funcionaStatus: event.target.value as FormState['funcionaStatus'] })}
@@ -469,7 +472,7 @@ export const EditMoviePage: React.FC = () => {
 
             <div className="catalog-card">
               <div className="catalog-card__header">
-                <h3>Ratings</h3>
+                <h3>Valoraciones</h3>
               </div>
               <div className="catalog-card__body catalog-grid">
                 <label>
@@ -490,6 +493,7 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ ratingRodrigo: event.target.value })}
                   />
                 </label>
+                <p className="muted ratings-helper">Escala 1 a 10</p>
               </div>
             </div>
           </div>
@@ -497,6 +501,13 @@ export const EditMoviePage: React.FC = () => {
 
         {status === 'error' && <p className="muted edit-form__error">{error}</p>}
       </div>
+      <footer className="edit-footer">
+        <Link className="ghost" to="/movies">Cancelar</Link>
+        <span className="edit-footer__divider">|</span>
+        <button className="btn" type="button" onClick={handleSubmit} disabled={status === 'saving'}>
+          {status === 'saving' ? 'Guardando...' : 'Guardar cambios'}
+        </button>
+      </footer>
     </section>
   );
 };

@@ -4008,6 +4008,14 @@ small {
   gap: 6px;
 }
 
+.ratings-helper {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .fade-swap {
   animation: catalogFade 0.22s ease;
 }
@@ -4045,6 +4053,9 @@ small {
 }
 
 .edit-hero__poster {
+  position: sticky;
+  top: 16px;
+  align-self: start;
   width: 160px;
   aspect-ratio: 2 / 3;
   border-radius: 12px;
@@ -4077,6 +4088,27 @@ small {
 
 .edit-hero__meta p {
   margin: 0;
+}
+
+.edit-footer {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(10, 12, 18, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  margin-top: 10px;
+  z-index: 2;
+}
+
+.edit-footer__divider {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .edit-success {
@@ -4244,6 +4276,7 @@ small {
 
   .edit-hero__poster {
     width: 100%;
+    position: static;
   }
 
   .favorite-card__badge {
