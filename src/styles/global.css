@@ -2038,6 +2038,14 @@ a.ghost {
   text-overflow: ellipsis;
 }
 
+.archive-card__overlay-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .archive-card__overlay-actions {
   display: flex;
   gap: 6px;

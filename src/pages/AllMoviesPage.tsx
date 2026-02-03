@@ -389,8 +389,11 @@ export const AllMoviesPage: React.FC = () => {
                   <span className="archive-card__chip">{movie.tmdbYear ?? movie.year ?? '?'}</span>
                   <span className="archive-card__chip">{movie.seccion}</span>
                 </div>
-                <div className="archive-card__overlay" onClick={(event) => event.stopPropagation()}>
+                <div className="archive-card__overlay">
                   <span className="archive-card__overlay-title">{movie.groupedDisplayTitle ?? movie.title}</span>
+                  <span className="archive-card__overlay-meta">
+                    {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.genreRaw || '?'}
+                  </span>
                   <div className="archive-card__overlay-actions">
                     <button type="button" onClick={() => setActiveMovie(movie)}>
                       Open
