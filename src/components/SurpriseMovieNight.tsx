@@ -8,6 +8,8 @@ interface Props {
   onSelect: (movie: MovieRecord) => void;
 }
 
+const MOOD_GENRES = ['Action', 'Horror', 'Comedy', 'Drama', 'Sci-Fi', 'Fantasy', 'Thriller', 'Animation'];
+
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
 
 const getGenres = (movie: MovieRecord) => {
@@ -16,13 +18,64 @@ const getGenres = (movie: MovieRecord) => {
   return unique([...raw, ...tmdb]);
 };
 
-const getMovieAverage = (movie: MovieRecord) => {
-  if (movie.ratingGloria != null && movie.ratingRodrigo != null) {
-    return (movie.ratingGloria + movie.ratingRodrigo) / 2;
-  }
-  if (movie.ratingGloria != null) return movie.ratingGloria;
-  if (movie.ratingRodrigo != null) return movie.ratingRodrigo;
-  return null;
+const getDecade = (year?: number | null) => {
+  if (!year) return null;
+  const decade = Math.floor(year / 10) * 10;
+  return `${decade}s`;
+};
+
+const MultiSelect: React.FC<{
+  label: string;
+  options: string[];
+  values: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}> = ({ label, options, values, onChange, placeholder = 'Search...' }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!query) return options;
+    const needle = query.toLowerCase();
+    return options.filter((option) => option.toLowerCase().includes(needle));
+  }, [options, query]);
+
+  const toggleValue = (value: string) => {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  };
+
+  return (
+    <div className={`surprise-select ${open ? 'is-open' : ''}`}>
+      <button type="button" className="surprise-select__trigger" onClick={() => setOpen((prev) => !prev)}>
+        <span>{label}</span>
+        <span className="surprise-select__count">{values.length ? `${values.length} selected` : 'Any'}</span>
+      </button>
+      {open && (
+        <div className="surprise-select__menu">
+          <input
+            className="surprise-select__search"
+            placeholder={placeholder}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <div className="surprise-select__options">
+            {filtered.length === 0 && <span className="muted">No results</span>}
+            {filtered.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`surprise-select__option ${values.includes(option) ? 'is-active' : ''}`}
+                onClick={() => toggleValue(option)}
+              >
+                <span>{option}</span>
+                {values.includes(option) && <span aria-hidden>?</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
@@ -30,22 +83,32 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [contentType, setContentType] = useState<'movies' | 'series' | 'both'>('movies');
   const [invocationMode, setInvocationMode] = useState<'single' | 'double'>('single');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [selectedSections, setSelectedSections] = useState<string[]>([]);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
+  const [selectedSubgenres, setSelectedSubgenres] = useState<string[]>([]);
   const [selectedSagas, setSelectedSagas] = useState<string[]>([]);
   const [selectedDirectors, setSelectedDirectors] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedDecades, setSelectedDecades] = useState<string[]>([]);
   const [excludeViewed, setExcludeViewed] = useState(true);
   const [onlyViewed, setOnlyViewed] = useState(false);
   const [includeDamaged, setIncludeDamaged] = useState(false);
   const [isInvoking, setIsInvoking] = useState(false);
   const [result, setResult] = useState<{ primary: MovieRecord; secondary?: MovieRecord } | null>(null);
 
-  const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
   const genres = useMemo(() => unique(movies.flatMap((m) => getGenres(m))), [movies]);
   const sagas = useMemo(() => unique(movies.map((m) => m.saga)), [movies]);
   const directors = useMemo(() => unique(movies.map((m) => m.director)), [movies]);
   const tags = useMemo(() => unique(movies.map((m) => m.group)), [movies]);
+  const decades = useMemo(
+    () =>
+      unique(
+        movies
+          .map((m) => getDecade(m.tmdbYear ?? m.year))
+          .filter((value): value is string => Boolean(value))
+      ),
+    [movies]
+  );
 
   const filtered = useMemo(() => {
     return movies.filter((movie) => {
@@ -53,14 +116,19 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       if (contentType === 'movies' && isSeries) return false;
       if (contentType === 'series' && !isSeries) return false;
 
-      if (selectedSections.length > 0 && !selectedSections.includes(movie.seccion)) return false;
       if (selectedSagas.length > 0 && !selectedSagas.includes(movie.saga)) return false;
       if (selectedDirectors.length > 0 && !selectedDirectors.includes(movie.director)) return false;
       if (selectedTags.length > 0 && !selectedTags.includes(movie.group)) return false;
 
-      if (selectedGenres.length > 0) {
+      if (selectedDecades.length > 0) {
+        const decade = getDecade(movie.tmdbYear ?? movie.year);
+        if (!decade || !selectedDecades.includes(decade)) return false;
+      }
+
+      const genreFilters = [...selectedMoods, ...selectedSubgenres];
+      if (genreFilters.length > 0) {
         const movieGenres = getGenres(movie);
-        if (!selectedGenres.some((genre) => movieGenres.includes(genre))) return false;
+        if (!genreFilters.some((genre) => movieGenres.includes(genre))) return false;
       }
 
       if (!includeDamaged && movie.funcionaStatus === 'damaged') return false;
@@ -73,11 +141,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   }, [
     movies,
     contentType,
-    selectedSections,
-    selectedGenres,
+    selectedMoods,
+    selectedSubgenres,
     selectedSagas,
     selectedDirectors,
     selectedTags,
+    selectedDecades,
     excludeViewed,
     onlyViewed,
     includeDamaged
@@ -174,11 +243,19 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       </div>
       <div className="surprise-result-info">
         <h3>{movie.title}</h3>
-        <p className="muted">{movie.tmdbYear ?? movie.year ?? '?'} ? {movie.seccion}</p>
+        <p className="muted">
+          {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.seccion}
+        </p>
         <div className="surprise-result-actions">
-          <button className="ghost" onClick={() => onSelect(movie)}>Open</button>
-          <button className="ghost" onClick={handleRespin}>Respin</button>
-          <button onClick={() => handleMarkViewed(movie)}>Mark Viewed</button>
+          <button className="ghost" onClick={() => onSelect(movie)}>
+            Open
+          </button>
+          <button className="ghost" onClick={handleRespin}>
+            Respin
+          </button>
+          <button onClick={() => handleMarkViewed(movie)}>
+            <span aria-hidden>?</span> Mark Viewed
+          </button>
         </div>
       </div>
     </div>
@@ -235,63 +312,37 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         {preferencesOpen && (
           <div className="surprise-preferences__body">
             <div className="surprise-preferences__group">
-              <h4>Section / Genre</h4>
-              <div className="surprise-chip-grid">
-                {sections.map((section) => (
+              <h4>Mood</h4>
+              <div className="surprise-chip-grid surprise-chip-grid--large">
+                {MOOD_GENRES.map((mood) => (
                   <button
-                    key={section}
+                    key={mood}
                     type="button"
-                    className={`surprise-chip ${selectedSections.includes(section) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(section, selectedSections, setSelectedSections)}
+                    className={`surprise-chip ${selectedMoods.includes(mood) ? 'is-active' : ''}`}
+                    onClick={() => toggleValue(mood, selectedMoods, setSelectedMoods)}
                   >
-                    {section}
-                  </button>
-                ))}
-                {genres.map((genre) => (
-                  <button
-                    key={genre}
-                    type="button"
-                    className={`surprise-chip ${selectedGenres.includes(genre) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(genre, selectedGenres, setSelectedGenres)}
-                  >
-                    {genre}
+                    {mood}
                   </button>
                 ))}
               </div>
             </div>
             <div className="surprise-preferences__group">
-              <h4>Saga / Director / Tag</h4>
-              <div className="surprise-chip-grid">
-                {sagas.map((saga) => (
-                  <button
-                    key={saga}
-                    type="button"
-                    className={`surprise-chip ${selectedSagas.includes(saga) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(saga, selectedSagas, setSelectedSagas)}
-                  >
-                    {saga}
-                  </button>
-                ))}
-                {directors.map((director) => (
-                  <button
-                    key={director}
-                    type="button"
-                    className={`surprise-chip ${selectedDirectors.includes(director) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(director, selectedDirectors, setSelectedDirectors)}
-                  >
-                    {director}
-                  </button>
-                ))}
-                {tags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className={`surprise-chip ${selectedTags.includes(tag) ? 'is-active' : ''}`}
-                    onClick={() => toggleValue(tag, selectedTags, setSelectedTags)}
-                  >
-                    {tag}
-                  </button>
-                ))}
+              <h4>Collections</h4>
+              <div className="surprise-preferences__row">
+                <MultiSelect
+                  label="Directors"
+                  options={directors}
+                  values={selectedDirectors}
+                  onChange={setSelectedDirectors}
+                  placeholder="Search directors"
+                />
+                <MultiSelect
+                  label="Sagas"
+                  options={sagas}
+                  values={selectedSagas}
+                  onChange={setSelectedSagas}
+                  placeholder="Search sagas"
+                />
               </div>
             </div>
             <div className="surprise-preferences__group">
@@ -322,6 +373,65 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                   Include damaged
                 </button>
               </div>
+            </div>
+            <div className="surprise-preferences__group">
+              <button
+                type="button"
+                className="surprise-advanced__toggle"
+                onClick={() => setAdvancedOpen((prev) => !prev)}
+                aria-expanded={advancedOpen}
+              >
+                Advanced {advancedOpen ? '?' : '?'}
+              </button>
+              {advancedOpen && (
+                <div className="surprise-advanced__body">
+                  <div className="surprise-preferences__subgroup">
+                    <h5>Subgenres</h5>
+                    <div className="surprise-chip-grid">
+                      {genres.map((genre) => (
+                        <button
+                          key={genre}
+                          type="button"
+                          className={`surprise-chip ${selectedSubgenres.includes(genre) ? 'is-active' : ''}`}
+                          onClick={() => toggleValue(genre, selectedSubgenres, setSelectedSubgenres)}
+                        >
+                          {genre}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="surprise-preferences__subgroup">
+                    <h5>Decades</h5>
+                    <div className="surprise-chip-grid">
+                      {decades.map((decade) => (
+                        <button
+                          key={decade}
+                          type="button"
+                          className={`surprise-chip ${selectedDecades.includes(decade) ? 'is-active' : ''}`}
+                          onClick={() => toggleValue(decade, selectedDecades, setSelectedDecades)}
+                        >
+                          {decade}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="surprise-preferences__subgroup">
+                    <h5>Tags</h5>
+                    <div className="surprise-chip-grid">
+                      {tags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          className={`surprise-chip ${selectedTags.includes(tag) ? 'is-active' : ''}`}
+                          onClick={() => toggleValue(tag, selectedTags, setSelectedTags)}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
