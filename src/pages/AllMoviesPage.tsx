@@ -387,7 +387,7 @@ export const AllMoviesPage: React.FC = () => {
                 {movie.seen && <span className="archive-card__badge archive-card__badge--seen">Viewed</span>}
                 <div className="archive-card__chips">
                   <span className="archive-card__chip">{movie.tmdbYear ?? movie.year ?? '?'}</span>
-                  <span className="archive-card__chip">{movie.genreRaw || '?'}</span>
+                  <span className="archive-card__chip">{movie.seccion}</span>
                 </div>
                 <div className="archive-card__overlay">
                   <span className="archive-card__overlay-title">{movie.groupedDisplayTitle ?? movie.title}</span>
