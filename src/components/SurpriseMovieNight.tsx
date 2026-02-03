@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMovies } from '../context/MovieContext';
 import { updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
@@ -8,6 +8,48 @@ interface Props {
   onSelect: (movie: MovieRecord) => void;
 }
 
+const CONNECTION_TYPES = ['saga', 'director', 'actor', 'subgenre', 'decade', 'contrast'] as const;
+type ConnectionType = (typeof CONNECTION_TYPES)[number];
+type ConnectionResult = {
+  movie: MovieRecord;
+  type: ConnectionType | 'random';
+  value: string;
+  candidateCount: number;
+};
+
+const CONNECTION_LABELS: Record<ConnectionType, string> = {
+  saga: 'Same Saga',
+  director: 'Same Director',
+  actor: 'Shared Lead Actor',
+  subgenre: 'Same Subgenre',
+  decade: 'Same Decade',
+  contrast: 'Contrast Pair'
+};
+
+const CONTRAST_MAP: Record<string, string> = {
+  horror: 'comedy',
+  comedy: 'horror',
+  drama: 'action',
+  action: 'drama',
+  animation: 'live action',
+  'live action': 'animation',
+  'sci-fi': 'fantasy',
+  fantasy: 'sci-fi',
+  indie: 'blockbuster',
+  blockbuster: 'indie'
+};
+
+const MOOD_SECTION_MAP: Record<string, string[]> = {
+  Action: ['Acci?n', 'Action'],
+  Horror: ['Horror', 'Terror'],
+  Comedy: ['Comedia', 'Comedy'],
+  Drama: ['Drama'],
+  'Sci-Fi': ['Ciencia ficci?n', 'Sci-Fi', 'Sci Fi', 'Science Fiction'],
+  Fantasy: ['Fantas?a', 'Fantasy'],
+  Thriller: ['Thriller', 'Suspenso'],
+  Animation: ['Animaci?n', 'Animation']
+};
+
 const MOOD_GENRES = ['Action', 'Horror', 'Comedy', 'Drama', 'Sci-Fi', 'Fantasy', 'Thriller', 'Animation'];
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort();
@@ -16,6 +58,29 @@ const getGenres = (movie: MovieRecord) => {
   const raw = movie.genreRaw ? movie.genreRaw.split(',').map((g) => g.trim()) : [];
   const tmdb = movie.tmdbGenres ?? [];
   return unique([...raw, ...tmdb]);
+};
+
+
+const normalizeGenre = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace('science fiction', 'sci-fi')
+    .replace('sci fi', 'sci-fi');
+
+const getActors = (movie: MovieRecord) => {
+  const raw = (movie as MovieRecord & { actors?: string[]; cast?: string[]; tmdbActors?: string[] }).actors
+    ?? (movie as MovieRecord & { actors?: string[]; cast?: string[]; tmdbActors?: string[] }).cast
+    ?? (movie as MovieRecord & { actors?: string[]; cast?: string[]; tmdbActors?: string[] }).tmdbActors
+    ?? [];
+  return raw.filter(Boolean).slice(0, 5);
+};
+
+const getSubgenre = (movie: MovieRecord) => {
+  const subgenre = (movie as MovieRecord & { subgenre?: string; subgenres?: string[] }).subgenre;
+  if (subgenre) return subgenre;
+  const list = (movie as MovieRecord & { subgenres?: string[] }).subgenres ?? [];
+  return list[0] ?? null;
 };
 
 const getDecade = (year?: number | null) => {
@@ -68,7 +133,7 @@ const MultiSelect: React.FC<{
                 onClick={() => toggleValue(option)}
               >
                 <span>{option}</span>
-                {values.includes(option) && <span aria-hidden>?</span>}
+                {values.includes(option) && <span aria-hidden>{'\u2713'}</span>}
               </button>
             ))}
           </div>
@@ -85,6 +150,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
   const [selectedSubgenres, setSelectedSubgenres] = useState<string[]>([]);
   const [selectedSagas, setSelectedSagas] = useState<string[]>([]);
   const [selectedDirectors, setSelectedDirectors] = useState<string[]>([]);
@@ -94,8 +160,30 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [onlyViewed, setOnlyViewed] = useState(false);
   const [includeDamaged, setIncludeDamaged] = useState(false);
   const [isInvoking, setIsInvoking] = useState(false);
-  const [result, setResult] = useState<{ primary: MovieRecord; secondary?: MovieRecord } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
+  const effectiveSections = useMemo(() => {
+    const mapped = selectedMoods.flatMap((mood) => MOOD_SECTION_MAP[mood] ?? []);
+    const all = [...mapped, ...selectedSections];
+    return Array.from(new Set(all.filter(Boolean)));
+  }, [selectedMoods, selectedSections]);
+
+  const [result, setResult] = useState<{
+    primary: MovieRecord;
+    secondary?: MovieRecord;
+    connectionType?: string;
+    connectionValue?: string;
+  } | null>(null);
+  const connectionUsage = useRef<Record<(typeof CONNECTION_TYPES)[number], number>>({
+    saga: 0,
+    director: 0,
+    actor: 0,
+    subgenre: 0,
+    decade: 0,
+    contrast: 0
+  });
+
+  const sections = useMemo(() => unique(movies.map((m) => m.seccion)), [movies]);
   const genres = useMemo(() => unique(movies.flatMap((m) => getGenres(m))), [movies]);
   const sagas = useMemo(() => unique(movies.map((m) => m.saga)), [movies]);
   const directors = useMemo(() => unique(movies.map((m) => m.director)), [movies]);
@@ -115,6 +203,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       const isSeries = Boolean(movie.series || movie.tmdbType === 'tv');
       if (contentType === 'movies' && isSeries) return false;
       if (contentType === 'series' && !isSeries) return false;
+
+      if (effectiveSections.length > 0 && !effectiveSections.includes(movie.seccion)) return false;
 
       if (selectedSagas.length > 0 && !selectedSagas.includes(movie.saga)) return false;
       if (selectedDirectors.length > 0 && !selectedDirectors.includes(movie.director)) return false;
@@ -142,6 +232,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     movies,
     contentType,
     selectedMoods,
+    selectedSections,
+    effectiveSections,
     selectedSubgenres,
     selectedSagas,
     selectedDirectors,
@@ -152,39 +244,207 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     includeDamaged
   ]);
 
+  const samplePool = (pool: MovieRecord[], max = 200) => {
+    if (pool.length <= max) return pool;
+    const copy = [...pool];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, max);
+  };
+
+  const findConnection = (primary: MovieRecord, pool: MovieRecord[]): ConnectionResult | null => {
+    const usage = connectionUsage.current;
+    const minUsage = Math.min(...CONNECTION_TYPES.map((type) => usage[type]));
+    const poolLimited = samplePool(pool.filter((movie) => movie.id !== primary.id));
+
+    const attemptTypes = (allowed: (typeof CONNECTION_TYPES)[number][]) => {
+      for (const type of allowed) {
+        if (type === 'saga') {
+          const saga = primary.saga?.trim();
+          if (!saga) continue;
+          const candidates = poolLimited.filter((movie) => movie.saga === saga);
+          if (candidates.length) {
+            return { movie: pickRandom(candidates), type, value: saga, candidateCount: candidates.length };
+          }
+        }
+
+        if (type === 'director') {
+          const director = primary.director?.trim();
+          if (!director) continue;
+          const candidates = poolLimited.filter((movie) => movie.director === director);
+          if (candidates.length) {
+            return { movie: pickRandom(candidates), type, value: director, candidateCount: candidates.length };
+          }
+        }
+
+        if (type === 'actor') {
+          const actors = getActors(primary);
+          if (!actors.length) continue;
+          const candidates = poolLimited.filter((movie) => {
+            const candidateActors = getActors(movie);
+            return actors.some((actor) => candidateActors.includes(actor));
+          });
+          if (candidates.length) {
+            const selected = pickRandom(candidates);
+            const shared = getActors(selected).find((actor) => actors.includes(actor)) ?? 'Shared Actor';
+            return { movie: selected, type, value: shared, candidateCount: candidates.length };
+          }
+        }
+
+        if (type === 'subgenre') {
+          const subgenre = getSubgenre(primary);
+          if (!subgenre) continue;
+          const candidates = poolLimited.filter((movie) => getSubgenre(movie) === subgenre);
+          if (candidates.length) {
+            return { movie: pickRandom(candidates), type, value: subgenre, candidateCount: candidates.length };
+          }
+        }
+
+        if (type === 'decade') {
+          const decade = getDecade(primary.tmdbYear ?? primary.year);
+          if (!decade) continue;
+          const candidates = poolLimited.filter((movie) => getDecade(movie.tmdbYear ?? movie.year) === decade);
+          if (candidates.length) {
+            return { movie: pickRandom(candidates), type, value: decade, candidateCount: candidates.length };
+          }
+        }
+
+        if (type === 'contrast') {
+          const genres = getGenres(primary).map((genre) => normalizeGenre(genre));
+          const matched = genres.find((genre) => CONTRAST_MAP[genre]);
+          if (!matched) continue;
+          const contrast = CONTRAST_MAP[matched];
+          const candidates = poolLimited.filter((movie) => {
+            const candidateGenres = getGenres(movie).map((genre) => normalizeGenre(genre));
+            if (contrast === 'live action') return !candidateGenres.includes('animation');
+            return candidateGenres.includes(contrast);
+          });
+          if (candidates.length) {
+            const label = `${matched.replace('sci-fi', 'Sci-Fi')} ↔ ${contrast.replace('sci-fi', 'Sci-Fi')}`;
+            return { movie: pickRandom(candidates), type, value: label, candidateCount: candidates.length };
+          }
+        }
+      }
+      return null;
+    };
+
+    const priorityTypes = CONNECTION_TYPES.filter((type) => usage[type] === minUsage);
+    const secondaryTypes = CONNECTION_TYPES.filter((type) => usage[type] !== minUsage);
+    const firstPass = attemptTypes(priorityTypes);
+    if (firstPass) return firstPass;
+    const secondPass = attemptTypes(secondaryTypes);
+    if (secondPass) return secondPass;
+
+    const fallback = poolLimited.filter((movie) => movie.seccion === primary.seccion);
+    if (fallback.length) {
+      return { movie: pickRandom(fallback), type: 'random', value: 'Random Pair', candidateCount: fallback.length };
+    }
+    return null;
+  };
+
   const toggleValue = (value: string, current: string[], setCurrent: (next: string[]) => void) => {
     setResult(null);
+    setMessage(null);
     setCurrent(current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
   };
 
-  const pickRandom = (pool: MovieRecord[]) => pool[Math.floor(Math.random() * pool.length)];
-
-  const pickRelated = (base: MovieRecord, pool: MovieRecord[]) => {
-    const candidates = pool.filter((m) => m.id !== base.id);
-    if (candidates.length === 0) return null;
-
-    const sameSection = candidates.filter((m) => m.seccion === base.seccion);
-    if (sameSection.length) return pickRandom(sameSection);
-
-    const sameDirector = candidates.filter((m) => m.director === base.director);
-    if (sameDirector.length) return pickRandom(sameDirector);
-
-    const baseGenres = getGenres(base);
-    const sameGenre = candidates.filter((m) => getGenres(m).some((genre) => baseGenres.includes(genre)));
-    if (sameGenre.length) return pickRandom(sameGenre);
-
-    return pickRandom(candidates);
+  const updateSections = (next: string[]) => {
+    setSelectedSections(next);
+    setResult(null);
+    setMessage(null);
   };
 
-  const invoke = (isRespin = false) => {
-    if (filtered.length === 0) return;
-    if (!isRespin) setResult(null);
+  const updateDirectors = (next: string[]) => {
+    setSelectedDirectors(next);
+    setResult(null);
+    setMessage(null);
+  };
+
+  const updateSagas = (next: string[]) => {
+    setSelectedSagas(next);
+    setResult(null);
+    setMessage(null);
+  };
+
+
+  const pickRandom = (pool: MovieRecord[]) => pool[Math.floor(Math.random() * pool.length)];
+
+  const invoke = (isRespin = false, lockedPrimary?: MovieRecord | null) => {
+    const query = {
+      contentType,
+      mode: invocationMode,
+      selectedMoods,
+      selectedSections,
+      selectedDirectors,
+      selectedSagas,
+      toggles: {
+        excludeViewed,
+        onlyViewed,
+        includeDamaged
+      },
+      effectiveSections
+    };
+
+    if (import.meta.env.DEV) {
+      console.log('[Invoke Fate]', {
+        contentType,
+        mode: invocationMode,
+        selectedMoodChips: selectedMoods,
+        selectedSections,
+        selectedDirectors,
+        selectedSagas,
+        toggles: { excludeViewed, onlyViewed, includeDamaged },
+        query,
+        candidateCount: filtered.length
+      });
+    }
+
+    if (filtered.length === 0) {
+      setMessage('No results match your current preferences.');
+      setResult(null);
+      return;
+    }
+
+    if (!isRespin) {
+      setResult(null);
+      setMessage(null);
+    }
+
     setIsInvoking(true);
     setTimeout(() => {
-      const primary = pickRandom(filtered);
+      const primary = lockedPrimary ?? pickRandom(filtered);
+      if (!primary) {
+        setIsInvoking(false);
+        setMessage('No results match your current preferences.');
+        return;
+      }
       if (invocationMode === 'double') {
-        const secondary = pickRelated(primary, filtered);
-        setResult({ primary, secondary: secondary ?? undefined });
+        const connection = findConnection(primary, filtered);
+        if (connection) {
+          const connectionTypeLabel =
+            connection.type === 'random' ? 'Random Pair' : CONNECTION_LABELS[connection.type];
+          if (connection.type !== 'random') {
+            connectionUsage.current[connection.type] += 1;
+          }
+          if (import.meta.env.DEV) {
+            console.log('[Surprise Double Feature]', {
+              movieA: primary.id,
+              connectionType: connectionTypeLabel,
+              candidates: connection.candidateCount,
+              movieB: connection.movie.id
+            });
+          }
+          setResult({
+            primary,
+            secondary: connection.movie,
+            connectionType: connectionTypeLabel,
+            connectionValue: connection.value
+          });
+        } else {
+          setResult({ primary });
+        }
       } else {
         setResult({ primary });
       }
@@ -194,6 +454,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
 
   const handleRespin = () => {
     if (isInvoking) return;
+    if (result?.secondary && invocationMode === 'double') {
+      invoke(true, result.primary);
+      return;
+    }
     invoke(true);
   };
 
@@ -254,7 +518,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
             Respin
           </button>
           <button onClick={() => handleMarkViewed(movie)}>
-            <span aria-hidden>?</span> Mark Viewed
+            <span aria-hidden>{'\u2713'}</span> Mark Viewed
           </button>
         </div>
       </div>
@@ -324,7 +588,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                     {mood}
                   </button>
                 ))}
+                <MultiSelect
+                  label="+ More?"
+                  options={sections}
+                  values={selectedSections}
+                  onChange={updateSections}
+                  placeholder="Search sections"
+                />
               </div>
+              {selectedSections.length > 0 && (
+                <div className="surprise-extra">
+                  <span>Additional sections: {selectedSections.length} selected</span>
+                  <button type="button" onClick={() => setSelectedSections([])}>Clear</button>
+                </div>
+              )}
             </div>
             <div className="surprise-preferences__group">
               <h4>Collections</h4>
@@ -333,14 +610,14 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                   label="Directors"
                   options={directors}
                   values={selectedDirectors}
-                  onChange={setSelectedDirectors}
+                  onChange={updateDirectors}
                   placeholder="Search directors"
                 />
                 <MultiSelect
                   label="Sagas"
                   options={sagas}
                   values={selectedSagas}
-                  onChange={setSelectedSagas}
+                  onChange={updateSagas}
                   placeholder="Search sagas"
                 />
               </div>
@@ -443,9 +720,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
 
       {isInvoking && <div className="surprise-invoking">Summoning destiny...</div>}
 
+      {message && <div className="surprise-message">{message}</div>}
+
       {result && (
         <div className={`surprise-results ${invocationMode === 'double' ? 'is-double' : ''}`}>
           {renderCard(result.primary)}
+          {result.secondary && (
+            <div className="surprise-connection-badge">
+              <span aria-hidden>🔗</span>
+              <span>
+                {result.connectionType}
+                {result.connectionValue ? `: ${result.connectionValue}` : ''}
+              </span>
+            </div>
+          )}
           {result.secondary && renderCard(result.secondary)}
         </div>
       )}
