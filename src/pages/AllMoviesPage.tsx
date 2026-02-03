@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArchiveDropdown, ArchiveOption } from '../components/ArchiveDropdown';
 import { MovieDetail } from '../components/MovieDetail';
 import { useMovies } from '../context/MovieContext';
 import { setStoredFilters, getStoredFilters } from '../services/localStorage';
-import { compareShelfSort } from '../services/movieSort';
 import { normalizeText } from '../services/textNormalize';
 import { groupSeriesForDisplay } from '../services/seriesGrouping';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
@@ -25,43 +24,21 @@ const defaultFilters: MovieFilters = {
 const uniqueValues = (items: string[]) => Array.from(new Set(items.filter(Boolean))).sort();
 
 const getMovieAverage = (movie: MovieRecord) => {
-  if (movie.ratingGloria == null || movie.ratingRodrigo == null) return null;
-  return (movie.ratingGloria + movie.ratingRodrigo) / 2;
+  if (movie.ratingGloria != null && movie.ratingRodrigo != null) {
+    return (movie.ratingGloria + movie.ratingRodrigo) / 2;
+  }
+  if (movie.ratingGloria != null) return movie.ratingGloria;
+  if (movie.ratingRodrigo != null) return movie.ratingRodrigo;
+  return null;
 };
 
-type VirtualConfig = {
-  count: number;
-  itemHeight: number;
-  containerRef: React.RefObject<HTMLDivElement>;
-  overscan?: number;
-  enabled?: boolean;
-};
-
-const useVirtualWindow = ({ count, itemHeight, containerRef, overscan = 6, enabled = true }: VirtualConfig) => {
-  const [scrollTop, setScrollTop] = useState(0);
-  const [height, setHeight] = useState(600);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const el = containerRef.current;
-    if (!el) return;
-    const handleScroll = () => setScrollTop(el.scrollTop);
-    const handleResize = () => setHeight(el.clientHeight);
-    handleResize();
-    el.addEventListener('scroll', handleScroll);
-    window.addEventListener('resize', handleResize);
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [containerRef, enabled]);
-
-  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
-  const endIndex = Math.min(count - 1, Math.floor((scrollTop + height) / itemHeight) + overscan);
-  const offsetY = startIndex * itemHeight;
-  const totalHeight = count * itemHeight;
-
-  return { startIndex, endIndex, offsetY, totalHeight };
+const coerceTimestamp = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return null;
 };
 
 export const AllMoviesPage: React.FC = () => {
@@ -72,6 +49,8 @@ export const AllMoviesPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(120);
   const location = useLocation();
+
+  const recentIndexMap = useMemo(() => new Map(visibleMovies.map((movie, index) => [movie.id, index])), [visibleMovies]);
 
   const handleChange = (patch: Partial<MovieFilters>) => {
     const next = { ...filters, ...patch };
@@ -121,11 +100,10 @@ export const AllMoviesPage: React.FC = () => {
         return m.funcionaStatus === filters.condition;
       })
       .sort((a, b) => {
+        const titleCompare = a.title.localeCompare(b.title);
         switch (filters.sort) {
           case 'title-desc':
             return b.title.localeCompare(a.title);
-          case 'shelf-asc':
-            return compareShelfSort(a, b);
           case 'year-asc':
             return (a.year ?? 0) - (b.year ?? 0);
           case 'year-desc':
@@ -135,14 +113,60 @@ export const AllMoviesPage: React.FC = () => {
           case 'tmdb-asc':
             return Number(a.tmdbRating ?? 0) - Number(b.tmdbRating ?? 0);
           case 'rating-desc':
-            return Number(ratings[b.id] ?? 0) - Number(ratings[a.id] ?? 0);
+            return Number(ratings[b.id] ?? 0) - Number(ratings[a.id] ?? 0) || titleCompare;
           case 'rating-asc':
-            return Number(ratings[a.id] ?? 0) - Number(ratings[b.id] ?? 0);
+            return Number(ratings[a.id] ?? 0) - Number(ratings[b.id] ?? 0) || titleCompare;
+          case 'rating-best': {
+            const aAvg = getMovieAverage(a);
+            const bAvg = getMovieAverage(b);
+            if (aAvg == null && bAvg == null) return titleCompare;
+            if (aAvg == null) return 1;
+            if (bAvg == null) return -1;
+            return bAvg - aAvg || titleCompare;
+          }
+          case 'recent-desc': {
+            const metaA = a as MovieRecord & {
+              createdAt?: string | number;
+              created_at?: string | number;
+              addedAt?: string | number;
+              added_at?: string | number;
+              importedAt?: string | number;
+              imported_at?: string | number;
+            };
+            const metaB = b as MovieRecord & {
+              createdAt?: string | number;
+              created_at?: string | number;
+              addedAt?: string | number;
+              added_at?: string | number;
+              importedAt?: string | number;
+              imported_at?: string | number;
+            };
+            const aTimestamp =
+              coerceTimestamp(metaA.createdAt) ??
+              coerceTimestamp(metaA.created_at) ??
+              coerceTimestamp(metaA.addedAt) ??
+              coerceTimestamp(metaA.added_at) ??
+              coerceTimestamp(metaA.importedAt) ??
+              coerceTimestamp(metaA.imported_at) ??
+              recentIndexMap.get(a.id);
+            const bTimestamp =
+              coerceTimestamp(metaB.createdAt) ??
+              coerceTimestamp(metaB.created_at) ??
+              coerceTimestamp(metaB.addedAt) ??
+              coerceTimestamp(metaB.added_at) ??
+              coerceTimestamp(metaB.importedAt) ??
+              coerceTimestamp(metaB.imported_at) ??
+              recentIndexMap.get(b.id);
+            if (aTimestamp == null && bTimestamp == null) return titleCompare;
+            if (aTimestamp == null) return 1;
+            if (bTimestamp == null) return -1;
+            return bTimestamp - aTimestamp || titleCompare;
+          }
           default:
-            return a.title.localeCompare(b.title);
+            return titleCompare;
         }
       });
-  }, [visibleMovies, filters, ratings]);
+  }, [visibleMovies, filters, ratings, recentIndexMap]);
 
   const grouped = useMemo(() => groupSeriesForDisplay(visibleMovies, filtered), [visibleMovies, filtered]);
 
@@ -150,7 +174,7 @@ export const AllMoviesPage: React.FC = () => {
   const pagedMovies = useMemo(() => {
     const start = (page - 1) * pageSize;
     return grouped.slice(start, start + pageSize);
-  }, [filtered, page, pageSize]);
+  }, [grouped, page, pageSize]);
 
   useEffect(() => {
     setPage(1);
@@ -191,10 +215,11 @@ export const AllMoviesPage: React.FC = () => {
   const secciones = useMemo(() => uniqueValues(visibleMovies.map((m) => m.seccion)), [visibleMovies]);
   const sagas = useMemo(() => uniqueValues(visibleMovies.map((m) => m.saga)), [visibleMovies]);
   const sortOptions: ArchiveOption[] = [
-    { value: 'title-asc', label: 'Title A–Z' },
+    { value: 'title-asc', label: 'Title A?Z' },
     { value: 'year-desc', label: 'Year' },
     { value: 'rating-desc', label: 'Rating' },
-    { value: 'shelf-asc', label: 'Recently Added' }
+    { value: 'recent-desc', label: 'Recently Added' },
+    { value: 'rating-best', label: 'Best Rated (Highest Avg)' }
   ];
 
   useEffect(() => {
@@ -213,7 +238,7 @@ export const AllMoviesPage: React.FC = () => {
       </div>
       <div className="archive-pagination__controls">
         <label className="archive-pagination__size">
-          <span className="muted">Por página</span>
+          <span className="muted">Por p?gina</span>
           <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
             <option value={30}>30</option>
             <option value={60}>60</option>
@@ -222,10 +247,10 @@ export const AllMoviesPage: React.FC = () => {
         </label>
         <div className="archive-pagination__buttons">
           <button className="ghost" onClick={() => setPage(1)} disabled={page === 1}>
-            «
+            ?
           </button>
           <button className="ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-            ‹
+            ?
           </button>
           <span className="muted">
             {page}/{totalPages}
@@ -235,53 +260,15 @@ export const AllMoviesPage: React.FC = () => {
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
           >
-            ›
+            ?
           </button>
           <button className="ghost" onClick={() => setPage(totalPages)} disabled={page === totalPages}>
-            »
+            ?
           </button>
         </div>
       </div>
     </div>
   );
-
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const tableRef = useRef<HTMLDivElement | null>(null);
-  const [gridColumns, setGridColumns] = useState(6);
-
-  useEffect(() => {
-    const el = gridRef.current;
-    if (!el) return;
-    const updateColumns = () => {
-      const width = el.clientWidth;
-      const minColumn = 170;
-      const columns = Math.max(1, Math.floor(width / minColumn));
-      setGridColumns(columns);
-    };
-    updateColumns();
-    const observer = new ResizeObserver(updateColumns);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [filters.view]);
-
-  const gridRowHeight = 280;
-  const gridRowCount = Math.ceil(pagedMovies.length / gridColumns);
-  const gridVirtual = useVirtualWindow({
-    count: gridRowCount,
-    itemHeight: gridRowHeight,
-    containerRef: gridRef,
-    overscan: 4,
-    enabled: filters.view === 'grid'
-  });
-
-  const listRowHeight = 86;
-  const listVirtual = useVirtualWindow({
-    count: pagedMovies.length,
-    itemHeight: listRowHeight,
-    containerRef: tableRef,
-    overscan: 8,
-    enabled: filters.view === 'list'
-  });
 
   const hasActiveFilters =
     Boolean(filters.query.trim()) ||
@@ -337,7 +324,7 @@ export const AllMoviesPage: React.FC = () => {
             value={filters.sort}
             options={sortOptions}
             onChange={(value) => handleChange({ sort: value as MovieFilters['sort'] })}
-            placeholder="Title A–Z"
+            placeholder="Title A?Z"
           />
         </div>
         <div className="archive-filter-row archive-filter-row--bottom">
@@ -386,44 +373,37 @@ export const AllMoviesPage: React.FC = () => {
       </div>
 
       {filters.view === 'grid' ? (
-        <div className="archive-grid" ref={gridRef}>
-          <div className="archive-grid__spacer" style={{ height: gridVirtual.totalHeight }}>
-            <div
-              className="archive-grid__window"
-              style={{
-                transform: `translateY(${gridVirtual.offsetY}px)`,
-                gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`
-              }}
-            >
-              {pagedMovies
-                .slice(gridVirtual.startIndex * gridColumns, (gridVirtual.endIndex + 1) * gridColumns)
-                .map((movie) => (
-                  <div key={movie.id} className="archive-card" onClick={() => setActiveMovie(movie)}>
-                    <div className="archive-card__poster">
-                      <img
-                        src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
-                        alt={movie.groupedDisplayTitle ?? movie.title}
-                        loading="lazy"
-                      />
-                      {movie.seen && <span className="archive-card__badge archive-card__badge--seen">Viewed</span>}
-                      <span className="archive-card__badge archive-card__badge--section">{movie.seccion}</span>
-                      <div className="archive-card__ratings">
-                        <span>G {movie.ratingGloria?.toFixed(1) ?? '—'}</span>
-                        <span>R {movie.ratingRodrigo?.toFixed(1) ?? '—'}</span>
-                        <span>Avg {getMovieAverage(movie)?.toFixed(1) ?? '—'}</span>
-                      </div>
-                    </div>
-                    <div className="archive-card__meta">
-                      <span className="archive-card__title">{movie.groupedDisplayTitle ?? movie.title}</span>
-                      <span className="archive-card__year">{movie.tmdbYear ?? movie.year ?? '—'}</span>
-                    </div>
+        <div className="archive-grid">
+          {pagedMovies.map((movie) => (
+            <div key={movie.id} className="archive-card" onClick={() => setActiveMovie(movie)}>
+              <div className="archive-card__poster">
+                <img
+                  src={movie.posterUrl ?? 'https://via.placeholder.com/300x450/0b0f17/ffffff?text=No+Poster'}
+                  alt={movie.groupedDisplayTitle ?? movie.title}
+                  loading="lazy"
+                />
+                {movie.seen && <span className="archive-card__badge archive-card__badge--seen">Viewed</span>}
+                <div className="archive-card__chips">
+                  <span className="archive-card__chip">{movie.tmdbYear ?? movie.year ?? '?'}</span>
+                  <span className="archive-card__chip">{movie.seccion}</span>
+                </div>
+                <div className="archive-card__overlay" onClick={(event) => event.stopPropagation()}>
+                  <span className="archive-card__overlay-title">{movie.groupedDisplayTitle ?? movie.title}</span>
+                  <div className="archive-card__overlay-actions">
+                    <button type="button" onClick={() => setActiveMovie(movie)}>
+                      Open
+                    </button>
+                    <button type="button" onClick={() => navigate(`/admin/movies/${movie.id}/edit`)}>
+                      Edit
+                    </button>
                   </div>
-                ))}
+                </div>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       ) : (
-        <div className="archive-table" ref={tableRef}>
+        <div className="archive-table">
           <div className="archive-table__header">
             <span>Poster</span>
             <span>Title</span>
@@ -436,17 +416,11 @@ export const AllMoviesPage: React.FC = () => {
             <span className="is-right">R</span>
             <span className="is-right">Avg</span>
           </div>
-          <div className="archive-table__body" style={{ height: listVirtual.totalHeight }}>
-            {pagedMovies.slice(listVirtual.startIndex, listVirtual.endIndex + 1).map((movie, index) => {
+          <div className="archive-table__body">
+            {pagedMovies.map((movie) => {
               const avg = getMovieAverage(movie);
-              const rowIndex = listVirtual.startIndex + index;
               return (
-                <div
-                  key={movie.id}
-                  className="archive-row"
-                  style={{ top: rowIndex * listRowHeight }}
-                  onClick={() => setActiveMovie(movie)}
-                >
+                <div key={movie.id} className="archive-row" onClick={() => setActiveMovie(movie)}>
                   <span className="archive-row__poster">
                     <img
                       src={movie.posterUrl ?? 'https://via.placeholder.com/60x90/0b0f17/ffffff?text=No+Poster'}
@@ -455,14 +429,14 @@ export const AllMoviesPage: React.FC = () => {
                     />
                   </span>
                   <span className="archive-row__title">{movie.groupedDisplayTitle ?? movie.title}</span>
-                  <span className="is-right">{movie.tmdbYear ?? movie.year ?? '—'}</span>
+                  <span className="is-right">{movie.tmdbYear ?? movie.year ?? '?'}</span>
                   <span className="archive-row__badge">{movie.seccion}</span>
-                  <span className="archive-row__genre">{movie.genreRaw || '—'}</span>
-                  <span className="is-right">{movie.seen ? 'Sí' : 'No'}</span>
-                  <span className="is-right">{movie.tmdbRating?.toFixed(1) ?? '—'}</span>
-                  <span className="is-right">{movie.ratingGloria?.toFixed(1) ?? '—'}</span>
-                  <span className="is-right">{movie.ratingRodrigo?.toFixed(1) ?? '—'}</span>
-                  <span className="is-right">{avg != null ? avg.toFixed(1) : '—'}</span>
+                  <span className="archive-row__genre">{movie.genreRaw || '?'}</span>
+                  <span className="is-right">{movie.seen ? 'S?' : 'No'}</span>
+                  <span className="is-right">{movie.tmdbRating?.toFixed(1) ?? '?'}</span>
+                  <span className="is-right">{movie.ratingGloria?.toFixed(1) ?? '?'}</span>
+                  <span className="is-right">{movie.ratingRodrigo?.toFixed(1) ?? '?'}</span>
+                  <span className="is-right">{avg != null ? avg.toFixed(1) : '?'}</span>
                   <div className="archive-row__actions" onClick={(event) => event.stopPropagation()}>
                     <button type="button" onClick={() => setActiveMovie(movie)}>
                       Open

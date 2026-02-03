@@ -1913,29 +1913,45 @@ a.ghost {
 }
 
 .archive-grid {
-  height: 70vh;
-  overflow: auto;
-}
-
-.archive-grid__spacer {
-  position: relative;
-  width: 100%;
-}
-
-.archive-grid__window {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
   display: grid;
   gap: 12px;
   padding: 4px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+@media (max-width: 1400px) {
+  .archive-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1100px) {
+  .archive-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .archive-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .archive-card {
   display: grid;
   gap: 6px;
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.archive-card:hover {
+  border-color: rgba(224, 160, 64, 0.5);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  transform: translateY(-2px);
 }
 
 .archive-card__poster {
@@ -1969,55 +1985,81 @@ a.ghost {
 }
 
 .archive-card__badge--seen {
-  top: 8px;
-  right: 8px;
-  left: auto;
   border-color: rgba(224, 160, 64, 0.5);
   color: var(--accent-2);
 }
 
-.archive-card__ratings {
+.archive-card__chips {
   position: absolute;
-  inset: auto 8px 8px 8px;
+  top: 8px;
+  right: 8px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.archive-card__chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(8, 10, 16, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.archive-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: rgba(5, 7, 12, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 11px;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(6, 8, 12, 0.05) 30%, rgba(6, 8, 12, 0.85) 100%);
   opacity: 0;
-  transition: opacity 0.15s ease;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
 }
 
-.archive-card:hover .archive-card__ratings {
+.archive-card:hover .archive-card__overlay {
   opacity: 1;
+  pointer-events: auto;
 }
 
-.archive-card__meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+.archive-card__overlay-title {
   font-size: 12px;
-}
-
-.archive-card__title {
   font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.archive-card__year {
-  color: var(--text-muted);
+.archive-card__overlay-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.archive-card__overlay-actions button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 10, 16, 0.85);
+  color: var(--text);
+  font-size: 11px;
 }
 
 .archive-table {
-  height: 70vh;
-  overflow: auto;
+  --archive-list-template: 56px 3fr 70px 120px 140px 70px 70px 50px 50px 60px;
 }
 
 .archive-table__header {
   display: grid;
-  grid-template-columns: 60px 2fr 70px 120px 1.6fr 70px 70px 60px 60px 70px;
+  grid-template-columns: var(--archive-list-template);
   gap: 8px;
   font-size: 11px;
   text-transform: uppercase;
@@ -2031,24 +2073,26 @@ a.ghost {
   z-index: 1;
 }
 
+.archive-table__header .is-right {
+  text-align: right;
+}
+
 .archive-table__body {
   position: relative;
 }
 
 .archive-row {
-  position: absolute;
-  left: 0;
-  right: 0;
   display: grid;
-  grid-template-columns: 60px 2fr 70px 120px 1.6fr 70px 70px 60px 60px 70px;
+  grid-template-columns: var(--archive-list-template);
   gap: 8px;
   align-items: center;
   padding: 6px 8px;
   font-size: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   cursor: pointer;
-  height: 86px;
-  padding-right: 220px;
+  min-height: 72px;
+  position: relative;
+  padding-right: 200px;
 }
 
 .archive-row:hover {
@@ -2093,6 +2137,8 @@ a.ghost {
 .archive-row__actions {
   position: absolute;
   right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   gap: 6px;
   opacity: 0;
@@ -2157,11 +2203,6 @@ a.ghost {
 }
 
 @media (max-width: 720px) {
-  .archive-table__header,
-  .archive-row {
-    grid-template-columns: 50px 1.6fr 60px 90px 1fr 50px 60px 50px 50px 60px;
-  }
-
   .archive-row {
     padding-right: 8px;
   }
@@ -2171,6 +2212,7 @@ a.ghost {
     opacity: 1;
     pointer-events: auto;
     margin-top: 6px;
+    transform: none;
   }
 }
 

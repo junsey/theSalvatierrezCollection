@@ -95,5 +95,7 @@ export type MovieFilters = {
     | 'tmdb-desc'
     | 'tmdb-asc'
     | 'rating-desc'
-    | 'rating-asc';
+    | 'rating-asc'
+    | 'recent-desc'
+    | 'rating-best';
 };
