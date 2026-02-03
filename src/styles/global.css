@@ -1994,9 +1994,9 @@ a.ghost {
   top: 8px;
   right: 8px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
 }
 
 .archive-card__chip {
@@ -2033,14 +2033,6 @@ a.ghost {
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.archive-card__overlay-meta {
-  font-size: 11px;
-  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

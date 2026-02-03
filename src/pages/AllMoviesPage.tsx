@@ -387,13 +387,10 @@ export const AllMoviesPage: React.FC = () => {
                 {movie.seen && <span className="archive-card__badge archive-card__badge--seen">Viewed</span>}
                 <div className="archive-card__chips">
                   <span className="archive-card__chip">{movie.tmdbYear ?? movie.year ?? '?'}</span>
-                  <span className="archive-card__chip">{movie.seccion}</span>
+                  <span className="archive-card__chip">{movie.genreRaw || '?'}</span>
                 </div>
                 <div className="archive-card__overlay">
                   <span className="archive-card__overlay-title">{movie.groupedDisplayTitle ?? movie.title}</span>
-                  <span className="archive-card__overlay-meta">
-                    {movie.tmdbYear ?? movie.year ?? '?'} ? {movie.genreRaw || '?'}
-                  </span>
                   <div className="archive-card__overlay-actions">
                     <button type="button" onClick={() => setActiveMovie(movie)}>
                       Open
