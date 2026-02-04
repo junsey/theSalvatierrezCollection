@@ -2734,6 +2734,10 @@ a.ghost {
   text-align: left;
 }
 
+.surprise-result-hero__synopsis-toggle {
+  display: none;
+}
+
 
 .surprise-result-hero__actions {
   margin-top: auto;
