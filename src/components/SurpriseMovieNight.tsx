@@ -501,7 +501,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const year = movie.tmdbYear ?? movie.year ?? null;
     const genre = getGenres(movie)[0] ?? null;
     const section = movie.seccion ?? null;
-    const metadata = [year, genre, section].filter(Boolean).join(' • ');
+    const metadataParts = [
+      year ? String(year) : null,
+      genre ? `Genre: ${genre}` : null,
+      section ? `Section: ${section}` : null
+    ].filter(Boolean);
+    const metadata = metadataParts.join(' • ');
     const directorList = (movie.director ?? '')
       .split(/[,&]/)
       .map((d) => d.trim())
@@ -549,14 +554,16 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
             </div>
           )}
           <div className="surprise-result-hero__actions">
-            <button className="ghost" onClick={() => onSelect(movie)}>
-              Open
-            </button>
-            {adminSession && (
-              <button onClick={() => handleMarkViewed(movie)}>
-                <span aria-hidden>&#10003;</span> Mark Viewed
+            <div className="surprise-result-hero__action-bar">
+              <button className="ghost" onClick={() => onSelect(movie)}>
+                Open
               </button>
-            )}
+              {adminSession && (
+                <button onClick={() => handleMarkViewed(movie)}>
+                  <span aria-hidden>&#10003;</span> Mark Viewed
+                </button>
+              )}
+            </div>
             {!adminSession && (
               <span className="surprise-result-hero__hint">Sign in to track viewed</span>
             )}
@@ -762,6 +769,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
             <div className="surprise-connection-separator" role="presentation">
               <span className="surprise-connection-separator__line" />
               <div className="surprise-connection-separator__label">
+                <span aria-hidden>&#128279;</span>
                 <span>
                   {(result.connectionType ?? '').toUpperCase()}
                   {result.connectionValue ? ` · ${result.connectionValue.toUpperCase()}` : ''}
@@ -776,6 +784,9 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
 
 
 
