@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMovies } from '../context/MovieContext';
 import { updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
@@ -171,9 +171,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [includeDamaged, setIncludeDamaged] = useState(false);
   const [isInvoking, setIsInvoking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [expandedSynopsis, setExpandedSynopsis] = useState<string[]>([]);
-  const [synopsisOverflow, setSynopsisOverflow] = useState<Record<string, boolean>>({});
-  const synopsisRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
   const [result, setResult] = useState<{
     primary: MovieRecord;
@@ -276,7 +273,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       (acc, type) => ({ ...acc, [type]: (acc[type] ?? 0) + 1 }),
       { saga: 0, director: 0, actor: 0, subgenre: 0, contrast: 0, decade: 0 }
     );
-    const poolLimited = samplePool(pool.filter((movie) => movie.id !== primary.id));
+    const basePool = pool.filter((movie) => movie.id !== primary.id);\n    const poolLimited = forcedType ? basePool : samplePool(basePool);
 
     const scored = CONNECTION_TYPES.map((type, index) => {
       const recentPenalty = (recentCounts[type] ?? 0) * 10;
@@ -543,37 +540,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   useEffect(() => {
     if (onlyViewed) setExcludeViewed(false);
   }, [onlyViewed]);
-
-  const splitSentences = (text: string) =>
-    text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
-
-  const getSynopsisSummary = (text: string) => {
-    const cleaned = text.replace(/\s+/g, ' ').trim();
-    if (!cleaned) return null;
-    const sentences = splitSentences(cleaned);
-    if (sentences.length === 0) return null;
-    const count = sentences.length >= 3 ? 3 : sentences.length;
-    const summary = sentences.slice(0, Math.max(1, Math.min(count, sentences.length))).join(' ').trim();
-    if (!summary) return null;
-    return /[.!?]$/.test(summary) ? summary : `${summary}.`;
-  };
-
-
-  useLayoutEffect(() => {
-    if (!result) return;
-    const items = [result.primary, result.secondary].filter(Boolean) as MovieRecord[];
-    setSynopsisOverflow((prev) => {
-      const next = { ...prev };
-      items.forEach((movie) => {
-        if (expandedSynopsis.includes(movie.id)) return;
-        const el = synopsisRefs.current[movie.id];
-        if (!el) return;
-        const isOverflowing = el.scrollHeight > el.clientHeight + 1;
-        next[movie.id] = isOverflowing;
-      });
-      return next;
-    });
-  }, [result, expandedSynopsis]);
   const renderCard = (movie: MovieRecord) => {
     const year = movie.tmdbYear ?? movie.year ?? null;
     const genre = getGenres(movie)[0] ?? null;
@@ -593,14 +559,6 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const basedOnSource = [movie.group, movie.seccion].find((value) => knownAuthors.has(value?.trim?.() ?? ''));
     const basedOnText = basedOnSource ? `Based on: ${basedOnSource}` : null;
     const synopsis = movie.plot?.trim();
-    const synopsisSummary = synopsis ? getSynopsisSummary(synopsis) : null;
-    const overflow = synopsisOverflow[movie.id];
-    const hasMeasured = overflow !== undefined;
-    const showFullSynopsis = Boolean(
-      synopsis && (isExpanded || !hasMeasured || !overflow || !synopsisSummary || synopsisSummary === synopsis)
-    );
-    const displaySynopsis = showFullSynopsis ? synopsis : synopsisSummary;
-    const canExpand = Boolean(synopsis && hasMeasured && overflow && synopsisSummary && synopsisSummary !== synopsis);
 
     return (
       <div className="surprise-result-hero">
@@ -616,31 +574,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
           {metadata && <p className="surprise-result-hero__meta">{metadata}</p>}
           {basedOnText && <p className="surprise-result-hero__based">{basedOnText}</p>}
           {directorText && <p className="surprise-result-hero__director">{directorText}</p>}
-          {displaySynopsis && (
-            <div className={`surprise-result-hero__synopsis-wrap ${isExpanded ? 'is-expanded' : canExpand ? 'is-collapsed' : ''}`}>
-              <p
-                className="surprise-result-hero__synopsis"
-                ref={(el) => {
-                  synopsisRefs.current[movie.id] = el;
-                }}
-              >
-                {displaySynopsis}
-              </p>
-              {canExpand && (
-                <button
-                  type="button"
-                  className="surprise-result-hero__synopsis-toggle"
-                  onClick={() =>
-                    setExpandedSynopsis((prev) =>
-                      prev.includes(movie.id) ? prev.filter((id) => id !== movie.id) : [...prev, movie.id]
-                    )
-                  }
-                >
-                  {isExpanded ? 'SHOW LESS' : 'READ MORE'}
-                </button>
-              )}
-            </div>
-          )}
+          {synopsis && (
+            <div className="surprise-result-hero__synopsis-wrap">
+              <p className="surprise-result-hero__synopsis">{synopsis}</p>
+            
             </div>
           )}
           <div className="surprise-result-hero__actions">
@@ -896,6 +833,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
