@@ -521,6 +521,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     if (onlyViewed) setExcludeViewed(false);
   }, [onlyViewed]);
 
+  const splitSentences = (text: string) =>
+    text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [];
+
+  const getSynopsisSummary = (text: string) => {
+    const cleaned = text.replace(/\s+/g, ' ').trim();
+    if (!cleaned) return null;
+    const sentences = splitSentences(cleaned);
+    if (sentences.length === 0) return null;
+    const count = sentences.length >= 3 ? 3 : sentences.length;
+    const summary = sentences.slice(0, Math.max(1, Math.min(count, sentences.length))).join(' ').trim();
+    if (!summary) return null;
+    return /[.!?]$/.test(summary) ? summary : `${summary}.`;
+  };
+
+
   const renderCard = (movie: MovieRecord) => {
     const year = movie.tmdbYear ?? movie.year ?? null;
     const genre = getGenres(movie)[0] ?? null;
@@ -540,8 +555,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const basedOnSource = [movie.group, movie.seccion].find((value) => knownAuthors.has(value?.trim?.() ?? ''));
     const basedOnText = basedOnSource ? `Based on: ${basedOnSource}` : null;
     const synopsis = movie.plot?.trim();
-    const isExpanded = expandedSynopsis.includes(movie.id);
-    const canExpand = Boolean(synopsis && synopsis.length > 160);
+    const synopsisSummary = synopsis ? getSynopsisSummary(synopsis) : null;
+    const showFullSynopsis = Boolean(synopsis && (isExpanded || !synopsisSummary || synopsisSummary === synopsis));
+    const displaySynopsis = showFullSynopsis ? synopsis : synopsisSummary;
+    const canExpand = Boolean(synopsis && synopsisSummary && synopsisSummary !== synopsis);
 
     return (
       <div className="surprise-result-hero">
@@ -557,10 +574,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
           {metadata && <p className="surprise-result-hero__meta">{metadata}</p>}
           {basedOnText && <p className="surprise-result-hero__based">{basedOnText}</p>}
           {directorText && <p className="surprise-result-hero__director">{directorText}</p>}
-          {synopsis && (
-            <div className={`surprise-result-hero__synopsis-wrap ${isExpanded ? 'is-expanded' : 'is-clamped'}`}>
-              <p className={`surprise-result-hero__synopsis ${isExpanded ? 'is-expanded' : 'is-clamped'}`}>
-                {synopsis}
+          {displaySynopsis && (
+            <div className="surprise-result-hero__synopsis-wrap">
+              <p className="surprise-result-hero__synopsis">
+                {displaySynopsis}
               </p>
               {canExpand && (
                 <button
@@ -572,7 +589,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                     )
                   }
                 >
-                  {isExpanded ? 'Read less' : 'Read more'}
+                  {isExpanded ? 'SHOW LESS' : 'READ MORE'}
                 </button>
               )}
             </div>
@@ -830,6 +847,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
+
+
+
 
 
 
