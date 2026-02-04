@@ -2688,6 +2688,7 @@ a.ghost {
   display: grid;
   gap: 8px;
   grid-template-rows: auto auto auto auto 1fr auto;
+  min-height: 0;
   position: relative;
   z-index: 1;
 }
@@ -2722,6 +2723,9 @@ a.ghost {
   display: grid;
   gap: 6px;
   padding-right: 8px;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .surprise-result-hero__synopsis {
@@ -2731,6 +2735,19 @@ a.ghost {
   line-height: 1.6;
   font-weight: 400;
   text-align: left;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.surprise-result-hero__synopsis-wrap.is-collapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42px;
+  background: linear-gradient(180deg, rgba(12, 14, 20, 0), rgba(12, 14, 20, 0.98));
+  pointer-events: none;
 }
 
 .surprise-result-hero__synopsis-toggle {

@@ -423,7 +423,7 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ saga: event.target.value })}
                   />
                 </label>
-                {!form.series && (
+    
                   <>
                     <label>
                       <strong>Director</strong>
@@ -500,7 +500,7 @@ export const EditMoviePage: React.FC = () => {
           </div>
 
           <div className="catalog-column">
-            {!form.series && (
+
               <div className="catalog-card">
                 <div className="catalog-card__header">
                 <h3>Copia Física</h3>
@@ -562,8 +562,6 @@ export const EditMoviePage: React.FC = () => {
                   </label>
                 </div>
               </div>
-            )}
-
             <div className="catalog-card">
               <div className="catalog-card__header">
                 <h3>Estado del Ítem</h3>
@@ -664,3 +662,5 @@ export const EditMoviePage: React.FC = () => {
     </section>
   );
 };
+
+

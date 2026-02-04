@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMovies } from '../context/MovieContext';
 import { updateMovieStatus } from '../services/adminApi';
 import { MovieRecord } from '../types/MovieRecord';
@@ -56,6 +56,16 @@ const normalizeGenre = (value: string) =>
     .replace(/\./g, '')
     .replace('science fiction', 'sci-fi')
     .replace('sci fi', 'sci-fi');
+
+const normalizeToken = (value: string) => value.trim().toLowerCase();
+
+const splitList = (value?: string | null) =>
+  value
+    ? value
+        .split(/[,&]/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 
 const getActors = (movie: MovieRecord) => {
   const raw = (movie as MovieRecord & { actors?: string[]; cast?: string[]; tmdbActors?: string[] }).actors
@@ -162,6 +172,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [isInvoking, setIsInvoking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [expandedSynopsis, setExpandedSynopsis] = useState<string[]>([]);
+  const [synopsisOverflow, setSynopsisOverflow] = useState<Record<string, boolean>>({});
+  const synopsisRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
   const [result, setResult] = useState<{
     primary: MovieRecord;
@@ -277,45 +289,56 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         if (type === 'saga') {
           const saga = primary.saga?.trim();
           if (!saga) continue;
-          const candidates = poolLimited.filter((movie) => movie.saga === saga);
+          const normalizedSaga = normalizeToken(saga);
+          const candidates = poolLimited.filter((movie) => normalizeToken(movie.saga ?? '') === normalizedSaga);
           if (candidates.length) {
             return { movie: pickRandom(candidates), type, value: saga, candidateCount: candidates.length };
           }
         }
-
         if (type === 'director') {
-          const director = primary.director?.trim();
-          if (!director) continue;
-          const candidates = poolLimited.filter((movie) => movie.director === director);
+          const directors = splitList(primary.director).map((name) => normalizeToken(name));
+          if (!directors.length) continue;
+          const candidates = poolLimited.filter((movie) => {
+            const candidateDirectors = splitList(movie.director).map((name) => normalizeToken(name));
+            return directors.some((name) => candidateDirectors.includes(name));
+          });
           if (candidates.length) {
-            return { movie: pickRandom(candidates), type, value: director, candidateCount: candidates.length };
+            const selected = pickRandom(candidates);
+            const selectedDirectors = splitList(selected.director);
+            const shared = selectedDirectors.find((name) =>
+              directors.includes(normalizeToken(name))
+            ) ?? selectedDirectors[0] ?? 'Shared Director';
+            return { movie: selected, type, value: shared, candidateCount: candidates.length };
           }
         }
-
         if (type === 'actor') {
-          const actors = getActors(primary);
+          const actors = getActors(primary).map((actor) => normalizeToken(actor));
           if (!actors.length) continue;
           const candidates = poolLimited.filter((movie) => {
-            const candidateActors = getActors(movie);
+            const candidateActors = getActors(movie).map((actor) => normalizeToken(actor));
             return actors.some((actor) => candidateActors.includes(actor));
           });
           if (candidates.length) {
             const selected = pickRandom(candidates);
-            const shared = getActors(selected).find((actor) => actors.includes(actor)) ?? 'Shared Actor';
+            const shared = getActors(selected).find((actor) =>
+              actors.includes(normalizeToken(actor))
+            ) ?? 'Shared Actor';
             return { movie: selected, type, value: shared, candidateCount: candidates.length };
           }
         }
 
         if (type === 'subgenre') {
-          const genres = getGenres(primary);
+          const genres = getGenres(primary).map((genre) => normalizeToken(genre));
           if (!genres.length) continue;
           const candidates = poolLimited.filter((movie) => {
-            const candidateGenres = getGenres(movie);
+            const candidateGenres = getGenres(movie).map((genre) => normalizeToken(genre));
             return genres.some((genre) => candidateGenres.includes(genre));
           });
           if (candidates.length) {
             const selected = pickRandom(candidates);
-            const shared = getGenres(selected).find((genre) => genres.includes(genre)) ?? 'Shared Genre';
+            const shared = getGenres(selected).find((genre) =>
+              genres.includes(normalizeToken(genre))
+            ) ?? 'Shared Genre';
             return { movie: selected, type, value: shared, candidateCount: candidates.length };
           }
         }
@@ -536,6 +559,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   };
 
 
+  useLayoutEffect(() => {
+    if (!result) return;
+    const items = [result.primary, result.secondary].filter(Boolean) as MovieRecord[];
+    setSynopsisOverflow((prev) => {
+      const next = { ...prev };
+      items.forEach((movie) => {
+        if (expandedSynopsis.includes(movie.id)) return;
+        const el = synopsisRefs.current[movie.id];
+        if (!el) return;
+        const isOverflowing = el.scrollHeight > el.clientHeight + 1;
+        next[movie.id] = isOverflowing;
+      });
+      return next;
+    });
+  }, [result, expandedSynopsis]);
   const renderCard = (movie: MovieRecord) => {
     const year = movie.tmdbYear ?? movie.year ?? null;
     const genre = getGenres(movie)[0] ?? null;
@@ -556,9 +594,13 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const basedOnText = basedOnSource ? `Based on: ${basedOnSource}` : null;
     const synopsis = movie.plot?.trim();
     const synopsisSummary = synopsis ? getSynopsisSummary(synopsis) : null;
-    const showFullSynopsis = Boolean(synopsis && (isExpanded || !synopsisSummary || synopsisSummary === synopsis));
+    const overflow = synopsisOverflow[movie.id];
+    const hasMeasured = overflow !== undefined;
+    const showFullSynopsis = Boolean(
+      synopsis && (isExpanded || !hasMeasured || !overflow || !synopsisSummary || synopsisSummary === synopsis)
+    );
     const displaySynopsis = showFullSynopsis ? synopsis : synopsisSummary;
-    const canExpand = Boolean(synopsis && synopsisSummary && synopsisSummary !== synopsis);
+    const canExpand = Boolean(synopsis && hasMeasured && overflow && synopsisSummary && synopsisSummary !== synopsis);
 
     return (
       <div className="surprise-result-hero">
@@ -575,8 +617,13 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
           {basedOnText && <p className="surprise-result-hero__based">{basedOnText}</p>}
           {directorText && <p className="surprise-result-hero__director">{directorText}</p>}
           {displaySynopsis && (
-            <div className="surprise-result-hero__synopsis-wrap">
-              <p className="surprise-result-hero__synopsis">
+            <div className={`surprise-result-hero__synopsis-wrap ${isExpanded ? 'is-expanded' : canExpand ? 'is-collapsed' : ''}`}>
+              <p
+                className="surprise-result-hero__synopsis"
+                ref={(el) => {
+                  synopsisRefs.current[movie.id] = el;
+                }}
+              >
                 {displaySynopsis}
               </p>
               {canExpand && (
@@ -592,6 +639,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                   {isExpanded ? 'SHOW LESS' : 'READ MORE'}
                 </button>
               )}
+            </div>
+          )}
             </div>
           )}
           <div className="surprise-result-hero__actions">
@@ -847,6 +896,21 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
