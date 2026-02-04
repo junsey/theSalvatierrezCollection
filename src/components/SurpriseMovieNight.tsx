@@ -103,7 +103,7 @@ const MultiSelect: React.FC<{
       <button type="button" className="surprise-select__trigger" onClick={() => setOpen((prev) => !prev)}>
         <span className="surprise-select__label">{label}</span>
         <span className="surprise-select__count">{values.length ? `${values.length} selected` : 'Any'}</span>
-        <span className="surprise-select__action">Choose?</span>
+        <span className="surprise-select__action">Choose</span>
       </button>
       {open && (
         <div className="surprise-select__menu">
@@ -123,7 +123,7 @@ const MultiSelect: React.FC<{
                 onClick={() => toggleValue(option)}
               >
                 <span>{option}</span>
-                {values.includes(option) && <span aria-hidden>{'\u2713'}</span>}
+                {values.includes(option) && <span aria-hidden>&#10003;</span>}
               </button>
             ))}
           </div>
@@ -160,6 +160,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const [includeDamaged, setIncludeDamaged] = useState(false);
   const [isInvoking, setIsInvoking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [expandedSynopsis, setExpandedSynopsis] = useState<string[]>([]);
 
   const [result, setResult] = useState<{
     primary: MovieRecord;
@@ -500,13 +501,18 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     const year = movie.tmdbYear ?? movie.year ?? null;
     const genre = getGenres(movie)[0] ?? null;
     const section = movie.seccion ?? null;
-    const metadata = [year, genre, section].filter(Boolean).join(' ? ');
+    const metadata = [year, genre, section].filter(Boolean).join(' • ');
     const directorList = (movie.director ?? '')
       .split(/[,&]/)
       .map((d) => d.trim())
       .filter(Boolean);
-    const directorLabel = directorList.length > 1 ? 'Directors' : 'Director';
-    const directorText = directorList.length ? `${directorLabel}: ${directorList.join(', ')}` : null;
+    const directorText = directorList.length ? `Director: ${directorList.join(', ')}` : null;
+    const knownAuthors = new Set(['Stephen King']);
+    const basedOnSource = [movie.group, movie.seccion].find((value) => knownAuthors.has(value?.trim?.() ?? ''));
+    const basedOnText = basedOnSource ? `Based on: ${basedOnSource}` : null;
+    const synopsis = movie.plot?.trim();
+    const isExpanded = expandedSynopsis.includes(movie.id);
+    const canExpand = Boolean(synopsis && synopsis.length > 160);
 
     return (
       <div className="surprise-result-hero">
@@ -520,15 +526,35 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         <div className="surprise-result-hero__info">
           <h3>{movie.title}</h3>
           {metadata && <p className="surprise-result-hero__meta">{metadata}</p>}
+          {basedOnText && <p className="surprise-result-hero__based">{basedOnText}</p>}
           {directorText && <p className="surprise-result-hero__director">{directorText}</p>}
-          {movie.plot && <p className="surprise-result-hero__synopsis">{movie.plot}</p>}
+          {synopsis && (
+            <div className={`surprise-result-hero__synopsis-wrap ${isExpanded ? 'is-expanded' : 'is-clamped'}`}>
+              <p className={`surprise-result-hero__synopsis ${isExpanded ? 'is-expanded' : 'is-clamped'}`}>
+                {synopsis}
+              </p>
+              {canExpand && (
+                <button
+                  type="button"
+                  className="surprise-result-hero__synopsis-toggle"
+                  onClick={() =>
+                    setExpandedSynopsis((prev) =>
+                      prev.includes(movie.id) ? prev.filter((id) => id !== movie.id) : [...prev, movie.id]
+                    )
+                  }
+                >
+                  {isExpanded ? 'Read less' : 'Read more'}
+                </button>
+              )}
+            </div>
+          )}
           <div className="surprise-result-hero__actions">
             <button className="ghost" onClick={() => onSelect(movie)}>
               Open
             </button>
             {adminSession && (
               <button onClick={() => handleMarkViewed(movie)}>
-                <span aria-hidden>{'âœ“'}</span> Mark Viewed
+                <span aria-hidden>&#10003;</span> Mark Viewed
               </button>
             )}
             {!adminSession && (
@@ -586,7 +612,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
           onClick={() => setPreferencesOpen((prev) => !prev)}
           aria-expanded={preferencesOpen}
         >
-          Preferences {preferencesOpen ? '?' : '?'}
+          Preferences
         </button>
         {preferencesOpen && (
           <div className="surprise-preferences__body">
@@ -597,7 +623,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                 options={sections}
                 values={selectedSections}
                 onChange={updateSections}
-                placeholder="Search sections?"
+                placeholder="Search sections"
               />
             </div>
             <div className="surprise-preferences__group">
@@ -655,7 +681,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                 onClick={() => setAdvancedOpen((prev) => !prev)}
                 aria-expanded={advancedOpen}
               >
-                Advanced {advancedOpen ? '?' : '?'}
+                Advanced
               </button>
               {advancedOpen && (
                 <div className="surprise-advanced__body">
@@ -721,7 +747,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
           onClick={handleRespin}
           disabled={!result || isInvoking}
         >
-          REROLL <span aria-hidden>??</span>
+          REROLL
         </button>
       </div>
 
@@ -733,12 +759,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         <div className="surprise-results">
           {renderCard(result.primary)}
           {result.secondary && (
-            <div className="surprise-connection-badge">
-              <span aria-hidden>ðŸ”—</span>
-              <span>
-                {result.connectionType}
-                {result.connectionValue ? `: ${result.connectionValue}` : ''}
-              </span>
+            <div className="surprise-connection-separator" role="presentation">
+              <span className="surprise-connection-separator__line" />
+              <div className="surprise-connection-separator__label">
+                <span>
+                  {(result.connectionType ?? '').toUpperCase()}
+                  {result.connectionValue ? ` · ${result.connectionValue.toUpperCase()}` : ''}
+                </span>
+              </div>
+              <span className="surprise-connection-separator__line" />
             </div>
           )}
           {result.secondary && renderCard(result.secondary)}
@@ -747,3 +776,14 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
