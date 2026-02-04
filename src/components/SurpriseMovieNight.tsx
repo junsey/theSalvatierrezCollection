@@ -18,10 +18,10 @@ type ConnectionResult = {
 };
 
 const CONNECTION_LABELS: Record<ConnectionType, string> = {
-  saga: 'Same Saga',
+  saga: 'Same Saga / Franchise',
   director: 'Same Director',
-  actor: 'Shared Lead Actor',
-  subgenre: 'Same Subgenre',
+  actor: 'Same Actor / Cast',
+  subgenre: 'Same Genre',
   decade: 'Same Decade',
   contrast: 'Contrast Pair'
 };
@@ -147,6 +147,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
   const { adminSession, applyMovieStatusUpdate } = useMovies();
   const [contentType, setContentType] = useState<'movies' | 'series' | 'both'>('movies');
   const [invocationMode, setInvocationMode] = useState<'single' | 'double'>('single');
+  const [connectionPreference, setConnectionPreference] = useState<'random' | ConnectionType>('random');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
     const [selectedSections, setSelectedSections] = useState<string[]>([]);
@@ -193,6 +194,15 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     [movies]
   );
 
+  const connectionOptions: { value: 'random' | ConnectionType; label: string }[] = [
+    { value: 'random', label: 'Random' },
+    { value: 'director', label: 'Same Director' },
+    { value: 'actor', label: 'Same Actor / Cast' },
+    { value: 'saga', label: 'Same Saga / Franchise' },
+    { value: 'decade', label: 'Same Decade' },
+    { value: 'subgenre', label: 'Same Genre' },
+    { value: 'contrast', label: 'Contrast Pair' }
+  ];
   const filtered = useMemo(() => {
     return movies.filter((movie) => {
       const isSeries = Boolean(movie.series || movie.tmdbType === 'tv');
@@ -247,7 +257,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     return copy.slice(0, max);
   };
 
-  const findConnection = (primary: MovieRecord, pool: MovieRecord[]): ConnectionResult | null => {
+  const findConnection = (primary: MovieRecord, pool: MovieRecord[], forcedType?: ConnectionType | null): ConnectionResult | null => {
     const usage = connectionUsage.current;
     const recent = recentConnections.current;
     const recentCounts = recent.reduce<Record<ConnectionType, number>>(
@@ -297,11 +307,16 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         }
 
         if (type === 'subgenre') {
-          const subgenre = getSubgenre(primary);
-          if (!subgenre) continue;
-          const candidates = poolLimited.filter((movie) => getSubgenre(movie) === subgenre);
+          const genres = getGenres(primary);
+          if (!genres.length) continue;
+          const candidates = poolLimited.filter((movie) => {
+            const candidateGenres = getGenres(movie);
+            return genres.some((genre) => candidateGenres.includes(genre));
+          });
           if (candidates.length) {
-            return { movie: pickRandom(candidates), type, value: subgenre, candidateCount: candidates.length };
+            const selected = pickRandom(candidates);
+            const shared = getGenres(selected).find((genre) => genres.includes(genre)) ?? 'Shared Genre';
+            return { movie: selected, type, value: shared, candidateCount: candidates.length };
           }
         }
 
@@ -332,6 +347,10 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       }
       return null;
     };
+
+    if (forcedType) {
+      return attemptTypes([forcedType]);
+    }
 
     const orderedTypes = scored.map((entry) => entry.type);
     const firstPass = attemptTypes(orderedTypes);
@@ -418,7 +437,12 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
         return;
       }
       if (invocationMode === 'double') {
-        const connection = findConnection(primary, filtered);
+        const forcedType = connectionPreference !== 'random' ? connectionPreference : null;
+        const forcedConnection = forcedType ? findConnection(primary, filtered, forcedType) : null;
+        if (!forcedConnection && forcedType) {
+          setMessage('No second title found with this connection. Trying random.');
+        }
+        const connection = forcedConnection ?? findConnection(primary, filtered);
         if (connection) {
           const connectionTypeLabel =
             connection.type === 'random' ? 'Random Pair' : CONNECTION_LABELS[connection.type];
@@ -652,6 +676,28 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                 />
               </div>
             </div>
+            {invocationMode === 'double' && (
+              <div className="surprise-preferences__group">
+                <h4>Double Feature Connection</h4>
+                <p className="surprise-preferences__helper">Choose how the two films are connected.</p>
+                <div className="surprise-toggles">
+                  {connectionOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`surprise-toggle ${connectionPreference === option.value ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setConnectionPreference(option.value);
+                        setResult(null);
+                        setMessage(null);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="surprise-preferences__group">
               <h4>Toggles</h4>
               <div className="surprise-toggles">
@@ -784,6 +830,20 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
