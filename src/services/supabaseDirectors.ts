@@ -17,6 +17,10 @@ type SupabaseFilmographyRow = {
   poster_path?: string | null;
 };
 
+type SupabaseDirectorFavoriteRow = {
+  director_key: string;
+};
+
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
@@ -27,6 +31,7 @@ function isConfigured() {
 async function supabaseRequest<T>(path: string): Promise<T> {
   const url = `${SUPABASE_URL?.replace(/\/$/, '')}/rest/v1/${path}`;
   const response = await fetch(url, {
+    method: 'GET',
     headers: {
       apikey: SUPABASE_ANON_KEY ?? '',
       Authorization: `Bearer ${SUPABASE_ANON_KEY ?? ''}`,
@@ -42,6 +47,25 @@ async function supabaseRequest<T>(path: string): Promise<T> {
   const text = await response.text();
   if (!text) return null as T;
   return JSON.parse(text) as T;
+}
+
+async function supabaseWrite(path: string, options: { method: 'POST' | 'DELETE'; body?: unknown; prefer?: string }) {
+  const url = `${SUPABASE_URL?.replace(/\/$/, '')}/rest/v1/${path}`;
+  const response = await fetch(url, {
+    method: options.method,
+    headers: {
+      apikey: SUPABASE_ANON_KEY ?? '',
+      Authorization: `Bearer ${SUPABASE_ANON_KEY ?? ''}`,
+      'Content-Type': 'application/json',
+      ...(options.prefer ? { Prefer: options.prefer } : {})
+    },
+    body: options.body != null ? JSON.stringify(options.body) : undefined
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase error ${response.status}: ${text}`);
+  }
 }
 
 async function supabaseRequestCount(path: string): Promise<number | null> {
@@ -154,4 +178,43 @@ export async function fetchAllDirectorProfiles(): Promise<Record<string, { profi
     }
   }
   return map;
+}
+
+export async function fetchDirectorFavoriteKeys(): Promise<string[]> {
+  if (!isConfigured()) return [];
+  const params = new URLSearchParams({
+    select: 'director_key',
+    limit: '5000'
+  });
+  const rows = await supabaseRequest<SupabaseDirectorFavoriteRow[]>(`director_favorites?${params.toString()}`);
+  return (rows ?? []).map((row) => row.director_key).filter(Boolean);
+}
+
+export async function setDirectorFavorite(params: {
+  directorKey: string;
+  directorName: string;
+  tmdbId?: number | null;
+  isFavorite: boolean;
+}) {
+  if (!isConfigured()) return;
+
+  if (params.isFavorite) {
+    await supabaseWrite('director_favorites?on_conflict=director_key', {
+      method: 'POST',
+      prefer: 'resolution=merge-duplicates',
+      body: [
+        {
+          director_key: params.directorKey,
+          director_name: params.directorName,
+          tmdb_person_id: params.tmdbId ?? null,
+          updated_at: new Date().toISOString()
+        }
+      ]
+    });
+    return;
+  }
+
+  const query = new URLSearchParams();
+  query.set('director_key', `eq.${params.directorKey}`);
+  await supabaseWrite(`director_favorites?${query.toString()}`, { method: 'DELETE' });
 }

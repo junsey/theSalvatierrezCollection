@@ -423,8 +423,6 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ saga: event.target.value })}
                   />
                 </label>
-    
-                  <>
                     <label>
                       <strong>Director</strong>
                       <input
@@ -441,8 +439,6 @@ export const EditMoviePage: React.FC = () => {
                         onChange={(event) => handleChange({ year: event.target.value })}
                       />
                     </label>
-                  </>
-                )}
               </div>
             </div>
 
@@ -662,5 +658,4 @@ export const EditMoviePage: React.FC = () => {
     </section>
   );
 };
-
 
