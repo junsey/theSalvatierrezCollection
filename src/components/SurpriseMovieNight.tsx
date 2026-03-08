@@ -273,7 +273,8 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       (acc, type) => ({ ...acc, [type]: (acc[type] ?? 0) + 1 }),
       { saga: 0, director: 0, actor: 0, subgenre: 0, contrast: 0, decade: 0 }
     );
-    const basePool = pool.filter((movie) => movie.id !== primary.id);\n    const poolLimited = forcedType ? basePool : samplePool(basePool);
+    const basePool = pool.filter((movie) => movie.id !== primary.id);
+    const poolLimited = forcedType ? basePool : samplePool(basePool);
 
     const scored = CONNECTION_TYPES.map((type, index) => {
       const recentPenalty = (recentCounts[type] ?? 0) * 10;
@@ -360,7 +361,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
             return candidateGenres.includes(contrast);
           });
           if (candidates.length) {
-            const label = `${matched.replace('sci-fi', 'Sci-Fi')} ↔ ${contrast.replace('sci-fi', 'Sci-Fi')}`;
+            const label = `${matched.replace('sci-fi', 'Sci-Fi')} â ${contrast.replace('sci-fi', 'Sci-Fi')}`;
             return { movie: pickRandom(candidates), type, value: label, candidateCount: candidates.length };
           }
         }
@@ -549,7 +550,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
       genre ? `Genre: ${genre}` : null,
       section ? `Section: ${section}` : null
     ].filter(Boolean);
-    const metadata = metadataParts.join(' � ');
+    const metadata = metadataParts.join('  ');
     const directorList = (movie.director ?? '')
       .split(/[,&]/)
       .map((d) => d.trim())
@@ -821,7 +822,7 @@ export const SurpriseMovieNight: React.FC<Props> = ({ movies, onSelect }) => {
                 <span aria-hidden>&#128279;</span>
                 <span>
                   {(result.connectionType ?? '').toUpperCase()}
-                  {result.connectionValue ? ` � ${result.connectionValue.toUpperCase()}` : ''}
+                  {result.connectionValue ? ` · ${result.connectionValue.toUpperCase()}` : ''}
                 </span>
               </div>
               <span className="surprise-connection-separator__line" />
