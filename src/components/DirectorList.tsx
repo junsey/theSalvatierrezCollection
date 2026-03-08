@@ -711,21 +711,38 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               >
                 🎬 {label}
               </span>
-              {canFavorite && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className={`director-list-card__favorite ${isFavorite ? 'is-active' : ''}`}
-                  onClick={(event) => handleFavoriteToggle(event, director.key, !isFavorite)}
-                  onKeyDown={(event) => handleFavoriteKeyDown(event, director.key, !isFavorite)}
-                  aria-label={`${isFavorite ? 'Quitar' : 'Agregar'} a ${director.displayName || director.name} ${
-                    isFavorite ? 'de' : 'a'
-                  } favoritos`}
-                  title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
-                >
-                  ★
-                </span>
-              )}
+              <span
+                role="button"
+                tabIndex={canFavorite ? 0 : -1}
+                aria-disabled={!canFavorite}
+                className={`director-list-card__favorite ${isFavorite ? 'is-active' : ''} ${
+                  canFavorite ? '' : 'is-disabled'
+                }`}
+                onClick={(event) => {
+                  if (!canFavorite) return;
+                  handleFavoriteToggle(event, director.key, !isFavorite);
+                }}
+                onKeyDown={(event) => {
+                  if (!canFavorite) return;
+                  handleFavoriteKeyDown(event, director.key, !isFavorite);
+                }}
+                aria-label={
+                  canFavorite
+                    ? `${isFavorite ? 'Quitar' : 'Agregar'} a ${director.displayName || director.name} ${
+                        isFavorite ? 'de' : 'a'
+                      } favoritos`
+                    : `${director.displayName || director.name} aún no está completado`
+                }
+                title={
+                  canFavorite
+                    ? isFavorite
+                      ? 'Quitar de favoritos'
+                      : 'Agregar a favoritos'
+                    : 'Disponible al completar filmografía'
+                }
+              >
+                ★
+              </span>
               <div
                 className="director-list-card__thumb"
                 style={{ backgroundImage: `url(${supabasePortrait ?? director.profileUrl ?? FALLBACK_PORTRAIT})` }}
