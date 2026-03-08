@@ -200,7 +200,16 @@ export const AllMoviesPage: React.FC = () => {
     if (!visibleMovies.length) return;
     const params = new URLSearchParams(location.search);
     const tmdbId = params.get('tmdbId');
+    const movieId = params.get('movieId');
     const saga = params.get('saga');
+
+    if (movieId) {
+      const byId = visibleMovies.find((m) => m.id === movieId);
+      if (byId) {
+        setActiveMovie(byId);
+      }
+    }
+
     if (tmdbId) {
       const match = visibleMovies.find((m) => m.tmdbId === Number(tmdbId));
       if (match) {
@@ -217,6 +226,27 @@ export const AllMoviesPage: React.FC = () => {
       });
     }
   }, [location.search, visibleMovies]);
+
+  const updateMovieIdInUrl = (movieId: string | null) => {
+    const params = new URLSearchParams(location.search);
+    if (movieId) {
+      params.set('movieId', movieId);
+    } else {
+      params.delete('movieId');
+    }
+    const nextSearch = params.toString();
+    navigate({ pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' }, { replace: true });
+  };
+
+  const openMovieDetail = (movie: MovieRecord) => {
+    setActiveMovie(movie);
+    updateMovieIdInUrl(movie.id);
+  };
+
+  const closeMovieDetail = () => {
+    setActiveMovie(null);
+    updateMovieIdInUrl(null);
+  };
 
   const secciones = useMemo(() => uniqueValues(visibleMovies.map((m) => m.seccion)), [visibleMovies]);
   const sagas = useMemo(() => uniqueValues(visibleMovies.map((m) => m.saga)), [visibleMovies]);
@@ -386,7 +416,7 @@ export const AllMoviesPage: React.FC = () => {
             <div
               key={movie.id}
               className={`archive-card ${movie.seen ? 'is-viewed' : ''}`}
-              onClick={() => setActiveMovie(movie)}
+              onClick={() => openMovieDetail(movie)}
             >
               <div className="archive-card__poster">
                 <img
@@ -402,7 +432,7 @@ export const AllMoviesPage: React.FC = () => {
                 <div className="archive-card__overlay">
                   <span className="archive-card__overlay-title">{movie.groupedDisplayTitle ?? movie.title}</span>
                   <div className="archive-card__overlay-actions">
-                    <button type="button" onClick={() => setActiveMovie(movie)}>
+                    <button type="button" onClick={() => openMovieDetail(movie)}>
                       Open
                     </button>
                     <button type="button" onClick={() => navigate(`/admin/movies/${movie.id}/edit`)}>
@@ -432,7 +462,7 @@ export const AllMoviesPage: React.FC = () => {
             {pagedMovies.map((movie) => {
               const avg = getMovieAverage(movie);
               return (
-                <div key={movie.id} className="archive-row" onClick={() => setActiveMovie(movie)}>
+                <div key={movie.id} className="archive-row" onClick={() => openMovieDetail(movie)}>
                   <span className="archive-row__poster">
                     <img
                       src={movie.posterUrl ?? 'https://via.placeholder.com/60x90/0b0f17/ffffff?text=No+Poster'}
@@ -450,7 +480,7 @@ export const AllMoviesPage: React.FC = () => {
                   <span className="is-right">{movie.ratingRodrigo?.toFixed(1) ?? '?'}</span>
                   <span className="is-right">{avg != null ? avg.toFixed(1) : '?'}</span>
                   <div className="archive-row__actions" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => setActiveMovie(movie)}>
+                    <button type="button" onClick={() => openMovieDetail(movie)}>
                       Open
                     </button>
                     <button type="button" onClick={() => navigate(`/admin/movies/${movie.id}/edit`)}>
@@ -468,7 +498,7 @@ export const AllMoviesPage: React.FC = () => {
       )}
 
       {renderPagination()}
-      {activeMovie && <MovieDetail movie={activeMovie} onClose={() => setActiveMovie(null)} />}
+      {activeMovie && <MovieDetail movie={activeMovie} onClose={closeMovieDetail} />}
     </section>
   );
 };

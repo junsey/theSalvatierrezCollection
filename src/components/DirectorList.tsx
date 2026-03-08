@@ -16,6 +16,7 @@ import {
   saveDirectorCache
 } from '../lib/directorCache';
 import { fetchAllDirectorProfiles, fetchDirectorFilmographyCountByPersonId } from '../services/supabaseDirectors';
+import { getFavoriteDirectorKeys, toggleFavoriteDirectorKey } from '../services/directorFavorites';
 
 const FALLBACK_PORTRAIT =
   'https://images.unsplash.com/photo-1528892952291-009c663ce843?auto=format&fit=crop&w=400&q=80&sat=-100&blend=000000&blend-mode=multiply';
@@ -128,6 +129,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [letterFilter, setLetterFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
+  const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(() => new Set(getFavoriteDirectorKeys()));
 
   useEffect(() => {
     let active = true;
@@ -512,6 +514,49 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     return 'director-list-card--neutral';
   };
 
+  const isCompleteDirector = (owned: number, total: number | null) => Boolean(total && total > 0 && owned >= total);
+
+  const favoriteProfiles = useMemo(
+    () =>
+      filteredProfiles.filter((director) => {
+        if (!favoriteKeys.has(director.key)) return false;
+        const stats = coverage[director.key];
+        const owned = stats?.owned ?? director.worksCount;
+        const total = stats?.total ?? null;
+        return isCompleteDirector(owned, total);
+      }),
+    [filteredProfiles, favoriteKeys, coverage]
+  );
+
+  const handleFavoriteToggle = (
+    event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>,
+    directorKey: string,
+    shouldBeFavorite: boolean
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavoriteDirectorKey(directorKey, shouldBeFavorite);
+    setFavoriteKeys((prev) => {
+      const next = new Set(prev);
+      if (shouldBeFavorite) {
+        next.add(directorKey);
+      } else {
+        next.delete(directorKey);
+      }
+      return next;
+    });
+  };
+
+  const handleFavoriteKeyDown = (
+    event: React.KeyboardEvent<HTMLElement>,
+    directorKey: string,
+    shouldBeFavorite: boolean
+  ) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      handleFavoriteToggle(event, directorKey, shouldBeFavorite);
+    }
+  };
+
   if (loading) {
     const skeletonCards = Array.from({ length: 12 }, (_, idx) => idx);
     return (
@@ -580,6 +625,59 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           </div>
         </div>
       )}
+      {favoriteProfiles.length > 0 && (
+        <section className="director-subsection">
+          <div className="director-subsection__header">
+            <h2>Directores favoritos</h2>
+            <span className="muted">Solo directores completados y marcados como favoritos</span>
+          </div>
+          <div className="director-grid">
+            {favoriteProfiles.map((director) => {
+              const key = director.key;
+              const stats = coverage[key];
+              const owned = stats?.owned ?? director.worksCount;
+              const total = stats?.total ?? null;
+              const label = total ? `${owned} / ${total}` : `${owned} / —`;
+              const supabaseKey =
+                director.tmdbId != null
+                  ? `tmdb-${director.tmdbId}`
+                  : normalizeDirectorName(director.displayName || director.name);
+              const supabasePortrait =
+                supabaseProfiles[supabaseKey]?.profileUrl ??
+                supabaseProfiles[(director.displayName || director.name).toLowerCase()]?.profileUrl;
+
+              return (
+                <Link
+                  to={`/directors/${encodeURIComponent(director.displayName || director.name)}`}
+                  className="director-list-card director-list-card--complete"
+                  key={`favorite-${director.key}`}
+                >
+                  <span className="director-list-card__badge" title="Películas en tu colección / filmografía total">
+                    🎬 {label}
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    className="director-list-card__favorite is-active"
+                    onClick={(event) => handleFavoriteToggle(event, director.key, false)}
+                    onKeyDown={(event) => handleFavoriteKeyDown(event, director.key, false)}
+                    aria-label={`Quitar a ${director.displayName || director.name} de favoritos`}
+                    title="Quitar de favoritos"
+                  >
+                    ★
+                  </span>
+                  <div
+                    className="director-list-card__thumb"
+                    style={{ backgroundImage: `url(${supabasePortrait ?? director.profileUrl ?? FALLBACK_PORTRAIT})` }}
+                    aria-hidden
+                  />
+                  <strong className="director-list-card__name">{director.displayName || director.name}</strong>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
       <div className="director-grid">
         {letterFilter && (
           <div className="director-grid__letter" aria-hidden>
@@ -592,6 +690,8 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
           const owned = stats?.owned ?? director.worksCount;
           const total = stats?.total ?? null;
           const progressClass = getProgressClass(owned, total);
+          const canFavorite = isCompleteDirector(owned, total);
+          const isFavorite = favoriteKeys.has(director.key);
           const label = total ? `${owned} / ${total}` : `${owned} / —`;
           const supabaseKey =
             director.tmdbId != null ? `tmdb-${director.tmdbId}` : normalizeDirectorName(director.displayName || director.name);
@@ -611,6 +711,21 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
               >
                 🎬 {label}
               </span>
+              {canFavorite && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={`director-list-card__favorite ${isFavorite ? 'is-active' : ''}`}
+                  onClick={(event) => handleFavoriteToggle(event, director.key, !isFavorite)}
+                  onKeyDown={(event) => handleFavoriteKeyDown(event, director.key, !isFavorite)}
+                  aria-label={`${isFavorite ? 'Quitar' : 'Agregar'} a ${director.displayName || director.name} ${
+                    isFavorite ? 'de' : 'a'
+                  } favoritos`}
+                  title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                >
+                  ★
+                </span>
+              )}
               <div
                 className="director-list-card__thumb"
                 style={{ backgroundImage: `url(${supabasePortrait ?? director.profileUrl ?? FALLBACK_PORTRAIT})` }}
