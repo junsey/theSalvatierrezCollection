@@ -130,6 +130,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const [orderBy, setOrderBy] = useState<'alpha' | 'owned'>('alpha');
   const [favoriteKeys, setFavoriteKeys] = useState<Set<string>>(() => new Set(getFavoriteDirectorKeys()));
+  const [favoriteHint, setFavoriteHint] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -545,6 +546,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
       }
       return next;
     });
+    setFavoriteHint(null);
   };
 
   const handleFavoriteKeyDown = (
@@ -555,6 +557,15 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
     if (event.key === 'Enter' || event.key === ' ') {
       handleFavoriteToggle(event, directorKey, shouldBeFavorite);
     }
+  };
+
+  const handleBlockedFavoriteAttempt = (
+    event: React.MouseEvent<HTMLElement> | React.KeyboardEvent<HTMLElement>,
+    name: string
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setFavoriteHint(`Solo puedes marcar a ${name} como favorito cuando completes su filmografía.`);
   };
 
   if (loading) {
@@ -622,6 +633,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                 {orderBy === 'alpha' ? 'Orden: A–Z' : 'Orden: Colección'}
               </span>
             )}
+            {favoriteHint && <span className="director-toolbar__status-meta">{favoriteHint}</span>}
           </div>
         </div>
       )}
@@ -719,11 +731,19 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                   canFavorite ? '' : 'is-disabled'
                 }`}
                 onClick={(event) => {
-                  if (!canFavorite) return;
+                  if (!canFavorite) {
+                    handleBlockedFavoriteAttempt(event, director.displayName || director.name);
+                    return;
+                  }
                   handleFavoriteToggle(event, director.key, !isFavorite);
                 }}
                 onKeyDown={(event) => {
-                  if (!canFavorite) return;
+                  if (!canFavorite) {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      handleBlockedFavoriteAttempt(event, director.displayName || director.name);
+                    }
+                    return;
+                  }
                   handleFavoriteKeyDown(event, director.key, !isFavorite);
                 }}
                 aria-label={
@@ -741,7 +761,7 @@ export const DirectorList: React.FC<{ movies: MovieRecord[] }> = ({ movies }) =>
                     : 'Disponible al completar filmografía'
                 }
               >
-                ★
+                {isFavorite ? '★' : '☆'}
               </span>
               <div
                 className="director-list-card__thumb"
