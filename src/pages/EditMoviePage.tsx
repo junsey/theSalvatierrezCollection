@@ -423,7 +423,7 @@ export const EditMoviePage: React.FC = () => {
                     onChange={(event) => handleChange({ saga: event.target.value })}
                   />
                 </label>
-    
+                {!form.series && (
                   <>
                     <label>
                       <strong>Director</strong>

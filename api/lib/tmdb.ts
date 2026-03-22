@@ -54,6 +54,70 @@ const parseYear = (value?: string | null): number | null => {
   return Number.isFinite(year) ? year : null;
 };
 
+const normalizePersonName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const levenshteinDistance = (left: string, right: string) => {
+  const rows = left.length + 1;
+  const cols = right.length + 1;
+  const matrix = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
+
+  for (let row = 0; row < rows; row += 1) matrix[row][0] = row;
+  for (let col = 0; col < cols; col += 1) matrix[0][col] = col;
+
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = left[row - 1] === right[col - 1] ? 0 : 1;
+      matrix[row][col] = Math.min(
+        matrix[row - 1][col] + 1,
+        matrix[row][col - 1] + 1,
+        matrix[row - 1][col - 1] + cost
+      );
+    }
+  }
+
+  return matrix[left.length][right.length];
+};
+
+const scorePersonNameMatch = (query: string, candidate: string) => {
+  const normalizedQuery = normalizePersonName(query);
+  const normalizedCandidate = normalizePersonName(candidate);
+  if (!normalizedQuery || !normalizedCandidate) return -Infinity;
+  if (normalizedQuery === normalizedCandidate) return 1;
+  if (normalizedCandidate.includes(normalizedQuery) || normalizedQuery.includes(normalizedCandidate)) return 0.94;
+
+  const queryTokens = normalizedQuery.split(' ');
+  const candidateTokens = normalizedCandidate.split(' ');
+  const sharedTokens = queryTokens.filter((token) => candidateTokens.includes(token)).length;
+  const tokenScore = sharedTokens / Math.max(queryTokens.length, candidateTokens.length);
+  const distance = levenshteinDistance(normalizedQuery, normalizedCandidate);
+  const distanceScore = 1 - distance / Math.max(normalizedQuery.length, normalizedCandidate.length, 1);
+
+  return distanceScore * 0.75 + tokenScore * 0.25;
+};
+
+const buildPersonSearchVariants = (name: string) => {
+  const normalizedTokens = normalizePersonName(name).split(' ').filter((token) => token.length >= 3);
+  const variants = new Set<string>([name, ...normalizedTokens]);
+
+  normalizedTokens.forEach((token) => {
+    variants.add(token.slice(0, 4));
+    variants.add(token.replace(/^ph/, 'f'));
+    variants.add(token.replace(/^ph/, 'pf'));
+    variants.add(token.replace(/ph/g, 'f'));
+    variants.add(token.replace(/ai/g, 'ei'));
+    variants.add(token.replace(/ei/g, 'ai'));
+  });
+
+  return Array.from(variants).filter((variant) => variant.trim().length >= 3);
+};
+
 export const searchTmdb = async (title: string, year: number | null, mediaType: TmdbMediaType): Promise<TmdbSearchResult | null> => {
   const params: Record<string, string | number | null> = { query: title };
   if (mediaType === 'movie' && year) params.year = year;
@@ -152,6 +216,7 @@ type TmdbPersonCredit = {
   title?: string;
   name?: string;
   job?: string;
+  character?: string;
   release_date?: string | null;
   first_air_date?: string | null;
   poster_path?: string | null;
@@ -168,10 +233,59 @@ const isFeatureLengthProduction = (item: { title?: string | null; name?: string 
 };
 
 export const searchTmdbPerson = async (name: string): Promise<TmdbPersonSearchResult | null> => {
-  const data = await tmdbFetchJson<{ results?: TmdbPersonSearchResult[] }>('search/person', {
-    query: name
-  });
-  return data.results?.[0] ?? null;
+  const candidates = new Map<number, TmdbPersonSearchResult>();
+  const queries = buildPersonSearchVariants(name);
+
+  for (const query of queries) {
+    const data = await tmdbFetchJson<{ results?: TmdbPersonSearchResult[] }>('search/person', {
+      query
+    });
+    (data.results ?? []).slice(0, 20).forEach((person) => {
+      candidates.set(person.id, person);
+    });
+    if (candidates.size >= 40) break;
+  }
+
+  const scored = Array.from(candidates.values())
+    .map((person) => ({ person, score: scorePersonNameMatch(name, person.name) }))
+    .sort((a, b) => b.score - a.score);
+
+  const best = scored[0];
+  if (!best || best.score < 0.58) return null;
+  return best.person;
+};
+
+
+export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+  character?: string | null;
+}>> => {
+  const data = await tmdbFetchJson<{ cast?: TmdbPersonCredit[] }>(`person/${id}/combined_credits`);
+  const matches = new Map<number, {
+    id: number;
+    mediaType: 'movie' | 'tv';
+    title: string;
+    year: number | null;
+    character?: string | null;
+  }>();
+  (data.cast ?? [])
+    .filter((item) => (item.media_type === 'movie' || item.media_type === 'tv') && isFeatureLengthProduction(item))
+    .forEach((item) => {
+      const title = (item.title ?? item.name ?? '').trim();
+      if (!title) return;
+      const year = parseYear(item.media_type === 'tv' ? item.first_air_date : item.release_date);
+      matches.set(item.id, {
+        id: item.id,
+        mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+        title,
+        year,
+        character: item.character?.trim() || null
+      });
+    });
+  return Array.from(matches.values());
 };
 
 export const fetchTmdbPersonDetails = async (id: number): Promise<{ id: number; name: string; biography: string | null; profilePath: string | null }> => {
