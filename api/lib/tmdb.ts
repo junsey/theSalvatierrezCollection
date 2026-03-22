@@ -175,15 +175,25 @@ export const searchTmdbPerson = async (name: string): Promise<TmdbPersonSearchRe
 };
 
 
-export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{ id: number; mediaType: 'movie' | 'tv' }>> => {
-  const data = await tmdbFetchJson<{ cast?: TmdbPersonCredit[]; crew?: TmdbPersonCredit[] }>(`person/${id}/combined_credits`);
-  const matches = new Map<number, { id: number; mediaType: 'movie' | 'tv' }>();
-  [...(data.cast ?? []), ...(data.crew ?? [])]
-    .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
+export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
+}>> => {
+  const data = await tmdbFetchJson<{ cast?: TmdbPersonCredit[] }>(`person/${id}/combined_credits`);
+  const matches = new Map<number, { id: number; mediaType: 'movie' | 'tv'; title: string; year: number | null }>();
+  (data.cast ?? [])
+    .filter((item) => (item.media_type === 'movie' || item.media_type === 'tv') && isFeatureLengthProduction(item))
     .forEach((item) => {
+      const title = (item.title ?? item.name ?? '').trim();
+      if (!title) return;
+      const year = parseYear(item.media_type === 'tv' ? item.first_air_date : item.release_date);
       matches.set(item.id, {
         id: item.id,
-        mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+        mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
+        title,
+        year
       });
     });
   return Array.from(matches.values());

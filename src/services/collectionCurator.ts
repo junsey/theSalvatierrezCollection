@@ -24,6 +24,8 @@ export type CuratorMoviePayload = {
   dubbing?: boolean | string | null;
   plot?: string;
   tmdbId?: number;
+  tmdbTitle?: string;
+  tmdbOriginalTitle?: string;
 };
 
 const shorten = (value: string | undefined, maxLength: number) => {
@@ -57,5 +59,7 @@ export const buildCuratorPayload = (movies: MovieRecord[]): CuratorMoviePayload[
     region: movie.region,
     dubbing: movie.dubbing,
     plot: shorten(movie.plot, 360),
-    tmdbId: movie.tmdbId
+    tmdbId: movie.tmdbId,
+    tmdbTitle: shorten(movie.tmdbTitle, 120),
+    tmdbOriginalTitle: shorten(movie.tmdbOriginalTitle, 120)
   }));

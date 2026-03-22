@@ -25,6 +25,8 @@ type CuratorMovie = {
   dubbing?: boolean | string | null;
   plot?: string;
   tmdbId?: number;
+  tmdbTitle?: string;
+  tmdbOriginalTitle?: string;
 };
 
 type Recommendation = {
@@ -45,6 +47,13 @@ type Recommendation = {
   tmdbGenres?: string[];
   houseRating?: string;
   detailBullets: string[];
+};
+
+type ActorKnownTitle = {
+  id: number;
+  mediaType: 'movie' | 'tv';
+  title: string;
+  year: number | null;
 };
 
 const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
@@ -142,6 +151,29 @@ const buildSearchBlob = (movie: CuratorMovie) =>
     .filter(Boolean)
     .join(' | ');
 
+const titleLooksLike = (left: string | undefined | null, right: string | undefined | null) => {
+  const normalizedLeft = normalize(left);
+  const normalizedRight = normalize(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
+
+const movieMatchesActorTitle = (movie: CuratorMovie, actorTitles: ActorKnownTitle[]) =>
+  actorTitles.some((knownTitle) => {
+    if (movie.tmdbId && movie.tmdbId === knownTitle.id) return true;
+    if (movie.series && knownTitle.mediaType !== 'tv') return false;
+    if (!movie.series && knownTitle.mediaType !== 'movie') return false;
+
+    const titleMatches =
+      titleLooksLike(movie.title, knownTitle.title)
+      || titleLooksLike(movie.originalTitle, knownTitle.title)
+      || titleLooksLike(movie.tmdbTitle, knownTitle.title)
+      || titleLooksLike(movie.tmdbOriginalTitle, knownTitle.title);
+    if (!titleMatches) return false;
+
+    if (movie.year == null || knownTitle.year == null) return true;
+    return Math.abs(movie.year - knownTitle.year) <= 1;
+  });
+
 const buildDetailBullets = (movie: CuratorMovie, actorMatch: boolean) => {
   const details: string[] = [];
   if (actorMatch) details.push('Coincide con el actor pedido.');
@@ -186,6 +218,7 @@ const scoreMovie = (
   query: string,
   tokens: string[],
   actorTitleIds: Set<number>,
+  actorKnownTitles: ActorKnownTitle[],
   seenPreference: ReturnType<typeof getSeenPreference>,
   seriesPreference: ReturnType<typeof getSeriesPreference>,
   conditionPreference: ReturnType<typeof getConditionPreference>
@@ -211,7 +244,8 @@ const scoreMovie = (
     if (plot.includes(token)) score += 2.5;
   });
 
-  if (movie.tmdbId && actorTitleIds.has(movie.tmdbId)) {
+  const actorMatch = movieMatchesActorTitle(movie, actorKnownTitles) || Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId));
+  if (actorMatch) {
     score += 18;
   }
 
@@ -337,14 +371,15 @@ export default async function handler(req: any, res: any) {
 
     const tokens = tokenize(query);
     const extractedActor = extractLikelyActor(query);
+    let actorKnownTitles: ActorKnownTitle[] = [];
     let actorTitleIds = new Set<number>();
 
     if (extractedActor) {
       try {
         const person = await searchTmdbPerson(extractedActor);
         if (person) {
-          const titles = await fetchTmdbPersonKnownTitles(person.id);
-          actorTitleIds = new Set(titles.map((item) => item.id));
+          actorKnownTitles = await fetchTmdbPersonKnownTitles(person.id);
+          actorTitleIds = new Set(actorKnownTitles.map((item) => item.id));
         }
       } catch (error) {
         console.warn('No se pudo enriquecer la búsqueda por actor', error);
@@ -358,12 +393,12 @@ export default async function handler(req: any, res: any) {
     const scoredMovies = movies
       .map((movie) => ({
         movie,
-        score: scoreMovie(movie, query, tokens, actorTitleIds, seenPreference, seriesPreference, conditionPreference)
+        score: scoreMovie(movie, query, tokens, actorTitleIds, actorKnownTitles, seenPreference, seriesPreference, conditionPreference)
       }))
       .filter(({ score }) => Number.isFinite(score));
 
     const actorMatched = extractedActor
-      ? scoredMovies.filter(({ movie }) => Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId)))
+      ? scoredMovies.filter(({ movie }) => movieMatchesActorTitle(movie, actorKnownTitles))
       : [];
 
     if (extractedActor && actorMatched.length === 0) {
@@ -383,7 +418,7 @@ export default async function handler(req: any, res: any) {
       title: movie.title,
       year: movie.year,
       director: movie.director,
-      reason: buildRecommendationReason(movie, query, Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId))),
+      reason: buildRecommendationReason(movie, query, movieMatchesActorTitle(movie, actorKnownTitles)),
       seen: movie.seen,
       enDeposito: movie.enDeposito,
       funcionaStatus: movie.funcionaStatus,
@@ -395,7 +430,7 @@ export default async function handler(req: any, res: any) {
       plotSnippet: movie.plot,
       tmdbGenres: movie.tmdbGenres,
       houseRating: formatHouseRating(movie),
-      detailBullets: buildDetailBullets(movie, Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId)))
+      detailBullets: buildDetailBullets(movie, movieMatchesActorTitle(movie, actorKnownTitles))
     }));
 
     const groqApiKey = getGroqApiKey();
