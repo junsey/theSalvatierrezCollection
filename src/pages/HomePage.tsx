@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MovieCard } from '../components/MovieCard';
 import { CollectionCurator } from '../components/CollectionCurator';
@@ -193,7 +193,7 @@ const TreasuresGrid: React.FC<{
 };
 
 export const HomePage: React.FC = () => {
-  const { visibleMovies: movies, loading, updateSeen } = useMovies();
+  const { visibleMovies: movies, loading, updateSeen, adminSession } = useMovies();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -460,7 +460,7 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
-      <CollectionCurator movies={movies} loading={loading} />
+      {adminSession && <CollectionCurator movies={movies} loading={loading} />}
 
       <section className="metrics-section">
         <div className="metrics-grid">
