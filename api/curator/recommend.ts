@@ -347,7 +347,7 @@ const scoreMovie = (
   return score;
 };
 
-const buildLocalAnswer = (query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
+const buildLocalAnswer = (query: string, recommendations: Recommendation[], extractedActor?: string | null, resolvedActor?: string | null) => {
   const top = recommendations.slice(0, 3);
   if (!top.length) {
     return 'Las bisagras de la cripta gimen... pero esta vez no encontré una joya clara para tu pedido. Dame otro actor, sección, saga o estado de visionado y volveré a husmear entre los anaqueles malditos.';
@@ -355,7 +355,9 @@ const buildLocalAnswer = (query: string, recommendations: Recommendation[], extr
 
   const [first, ...rest] = top;
   const intro = extractedActor
-    ? `Ahh... ya veo. Has invocado a ${extractedActor} entre los estantes polvorientos de la cripta.`
+    ? resolvedActor && normalize(resolvedActor) !== normalize(extractedActor)
+      ? `Ahh... ya veo. Estimo que te refieres a ${resolvedActor}. Ese nombre mal escrito también retumbó en la cripta.`
+      : `Ahh... ya veo. Has invocado a ${extractedActor} entre los estantes polvorientos de la cripta.`
     : `Ahh... ya veo. Tu petición (“${query}”) ha resonado por la cripta y una caja ha empezado a temblar.`;
 
   const firstLineParts = [
@@ -386,7 +388,7 @@ const buildLocalAnswer = (query: string, recommendations: Recommendation[], extr
   return [intro, `Mi primera ofrenda sería ${firstLineParts.join(', ')}.`, closer].join(' ');
 };
 
-const buildGroqAnswer = async (groqApiKey: string, query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
+const buildGroqAnswer = async (groqApiKey: string, query: string, recommendations: Recommendation[], extractedActor?: string | null, resolvedActor?: string | null) => {
   const system = [
     'Eres el Guardián de la Cripta de The Salvatierrez Collection, con voz teatral, gótica y juguetona al estilo de un maestro de ceremonias macabro.',
     'Respondes siempre en español.',
@@ -395,6 +397,7 @@ const buildGroqAnswer = async (groqApiKey: string, query: string, recommendation
     'Debes mencionar la película elegida por nombre y conectarla explícitamente con la petición del usuario.',
     'La personalidad debe recordar a un guardián de la cripta, sardónico, macabro y juguetón, sin citar frases textuales de la serie.',
     'Si la consulta pide un actor y la recomendación incluye actorCredit, menciona ese papel o aparición de forma concreta.',
+    'Si resolvedActor es distinto de extractedActor, di de forma natural que estimas que el usuario se refiere a resolvedActor.',
     'No recites la sinopsis; prioriza actorCredit o curatorHook como curiosidad o detalle sabroso vinculado al pedido.',
     'Apóyate en detalles de ficha: sección, saga, formato, géneros, ratings de la casa y estado dentro de la colección.',
     'Debes mencionar si una película está vista, en depósito o dañada cuando sea relevante.',
@@ -405,6 +408,7 @@ const buildGroqAnswer = async (groqApiKey: string, query: string, recommendation
   const user = JSON.stringify({
     query,
     extractedActor: extractedActor ?? null,
+    resolvedActor: resolvedActor ?? null,
     recommendations
   });
 
@@ -459,11 +463,13 @@ export default async function handler(req: any, res: any) {
     const extractedActor = extractLikelyActor(query);
     let actorKnownTitles: ActorKnownTitle[] = [];
     let actorTitleIds = new Set<number>();
+    let resolvedActorName: string | null = null;
 
     if (extractedActor) {
       try {
         const person = await searchTmdbPerson(extractedActor);
         if (person) {
+          resolvedActorName = person.name;
           actorKnownTitles = await fetchTmdbPersonKnownTitles(person.id);
           actorTitleIds = new Set(actorKnownTitles.map((item) => item.id));
         }
@@ -554,14 +560,14 @@ export default async function handler(req: any, res: any) {
 
     if (groqApiKey) {
       try {
-        answer = await buildGroqAnswer(groqApiKey, query, recommendations, extractedActor);
+        answer = await buildGroqAnswer(groqApiKey, query, recommendations, extractedActor, resolvedActorName);
         model = GROQ_MODEL;
       } catch (error) {
         console.warn('Groq no estuvo disponible; respondo con el curador local.', error);
-        answer = buildLocalAnswer(query, recommendations, extractedActor);
+        answer = buildLocalAnswer(query, recommendations, extractedActor, resolvedActorName);
       }
     } else {
-      answer = buildLocalAnswer(query, recommendations, extractedActor);
+      answer = buildLocalAnswer(query, recommendations, extractedActor, resolvedActorName);
     }
 
     return res.status(200).json({
