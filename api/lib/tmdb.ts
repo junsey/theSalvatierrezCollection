@@ -174,6 +174,21 @@ export const searchTmdbPerson = async (name: string): Promise<TmdbPersonSearchRe
   return data.results?.[0] ?? null;
 };
 
+
+export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{ id: number; mediaType: 'movie' | 'tv' }>> => {
+  const data = await tmdbFetchJson<{ cast?: TmdbPersonCredit[]; crew?: TmdbPersonCredit[] }>(`person/${id}/combined_credits`);
+  const matches = new Map<number, { id: number; mediaType: 'movie' | 'tv' }>();
+  [...(data.cast ?? []), ...(data.crew ?? [])]
+    .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
+    .forEach((item) => {
+      matches.set(item.id, {
+        id: item.id,
+        mediaType: item.media_type === 'tv' ? 'tv' : 'movie'
+      });
+    });
+  return Array.from(matches.values());
+};
+
 export const fetchTmdbPersonDetails = async (id: number): Promise<{ id: number; name: string; biography: string | null; profilePath: string | null }> => {
   const primary = await tmdbFetchJson<TmdbPersonDetails>(`person/${id}`);
   const needsFallback = !primary?.biography || primary.biography.trim() === '';

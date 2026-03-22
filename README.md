@@ -19,10 +19,13 @@ Create a `.env` file (Vite style) in the project root with your API keys and she
 VITE_TMDB_API_KEY=69fde1846d54ced5beb027c9f07cf9a5
 VITE_TMDB_BEARER=eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI2OWZkZTE4NDZkNTRjZWQ1YmViMDI3YzlmMDdjZjlhNSIsIm5iZiI6MTc2Mzg0NDExNS42NDYwMDAxLCJzdWIiOiI2OTIyMjAxM2U0N2UwNjU1ODcwYmExNmEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.-6sK7MbM6MYTU--zkDmwaSNEZ21D5onjxn_wPicFZ0o
 VITE_SHEETS_CSV_URL=https://docs.google.com/spreadsheets/d/1_kDej_nXLnz1REls5jDyqjIZU5z_fsN4mHap60_uvCI/gviz/tq?tqx=out:csv
+GROQ_API_KEY=tu_clave_server_side
+GROQ_MODEL=llama-3.3-70b-versatile
 ```
 
 - **TMDb**: La app consulta TMDb. Debes definir `VITE_TMDB_API_KEY` y `VITE_TMDB_BEARER` en tu `.env`; no se incluyen claves embebidas en el código.
 - **Google Sheets**: La app probará en orden `VITE_SHEETS_CSV_URL` (si existe), `gviz/tq?tqx=out:csv`, `export?format=csv&gid=0` y `pub?output=csv` sobre la hoja compartida para esquivar 404/403. Los resultados se guardan en `localStorage` 24h para evitar reintentos y, si la red falla, se usa la copia guardada aunque esté expirada.
+- **Groq Curator**: configura `GROQ_API_KEY` como variable de entorno del servidor (no `VITE_`) para habilitar la nueva sección del curador en Home. Opcionalmente puedes ajustar `GROQ_MODEL`; por defecto usa `llama-3.3-70b-versatile`.
   - Incluye una copia embebida en `src/data/sheet-backup.csv` para que nunca quede en blanco; puedes reemplazarla con un export de la hoja.
   - En la sección **Configuración** hay un botón para regenerar manualmente el documento y forzar un fetch fresco.
 - **Cache de TMDb**: Las respuestas de TMDb se guardan en `localStorage` (clave `salvatierrez-tmdb-cache-v1`) durante 6 meses para evitar reconsultas constantes. Si no hay red, se usa el último dato guardado. La configuración de imágenes se cachea en `salvatierrez-tmdb-config-v1`.

@@ -1,6 +1,7 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MovieCard } from '../components/MovieCard';
+import { CollectionCurator } from '../components/CollectionCurator';
 import { useMovies } from '../context/MovieContext';
 import { setStoredFilters } from '../services/localStorage';
 import { MovieFilters, MovieRecord } from '../types/MovieRecord';
@@ -458,6 +459,8 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <CollectionCurator movies={movies} loading={loading} />
 
       <section className="metrics-section">
         <div className="metrics-grid">
