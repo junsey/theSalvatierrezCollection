@@ -152,6 +152,7 @@ type TmdbPersonCredit = {
   title?: string;
   name?: string;
   job?: string;
+  character?: string;
   release_date?: string | null;
   first_air_date?: string | null;
   poster_path?: string | null;
@@ -180,9 +181,16 @@ export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{
   mediaType: 'movie' | 'tv';
   title: string;
   year: number | null;
+  character?: string | null;
 }>> => {
   const data = await tmdbFetchJson<{ cast?: TmdbPersonCredit[] }>(`person/${id}/combined_credits`);
-  const matches = new Map<number, { id: number; mediaType: 'movie' | 'tv'; title: string; year: number | null }>();
+  const matches = new Map<number, {
+    id: number;
+    mediaType: 'movie' | 'tv';
+    title: string;
+    year: number | null;
+    character?: string | null;
+  }>();
   (data.cast ?? [])
     .filter((item) => (item.media_type === 'movie' || item.media_type === 'tv') && isFeatureLengthProduction(item))
     .forEach((item) => {
@@ -193,7 +201,8 @@ export const fetchTmdbPersonKnownTitles = async (id: number): Promise<Array<{
         id: item.id,
         mediaType: item.media_type === 'tv' ? 'tv' : 'movie',
         title,
-        year
+        year,
+        character: item.character?.trim() || null
       });
     });
   return Array.from(matches.values());

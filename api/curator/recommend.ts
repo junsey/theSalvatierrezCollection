@@ -46,6 +46,7 @@ type Recommendation = {
   plotSnippet?: string;
   tmdbGenres?: string[];
   houseRating?: string;
+  actorCredit?: string;
   detailBullets: string[];
 };
 
@@ -54,6 +55,7 @@ type ActorKnownTitle = {
   mediaType: 'movie' | 'tv';
   title: string;
   year: number | null;
+  character?: string | null;
 };
 
 const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
@@ -157,8 +159,8 @@ const titleLooksLike = (left: string | undefined | null, right: string | undefin
   return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
 };
 
-const movieMatchesActorTitle = (movie: CuratorMovie, actorTitles: ActorKnownTitle[]) =>
-  actorTitles.some((knownTitle) => {
+const findActorCreditMatch = (movie: CuratorMovie, actorTitles: ActorKnownTitle[]) =>
+  actorTitles.find((knownTitle) => {
     if (movie.tmdbId && movie.tmdbId === knownTitle.id) return true;
     if (movie.series && knownTitle.mediaType !== 'tv') return false;
     if (!movie.series && knownTitle.mediaType !== 'movie') return false;
@@ -172,11 +174,18 @@ const movieMatchesActorTitle = (movie: CuratorMovie, actorTitles: ActorKnownTitl
 
     if (movie.year == null || knownTitle.year == null) return true;
     return Math.abs(movie.year - knownTitle.year) <= 1;
-  });
+  }) ?? null;
 
-const buildDetailBullets = (movie: CuratorMovie, actorMatch: boolean) => {
+const formatActorCredit = (actorCredit?: string | null) => {
+  if (!actorCredit) return undefined;
+  const cleaned = actorCredit.trim();
+  if (!cleaned) return undefined;
+  return cleaned;
+};
+
+const buildDetailBullets = (movie: CuratorMovie, actorMatch: boolean, actorCredit?: string) => {
   const details: string[] = [];
-  if (actorMatch) details.push('Coincide con el actor pedido.');
+  if (actorMatch) details.push(actorCredit ? `El actor pedido aparece como ${actorCredit}.` : 'Coincide con el actor pedido.');
   if (movie.seccion) details.push(`Pertenece a la sección ${movie.seccion}.`);
   if (movie.genreRaw) details.push(`Género base: ${movie.genreRaw}.`);
   if (movie.tmdbGenres?.length) details.push(`TMDb la clasifica como ${movie.tmdbGenres.join(', ')}.`);
@@ -199,9 +208,9 @@ const buildDetailBullets = (movie: CuratorMovie, actorMatch: boolean) => {
   return details.slice(0, 6);
 };
 
-const buildRecommendationReason = (movie: CuratorMovie, query: string, actorMatch: boolean) => {
+const buildRecommendationReason = (movie: CuratorMovie, query: string, actorMatch: boolean, actorCredit?: string) => {
   const pieces: string[] = [];
-  if (actorMatch) pieces.push('coincide con el actor pedido');
+  if (actorMatch) pieces.push(actorCredit ? `incluye al actor pedido en el papel de ${actorCredit}` : 'coincide con el actor pedido');
   if (movie.seccion) pieces.push(`entra en la sección ${movie.seccion}`);
   if (movie.genreRaw) pieces.push(`se mueve en ${movie.genreRaw}`);
   if (movie.plot) pieces.push(`su ficha apunta a “${movie.plot}”`);
@@ -244,7 +253,7 @@ const scoreMovie = (
     if (plot.includes(token)) score += 2.5;
   });
 
-  const actorMatch = movieMatchesActorTitle(movie, actorKnownTitles) || Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId));
+  const actorMatch = Boolean(findActorCreditMatch(movie, actorKnownTitles)) || Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId));
   if (actorMatch) {
     score += 18;
   }
@@ -276,44 +285,53 @@ const scoreMovie = (
 
 const buildLocalAnswer = (query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
   const top = recommendations.slice(0, 3);
+  if (!top.length) {
+    return 'Las bisagras de la cripta gimen... pero esta vez no encontré una joya clara para tu pedido. Dame otro actor, sección, saga o estado de visionado y volveré a husmear entre los anaqueles malditos.';
+  }
+
+  const [first, ...rest] = top;
   const intro = extractedActor
-    ? `Busqué en tu colección títulos relacionados con ${extractedActor}.`
-    : `Tomé tu búsqueda (“${query}”) y la crucé con la colección.`;
+    ? `Ahh... ya veo. Has invocado a ${extractedActor} entre los estantes polvorientos de la cripta.`
+    : `Ahh... ya veo. Tu petición (“${query}”) ha resonado por la cripta y una caja ha empezado a temblar.`;
 
-  const lines = top.map((movie, index) => {
-    const details = [
-      movie.seccion ? `sección ${movie.seccion}` : null,
-      movie.genreLabel ? `género ${movie.genreLabel}` : null,
-      movie.format ? `formato ${movie.format}` : null,
-      movie.seen ? 'ya marcada como vista' : 'todavía sin ver',
-      movie.enDeposito ? 'ahora mismo en depósito' : null,
-      movie.funcionaStatus === 'working'
-        ? 'funcionando bien'
-        : movie.funcionaStatus === 'damaged'
-          ? 'marcada como dañada'
-          : 'sin probar'
-    ].filter(Boolean);
+  const firstLineParts = [
+    `${first.title}${first.year ? ` (${first.year})` : ''}`,
+    first.actorCredit ? `donde el rostro que buscas asoma como ${first.actorCredit}` : null,
+    first.plotSnippet ? `y su historia susurra: ${first.plotSnippet}` : null,
+    first.seen ? 'ya fue vista en este mausoleo cinéfilo' : 'sigue esperando su turno en la penumbra',
+    first.funcionaStatus === 'working'
+      ? 'además figura funcionando bien'
+      : first.funcionaStatus === 'damaged'
+        ? 'aunque está marcada como dañada'
+        : 'aunque aún sigue sin probar'
+  ].filter(Boolean);
 
-    return `${index + 1}. ${movie.title}${movie.year ? ` (${movie.year})` : ''}: ${details.join(', ')}.`;
+  const extra = rest.map((movie) => {
+    const hook = movie.actorCredit
+      ? `${movie.title}${movie.year ? ` (${movie.year})` : ''}, donde también aparece como ${movie.actorCredit}`
+      : `${movie.title}${movie.year ? ` (${movie.year})` : ''}, otra reliquia que encaja con tu invocación`;
+    return hook;
   });
 
-  const closer =
-    top.length > 0
-      ? 'Si quieres, puedo afinar más por actor, sección, saga, formato o estado de visionado.'
-      : 'No encontré coincidencias claras; prueba afinando por actor, sección, género o si la quieres vista/sin ver.';
+  const closer = extra.length
+    ? `Si quieres, también puedo abrirte los nichos de ${extra.join(' o ')}.`
+    : 'Si quieres, puedo seguir excavando por actor, género, sección o estado de visionado.';
 
-  return [intro, ...lines, closer].join(' ');
+  return [intro, `Mi primera ofrenda sería ${firstLineParts.join(', ')}.`, closer].join(' ');
 };
 
 const buildGroqAnswer = async (groqApiKey: string, query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
   const system = [
-    'Eres el curador de The Salvatierrez Collection.',
+    'Eres el Guardián de la Cripta de The Salvatierrez Collection, con voz teatral, gótica y juguetona al estilo de un maestro de ceremonias macabro.',
     'Respondes siempre en español.',
     'Solo puedes recomendar títulos presentes en la lista de recomendaciones proporcionada.',
-    'Debes apoyar tu recomendación en detalles de ficha: sección, sinopsis, saga, formato, géneros y estado dentro de la colección.',
+    'Debes sonar natural, con roleplay ligero, una entrada atmosférica y luego una recomendación clara.',
+    'Debes mencionar la película elegida por nombre y conectarla explícitamente con la petición del usuario.',
+    'Si la consulta pide un actor y la recomendación incluye actorCredit, menciona ese papel o aparición de forma concreta.',
+    'Apóyate en detalles de ficha: sección, sinopsis, saga, formato, géneros y estado dentro de la colección.',
     'Debes mencionar si una película está vista, en depósito o dañada cuando sea relevante.',
-    'Si no hay coincidencia perfecta, dilo con honestidad y ofrece la mejor alternativa de la colección.',
-    'Sé breve pero útil: máximo 170 palabras.'
+    'No inventes datos no presentes en la lista de recomendaciones ni en actorCredit.',
+    'Mantén el tono inmersivo pero útil: máximo 190 palabras.'
   ].join(' ');
 
   const user = JSON.stringify({
@@ -398,12 +416,12 @@ export default async function handler(req: any, res: any) {
       .filter(({ score }) => Number.isFinite(score));
 
     const actorMatched = extractedActor
-      ? scoredMovies.filter(({ movie }) => movieMatchesActorTitle(movie, actorKnownTitles))
+      ? scoredMovies.filter(({ movie }) => Boolean(findActorCreditMatch(movie, actorKnownTitles)))
       : [];
 
     if (extractedActor && actorMatched.length === 0) {
       return res.status(200).json({
-        answer: `No pude encontrar en la colección títulos asociados a ${extractedActor}. Prueba con el nombre completo del actor o con otro dato como sección, género o saga.`,
+        answer: `Jeh, jeh... rebusqué entre ataúdes y celuloide, pero no hallé en la colección ningún título que pueda vincular con ${extractedActor}. Prueba con el nombre completo del actor o invócame otra sección, género o saga.`,
         recommendations: [],
         extractedActor
       });
@@ -413,25 +431,31 @@ export default async function handler(req: any, res: any) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
 
-    const recommendations: Recommendation[] = ranked.map(({ movie, score }) => ({
-      id: movie.id,
-      title: movie.title,
-      year: movie.year,
-      director: movie.director,
-      reason: buildRecommendationReason(movie, query, movieMatchesActorTitle(movie, actorKnownTitles)),
-      seen: movie.seen,
-      enDeposito: movie.enDeposito,
-      funcionaStatus: movie.funcionaStatus,
-      matchScore: Number(score.toFixed(2)),
-      seccion: movie.seccion,
-      genreLabel: movie.genreRaw || movie.tmdbGenres?.join(', ') || 'Sin género',
-      format: movie.format,
-      saga: movie.saga || undefined,
-      plotSnippet: movie.plot,
-      tmdbGenres: movie.tmdbGenres,
-      houseRating: formatHouseRating(movie),
-      detailBullets: buildDetailBullets(movie, movieMatchesActorTitle(movie, actorKnownTitles))
-    }));
+    const recommendations: Recommendation[] = ranked.map(({ movie, score }) => {
+      const actorMatch = findActorCreditMatch(movie, actorKnownTitles);
+      const actorCredit = formatActorCredit(actorMatch?.character);
+
+      return {
+        id: movie.id,
+        title: movie.title,
+        year: movie.year,
+        director: movie.director,
+        reason: buildRecommendationReason(movie, query, Boolean(actorMatch), actorCredit),
+        seen: movie.seen,
+        enDeposito: movie.enDeposito,
+        funcionaStatus: movie.funcionaStatus,
+        matchScore: Number(score.toFixed(2)),
+        seccion: movie.seccion,
+        genreLabel: movie.genreRaw || movie.tmdbGenres?.join(', ') || 'Sin género',
+        format: movie.format,
+        saga: movie.saga || undefined,
+        plotSnippet: movie.plot,
+        tmdbGenres: movie.tmdbGenres,
+        houseRating: formatHouseRating(movie),
+        actorCredit,
+        detailBullets: buildDetailBullets(movie, Boolean(actorMatch), actorCredit)
+      };
+    });
 
     const groqApiKey = getGroqApiKey();
 
