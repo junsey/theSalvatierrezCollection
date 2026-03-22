@@ -103,7 +103,14 @@ const extractLikelyActor = (query: string) => {
       .replace(/^(el|la|los|las)\s+/iu, '')
       .replace(/\b(que|y|o|pero)\b.*$/iu, '')
       .trim();
-    if (value.split(/\s+/).length >= 2) return value;
+
+    const parts = value.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return value;
+
+    const candidate = parts[0] ?? '';
+    if (candidate.length >= 4 && !STOP_WORDS.has(normalize(candidate))) {
+      return candidate;
+    }
   }
 
   return null;
@@ -348,12 +355,26 @@ export default async function handler(req: any, res: any) {
     const seriesPreference = getSeriesPreference(query);
     const conditionPreference = getConditionPreference(query);
 
-    const ranked = movies
+    const scoredMovies = movies
       .map((movie) => ({
         movie,
         score: scoreMovie(movie, query, tokens, actorTitleIds, seenPreference, seriesPreference, conditionPreference)
       }))
-      .filter(({ score }) => Number.isFinite(score))
+      .filter(({ score }) => Number.isFinite(score));
+
+    const actorMatched = extractedActor
+      ? scoredMovies.filter(({ movie }) => Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId)))
+      : [];
+
+    if (extractedActor && actorMatched.length === 0) {
+      return res.status(200).json({
+        answer: `No pude encontrar en la colección títulos asociados a ${extractedActor}. Prueba con el nombre completo del actor o con otro dato como sección, género o saga.`,
+        recommendations: [],
+        extractedActor
+      });
+    }
+
+    const ranked = (actorMatched.length > 0 ? actorMatched : scoredMovies)
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
 
