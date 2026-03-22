@@ -102,6 +102,55 @@ const getConditionPreference = (query: string) => {
   return 'any' as const;
 };
 
+const splitConstraintTerms = (value: string) =>
+  value
+    .split(/,|\/|\bo\b|\bni\b/iu)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const extractExcludedTerms = (query: string) => {
+  const exclusions = new Set<string>();
+  const patterns = [
+    /(?:que\s+)?no\s+sea\s+de\s+([^,.!?]+)/giu,
+    /(?:que\s+)?no\s+sea\s+([^,.!?]+)/giu,
+    /sin\s+([^,.!?]+)/giu,
+    /excepto\s+([^,.!?]+)/giu,
+    /menos\s+([^,.!?]+)/giu
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of query.matchAll(pattern)) {
+      const raw = match[1]
+        ?.replace(/^(el|la|los|las|de)\s+/iu, '')
+        .replace(/\b(para|con|del|de la|de el)\b.*$/iu, '')
+        .trim();
+      if (!raw) continue;
+      splitConstraintTerms(raw).forEach((part) => {
+        const normalized = normalize(part);
+        if (normalized && !STOP_WORDS.has(normalized)) exclusions.add(normalized);
+      });
+    }
+  }
+
+  return Array.from(exclusions);
+};
+
+const movieMatchesExcludedTerm = (movie: CuratorMovie, term: string) => {
+  const haystack = [
+    movie.genreRaw,
+    ...(movie.tmdbGenres ?? []),
+    movie.seccion,
+    movie.saga,
+    movie.group,
+    movie.format,
+    movie.director
+  ]
+    .map((value) => normalize(value))
+    .filter(Boolean);
+
+  return haystack.some((value) => value.includes(term) || term.includes(value));
+};
+
 const extractLikelyActor = (query: string) => {
   const patterns = [
     /(?:actor|actriz)\s+([^,.!?]+)/iu,
@@ -426,8 +475,11 @@ export default async function handler(req: any, res: any) {
     const seenPreference = getSeenPreference(query);
     const seriesPreference = getSeriesPreference(query);
     const conditionPreference = getConditionPreference(query);
+    const excludedTerms = extractExcludedTerms(query);
 
-    const scoredMovies = movies
+    const candidateMovies = movies.filter((movie) => !excludedTerms.some((term) => movieMatchesExcludedTerm(movie, term)));
+
+    const scoredMovies = candidateMovies
       .map((movie) => ({
         movie,
         score: scoreMovie(movie, query, tokens, actorTitleIds, actorKnownTitles, seenPreference, seriesPreference, conditionPreference)
@@ -437,6 +489,14 @@ export default async function handler(req: any, res: any) {
     const actorMatched = extractedActor
       ? scoredMovies.filter(({ movie }) => Boolean(findActorCreditMatch(movie, actorKnownTitles)))
       : [];
+
+    if (excludedTerms.length > 0 && scoredMovies.length === 0) {
+      return res.status(200).json({
+        answer: `Jeh, jeh... obedecí tu prohibición mortal y descarté todo lo que oliera a ${excludedTerms.join(', ')}. No quedó ninguna reliquia viva tras ese filtro.`,
+        recommendations: [],
+        extractedActor: extractedActor ?? null
+      });
+    }
 
     if (extractedActor && actorMatched.length === 0) {
       return res.status(200).json({
