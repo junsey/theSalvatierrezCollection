@@ -47,6 +47,7 @@ type Recommendation = {
   tmdbGenres?: string[];
   houseRating?: string;
   actorCredit?: string;
+  curatorHook?: string;
   detailBullets: string[];
 };
 
@@ -183,6 +184,19 @@ const formatActorCredit = (actorCredit?: string | null) => {
   return cleaned;
 };
 
+const buildCuratorHook = (movie: CuratorMovie, actorCredit?: string) => {
+  if (actorCredit) return `el actor pedido aparece aquí como ${actorCredit}`;
+  if (movie.saga) return `forma parte de la saga ${movie.saga}`;
+  if (movie.director) return `está dirigida por ${movie.director}`;
+  const houseRating = formatHouseRating(movie);
+  if (houseRating) return `en la cripta tiene el veredicto ${houseRating}`;
+  if (movie.seccion) return `duerme en la sección ${movie.seccion}`;
+  if (movie.format) return `reposa en formato ${movie.format}`;
+  if (movie.tmdbGenres?.length) return `TMDb la marca con ${movie.tmdbGenres.join(', ')}`;
+  if (movie.genreRaw) return `se mueve entre ${movie.genreRaw}`;
+  return undefined;
+};
+
 const buildDetailBullets = (movie: CuratorMovie, actorMatch: boolean, actorCredit?: string) => {
   const details: string[] = [];
   if (actorMatch) details.push(actorCredit ? `El actor pedido aparece como ${actorCredit}.` : 'Coincide con el actor pedido.');
@@ -213,9 +227,10 @@ const buildRecommendationReason = (movie: CuratorMovie, query: string, actorMatc
   if (actorMatch) pieces.push(actorCredit ? `incluye al actor pedido en el papel de ${actorCredit}` : 'coincide con el actor pedido');
   if (movie.seccion) pieces.push(`entra en la sección ${movie.seccion}`);
   if (movie.genreRaw) pieces.push(`se mueve en ${movie.genreRaw}`);
-  if (movie.plot) pieces.push(`su ficha apunta a “${movie.plot}”`);
   if (!movie.seen) pieces.push('sigue pendiente de ver');
   if (movie.seen) pieces.push('ya consta como vista');
+  const hook = buildCuratorHook(movie, actorCredit);
+  if (hook) pieces.push(hook);
   if (movie.funcionaStatus === 'working') pieces.push('figura como funcionando');
   if (movie.enDeposito) pieces.push('pero ahora mismo está en depósito');
   if (!pieces.length) pieces.push(`encaja con la búsqueda: ${query}`);
@@ -297,7 +312,7 @@ const buildLocalAnswer = (query: string, recommendations: Recommendation[], extr
   const firstLineParts = [
     `${first.title}${first.year ? ` (${first.year})` : ''}`,
     first.actorCredit ? `donde el rostro que buscas asoma como ${first.actorCredit}` : null,
-    first.plotSnippet ? `y su historia susurra: ${first.plotSnippet}` : null,
+    first.curatorHook ? `y te dejo un detalle jugoso: ${first.curatorHook}` : null,
     first.seen ? 'ya fue vista en este mausoleo cinéfilo' : 'sigue esperando su turno en la penumbra',
     first.funcionaStatus === 'working'
       ? 'además figura funcionando bien'
@@ -309,7 +324,9 @@ const buildLocalAnswer = (query: string, recommendations: Recommendation[], extr
   const extra = rest.map((movie) => {
     const hook = movie.actorCredit
       ? `${movie.title}${movie.year ? ` (${movie.year})` : ''}, donde también aparece como ${movie.actorCredit}`
-      : `${movie.title}${movie.year ? ` (${movie.year})` : ''}, otra reliquia que encaja con tu invocación`;
+      : movie.curatorHook
+        ? `${movie.title}${movie.year ? ` (${movie.year})` : ''}, y además ${movie.curatorHook}`
+        : `${movie.title}${movie.year ? ` (${movie.year})` : ''}, otra reliquia que encaja con tu invocación`;
     return hook;
   });
 
@@ -327,8 +344,10 @@ const buildGroqAnswer = async (groqApiKey: string, query: string, recommendation
     'Solo puedes recomendar títulos presentes en la lista de recomendaciones proporcionada.',
     'Debes sonar natural, con roleplay ligero, una entrada atmosférica y luego una recomendación clara.',
     'Debes mencionar la película elegida por nombre y conectarla explícitamente con la petición del usuario.',
+    'La personalidad debe recordar a un guardián de la cripta, sardónico, macabro y juguetón, sin citar frases textuales de la serie.',
     'Si la consulta pide un actor y la recomendación incluye actorCredit, menciona ese papel o aparición de forma concreta.',
-    'Apóyate en detalles de ficha: sección, sinopsis, saga, formato, géneros y estado dentro de la colección.',
+    'No recites la sinopsis; prioriza actorCredit o curatorHook como curiosidad o detalle sabroso vinculado al pedido.',
+    'Apóyate en detalles de ficha: sección, saga, formato, géneros, ratings de la casa y estado dentro de la colección.',
     'Debes mencionar si una película está vista, en depósito o dañada cuando sea relevante.',
     'No inventes datos no presentes en la lista de recomendaciones ni en actorCredit.',
     'Mantén el tono inmersivo pero útil: máximo 190 palabras.'
@@ -453,6 +472,7 @@ export default async function handler(req: any, res: any) {
         tmdbGenres: movie.tmdbGenres,
         houseRating: formatHouseRating(movie),
         actorCredit,
+        curatorHook: buildCuratorHook(movie, actorCredit),
         detailBullets: buildDetailBullets(movie, Boolean(actorMatch), actorCredit)
       };
     });
