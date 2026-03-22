@@ -102,6 +102,22 @@ const scorePersonNameMatch = (query: string, candidate: string) => {
   return distanceScore * 0.75 + tokenScore * 0.25;
 };
 
+const buildPersonSearchVariants = (name: string) => {
+  const normalizedTokens = normalizePersonName(name).split(' ').filter((token) => token.length >= 3);
+  const variants = new Set<string>([name, ...normalizedTokens]);
+
+  normalizedTokens.forEach((token) => {
+    variants.add(token.slice(0, 4));
+    variants.add(token.replace(/^ph/, 'f'));
+    variants.add(token.replace(/^ph/, 'pf'));
+    variants.add(token.replace(/ph/g, 'f'));
+    variants.add(token.replace(/ai/g, 'ei'));
+    variants.add(token.replace(/ei/g, 'ai'));
+  });
+
+  return Array.from(variants).filter((variant) => variant.trim().length >= 3);
+};
+
 export const searchTmdb = async (title: string, year: number | null, mediaType: TmdbMediaType): Promise<TmdbSearchResult | null> => {
   const params: Record<string, string | number | null> = { query: title };
   if (mediaType === 'movie' && year) params.year = year;
@@ -218,21 +234,16 @@ const isFeatureLengthProduction = (item: { title?: string | null; name?: string 
 
 export const searchTmdbPerson = async (name: string): Promise<TmdbPersonSearchResult | null> => {
   const candidates = new Map<number, TmdbPersonSearchResult>();
-  const normalizedTokens = normalizePersonName(name).split(' ').filter((token) => token.length >= 3);
-  const queries = Array.from(new Set([
-    name,
-    ...normalizedTokens,
-    ...normalizedTokens.map((token) => token.slice(0, 4)).filter((token) => token.length >= 3)
-  ]));
+  const queries = buildPersonSearchVariants(name);
 
   for (const query of queries) {
     const data = await tmdbFetchJson<{ results?: TmdbPersonSearchResult[] }>('search/person', {
       query
     });
-    (data.results ?? []).slice(0, 8).forEach((person) => {
+    (data.results ?? []).slice(0, 20).forEach((person) => {
       candidates.set(person.id, person);
     });
-    if (candidates.size >= 8) break;
+    if (candidates.size >= 40) break;
   }
 
   const scored = Array.from(candidates.values())
