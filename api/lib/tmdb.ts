@@ -218,7 +218,12 @@ const isFeatureLengthProduction = (item: { title?: string | null; name?: string 
 
 export const searchTmdbPerson = async (name: string): Promise<TmdbPersonSearchResult | null> => {
   const candidates = new Map<number, TmdbPersonSearchResult>();
-  const queries = [name, ...normalizePersonName(name).split(' ').filter((token) => token.length >= 4)];
+  const normalizedTokens = normalizePersonName(name).split(' ').filter((token) => token.length >= 3);
+  const queries = Array.from(new Set([
+    name,
+    ...normalizedTokens,
+    ...normalizedTokens.map((token) => token.slice(0, 4)).filter((token) => token.length >= 3)
+  ]));
 
   for (const query of queries) {
     const data = await tmdbFetchJson<{ results?: TmdbPersonSearchResult[] }>('search/person', {

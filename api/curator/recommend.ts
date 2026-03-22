@@ -174,6 +174,13 @@ const extractLikelyActor = (query: string) => {
     }
   }
 
+  const normalizedQuery = normalize(query);
+  const looksLikeNonActorIntent = /(seccion|sección|genero|género|saga|director|vista|visto|funcione|funcionando|terror|comedia|drama|accion|acción|thriller|misterio|western|romance|documental|anime|serie|pelicula|película|peli)/.test(normalizedQuery);
+  const plainTokens = query.trim().split(/\s+/).filter(Boolean);
+  if (!looksLikeNonActorIntent && plainTokens.length >= 1 && plainTokens.length <= 3 && plainTokens.some((token) => token.length >= 4)) {
+    return query.trim();
+  }
+
   return null;
 };
 
