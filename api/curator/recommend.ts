@@ -47,8 +47,9 @@ type Recommendation = {
   detailBullets: string[];
 };
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY?.trim();
 const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
+
+const getGroqApiKey = () => process.env.GROQ_API_KEY?.trim() || process.env.VITE_GROQ_API_KEY?.trim() || '';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const TOKEN_REGEX = /[\p{L}\p{N}]+/gu;
 const STOP_WORDS = new Set([
@@ -232,11 +233,38 @@ const scoreMovie = (
   return score;
 };
 
-const buildGroqAnswer = async (query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
-  if (!GROQ_API_KEY) {
-    throw new Error('Falta configurar GROQ_API_KEY en el servidor.');
-  }
+const buildLocalAnswer = (query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
+  const top = recommendations.slice(0, 3);
+  const intro = extractedActor
+    ? `Busqué en tu colección títulos relacionados con ${extractedActor}.`
+    : `Tomé tu búsqueda (“${query}”) y la crucé con la colección.`;
 
+  const lines = top.map((movie, index) => {
+    const details = [
+      movie.seccion ? `sección ${movie.seccion}` : null,
+      movie.genreLabel ? `género ${movie.genreLabel}` : null,
+      movie.format ? `formato ${movie.format}` : null,
+      movie.seen ? 'ya marcada como vista' : 'todavía sin ver',
+      movie.enDeposito ? 'ahora mismo en depósito' : null,
+      movie.funcionaStatus === 'working'
+        ? 'funcionando bien'
+        : movie.funcionaStatus === 'damaged'
+          ? 'marcada como dañada'
+          : 'sin probar'
+    ].filter(Boolean);
+
+    return `${index + 1}. ${movie.title}${movie.year ? ` (${movie.year})` : ''}: ${details.join(', ')}.`;
+  });
+
+  const closer =
+    top.length > 0
+      ? 'Si quieres, puedo afinar más por actor, sección, saga, formato o estado de visionado.'
+      : 'No encontré coincidencias claras; prueba afinando por actor, sección, género o si la quieres vista/sin ver.';
+
+  return [intro, ...lines, closer].join(' ');
+};
+
+const buildGroqAnswer = async (groqApiKey: string, query: string, recommendations: Recommendation[], extractedActor?: string | null) => {
   const system = [
     'Eres el curador de The Salvatierrez Collection.',
     'Respondes siempre en español.',
@@ -256,7 +284,7 @@ const buildGroqAnswer = async (query: string, recommendations: Recommendation[],
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${GROQ_API_KEY}`,
+      Authorization: `Bearer ${groqApiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
@@ -349,23 +377,38 @@ export default async function handler(req: any, res: any) {
       detailBullets: buildDetailBullets(movie, Boolean(movie.tmdbId && actorTitleIds.has(movie.tmdbId)))
     }));
 
+    const groqApiKey = getGroqApiKey();
+
     if (recommendations.length === 0) {
       return res.status(200).json({
         answer:
           'No encontré coincidencias claras en la colección con esa búsqueda. Prueba con un actor, sección, género, saga o si la quieres vista/sin ver.',
         recommendations: [],
         extractedActor: extractedActor ?? null,
-        model: GROQ_MODEL
+        ...(groqApiKey ? { model: GROQ_MODEL } : {})
       });
     }
 
-    const answer = await buildGroqAnswer(query, recommendations, extractedActor);
+    let answer = '';
+    let model: string | undefined;
+
+    if (groqApiKey) {
+      try {
+        answer = await buildGroqAnswer(groqApiKey, query, recommendations, extractedActor);
+        model = GROQ_MODEL;
+      } catch (error) {
+        console.warn('Groq no estuvo disponible; respondo con el curador local.', error);
+        answer = buildLocalAnswer(query, recommendations, extractedActor);
+      }
+    } else {
+      answer = buildLocalAnswer(query, recommendations, extractedActor);
+    }
 
     return res.status(200).json({
       answer,
       recommendations,
       extractedActor: extractedActor ?? null,
-      model: GROQ_MODEL
+      ...(model ? { model } : {})
     });
   } catch (error) {
     console.error('Curator recommendation failed', error);
