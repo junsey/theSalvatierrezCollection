@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMovies } from '../context/MovieContext';
 import { fixMovieTmdb, resolveMovieTmdb, updateMovieStatus } from '../services/adminApi';
+import { MovieCard } from './MovieCard';
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { fetchTvSeasonEpisodes, fetchTvSeasons } from '../services/tmdbApi';
@@ -1664,5 +1665,4 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
 };
 
 export const MovieDetail: React.FC<Props> = (props) => <MovieDetailSheet {...props} />;
-
 
