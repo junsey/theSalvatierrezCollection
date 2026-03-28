@@ -5,13 +5,14 @@ import { fixMovieTmdb, resolveMovieTmdb, updateMovieStatus } from '../services/a
 import { MovieRecord } from '../types/MovieRecord';
 import { getDirectorFromMovie } from '../services/tmdbPeopleService';
 import { fetchTvSeasonEpisodes, fetchTvSeasons } from '../services/tmdbApi';
+import { compareShelfSort } from '../services/movieSort';
 
 interface Props {
   movie: MovieRecord;
   onClose: () => void;
 }
 
-type TabId = 'summary' | 'details' | 'admin' | 'seasons' | 'episodes';
+type TabId = 'summary' | 'details' | 'where' | 'admin' | 'seasons' | 'episodes';
 
 type TabItem = {
   id: TabId;
@@ -580,6 +581,33 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
     () => ({ ...currentMovie, enDeposito: localDeposito, funcionaStatus: localFuncionaStatus }),
     [currentMovie, localDeposito, localFuncionaStatus]
   );
+  const shelfSortedMovies = useMemo(() => [...movies].sort(compareShelfSort), [movies]);
+  const whereIndex = useMemo(
+    () => shelfSortedMovies.findIndex((entry) => entry.id === currentMovie.id),
+    [currentMovie.id, shelfSortedMovies]
+  );
+  const whereTarget = whereIndex >= 0 ? shelfSortedMovies[whereIndex] : null;
+  const whereSectionMovies = useMemo(() => {
+    if (!whereTarget) return [];
+    const base = shelfSortedMovies.filter((entry) => entry.seccion === whereTarget.seccion);
+    const special = new Set(['Stephen King', 'David Lynch', 'Clint Eastwood']);
+    if (special.has(whereTarget.seccion)) {
+      const collator = new Intl.Collator('es', { sensitivity: 'base' });
+      return [...base].sort((a, b) => (a.year ?? 0) - (b.year ?? 0) || collator.compare(a.title, b.title));
+    }
+    return base;
+  }, [shelfSortedMovies, whereTarget?.seccion]);
+  const whereSectionIndex = useMemo(() => {
+    if (!whereTarget) return null;
+    const index = whereSectionMovies.findIndex((entry) => entry.id === whereTarget.id);
+    return index >= 0 ? index : null;
+  }, [whereSectionMovies, whereTarget]);
+  const whereWindow = useMemo(() => {
+    if (whereSectionIndex == null) return [];
+    const start = Math.max(0, whereSectionIndex - 2);
+    const end = Math.min(whereSectionMovies.length, whereSectionIndex + 3);
+    return whereSectionMovies.slice(start, end);
+  }, [whereSectionIndex, whereSectionMovies]);
 
   const tmdbUrl = currentMovie.tmdbId
     ? `https://www.themoviedb.org/${currentMovie.tmdbType === 'tv' || currentMovie.series ? 'tv' : 'movie'}/${currentMovie.tmdbId}`
@@ -1469,10 +1497,58 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
       </aside>
     </div>
   );
+  const whereStartIndex = whereSectionIndex != null ? Math.max(0, whereSectionIndex - 2) : 0;
+  const whereContent = (
+    <div className="detail-sheet__content-grid">
+      <div className="detail-sheet__main">
+        <div className="detail-sheet__section">
+          <h3>Dónde va</h3>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            Ubicación en estantería por orden de saga y luego título.
+          </p>
+          {!whereTarget && <p className="muted">No se pudo ubicar esta película en el orden de estantería.</p>}
+          {whereTarget && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <div className="where-section-title">Sección: {whereTarget.seccion}</div>
+                <div className="muted">
+                  {whereSectionIndex != null ? `${whereSectionIndex + 1} de ${whereSectionMovies.length}` : null}
+                </div>
+              </div>
+              <div className="movie-grid where-grid">
+                {whereWindow.map((entry, idx) => {
+                  const offset = whereStartIndex + idx - (whereSectionIndex ?? 0);
+                  const label = offset === 0 ? 'Buscada' : offset < 0 ? `Antes ${Math.abs(offset)}` : `Después ${offset}`;
+                  const isTarget = offset === 0;
+                  return (
+                    <div key={entry.id} style={{ display: 'grid', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: isTarget ? 'var(--accent-2)' : 'var(--text-muted)' }}>{label}</span>
+                      <div style={{ border: isTarget ? '2px solid var(--accent-2)' : '1px solid transparent', borderRadius: 16 }}>
+                        <MovieCard movie={entry} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+      <aside className="detail-sheet__sidebar">
+        <div className="detail-sheet__card">
+          <div className="detail-sheet__card-header">
+            <h3>Ubicación</h3>
+          </div>
+          <p className="muted">Este bloque replica la lógica de "Dónde va?" disponible en Admin.</p>
+        </div>
+      </aside>
+    </div>
+  );
 
   const tabs: TabItem[] = [
     { id: 'summary', label: 'Resumen', content: summaryContent },
-    { id: 'details', label: 'Detalles', content: detailsContent }
+    { id: 'details', label: 'Detalles', content: detailsContent },
+    { id: 'where', label: 'Dónde va', content: whereContent }
   ];
 
   if (isSeries) {
@@ -1588,6 +1664,5 @@ export const MovieDetailSheet: React.FC<Props> = ({ movie, onClose }) => {
 };
 
 export const MovieDetail: React.FC<Props> = (props) => <MovieDetailSheet {...props} />;
-
 
 
