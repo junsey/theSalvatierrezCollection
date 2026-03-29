@@ -2899,6 +2899,13 @@ a.ghost {
   }
 }
 
+@media (max-width: 640px) {
+  .detail-sheet .where-grid {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+}
+
 .movie-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border);
